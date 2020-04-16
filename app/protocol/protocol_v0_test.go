@@ -84,7 +84,7 @@ func TestProtocolV0_InitChainer_BeginBlocker_EndBlocker_ExportGenesis_ExportAppS
 	/****************************** test InitChainer ******************************/
 
 	// make  simulation of abci.RequestInitChain
-	genDoc, err := tm.GenesisDocFromFile("../../unittest/genesis.json")
+	genDoc, err := tm.GenesisDocFromFile("../genesis/genesis.json")
 	require.NoError(t, err)
 	genState, err := tmsm.MakeGenesisState(genDoc)
 	require.NoError(t, err)
@@ -107,7 +107,7 @@ func TestProtocolV0_InitChainer_BeginBlocker_EndBlocker_ExportGenesis_ExportAppS
 	// check the token
 	require.Equal(t, "OKT", protocolV0.GetTokenKeeper().GetTokenInfo(mockApp.GetDeliverStateCtx(), common.NativeToken).WholeName)
 
-	/****************************** test BeginBlocker ******************************/
+	///////////////////////////// test BeginBlocker /////////////////////////////
 
 	// create the pubkey 2 make the  beginBlockRequest
 	testPubKey := newPubKey("0B485CFC0EECC619440448436F8FC9DF40566F2369E72400281454CB552AFB50")
@@ -124,7 +124,7 @@ func TestProtocolV0_InitChainer_BeginBlocker_EndBlocker_ExportGenesis_ExportAppS
 	consAddr := protocolV0.GetDistrKeeper().GetPreviousProposerConsAddr(mockApp.GetDeliverStateCtx())
 	require.Equal(t, testConsAddr, consAddr)
 
-	/****************************** test EndBlocker ******************************/
+	///////////////////////////// test EndBlocker /////////////////////////////
 
 	var endBlockResponse abci.ResponseEndBlock
 
@@ -134,15 +134,15 @@ func TestProtocolV0_InitChainer_BeginBlocker_EndBlocker_ExportGenesis_ExportAppS
 	})
 
 	// check the event type "UpgradeAppVersion" in upgrade EndBlock
-	var exsited bool
+	var existed bool
 	for _, event := range endBlockResponse.Events {
 		if event.Type == upgrade.EventTypeUpgradeAppVersion {
-			exsited = true
+			existed = true
 		}
 	}
-	require.True(t, exsited)
+	require.True(t, existed)
 
-	/****************************** test ExportGenesis ******************************/
+	///////////////////////////// test ExportGenesis /////////////////////////////
 	var jsonRawMessageMap map[string]json.RawMessage
 
 	require.NotPanics(t, func() {
@@ -151,13 +151,6 @@ func TestProtocolV0_InitChainer_BeginBlocker_EndBlocker_ExportGenesis_ExportAppS
 
 	// the length of the Genesis exported map should be equal 2 the one of ModuleBasics
 	require.Equal(t, len(ModuleBasics), len(jsonRawMessageMap))
-
-	/****************************** test ExportAppStateAndValidators ******************************/
-	appState, _, err := protocolV0.ExportAppStateAndValidators(mockApp.GetDeliverStateCtx())
-	require.NoError(t, err)
-	var exportState ExportState
-	require.NoError(t, protocolV0.cdc.UnmarshalJSON(appState, &exportState))
-	require.NotEqual(t, 0, len(exportState.Accounts))
 }
 
 func TestProtocolV0_Stop(t *testing.T) {
@@ -170,14 +163,8 @@ func TestProtocolV0_Stop(t *testing.T) {
 	require.True(t, protocolv0.stopped)
 }
 
-func TestProtocolV0_ExportAppStateAndValidators(t *testing.T) {
-	//p:=NewProtocolV0(nil,0,nil,0,proto.ProtocolKeeper{})
-	//	//_,_,_=p.ExportAppStateAndValidators(sdk.Context{})
-
-}
-
 func TestProtocolV0_Hooks(t *testing.T) {
-	/********************** test isSystemFreeHook **********************/
+	///////////////////////////// test isSystemFreeHook /////////////////////////////
 	var mockMsgs1, mockMsgs2, mockMsgs3 []sdk.Msg
 	mockMsgs1 = append(mockMsgs1, order.MsgNewOrders{})
 	mockMsgs2 = append(mockMsgs2, order.MsgNewOrders{}, token.MsgSend{})

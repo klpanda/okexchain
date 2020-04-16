@@ -7,8 +7,6 @@ import (
 
 	"github.com/okex/okchain/app"
 
-	"github.com/okex/okchain/x/common"
-
 	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/client/keys"
 	"github.com/cosmos/cosmos-sdk/client/lcd"
@@ -19,6 +17,7 @@ import (
 	authcmd "github.com/cosmos/cosmos-sdk/x/auth/client/cli"
 	"github.com/cosmos/cosmos-sdk/x/bank"
 	tokencli "github.com/okex/okchain/x/token/client/cli"
+	debugcli "github.com/okex/okchain/x/debug/client/cli"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -27,21 +26,14 @@ import (
 	"github.com/tendermint/tendermint/libs/cli"
 )
 
-const (
-	storeAcc    = "acc"
-	storeOrder  = "order"
-	storeTo     = "token"
-	disStoreKey = "distribution"
-)
-
 func main() {
-	// Configure cobra to sort commands
+	// configure cobra to sort commands
 	cobra.EnableCommandSorting = false
 
-	// Instantiate the codec for the command line application
+	// instantiate the codec for the command line application
 	cdc := app.MakeCodec()
 
-	// Read in the configuration file for the sdk
+	// read in the configuration file for the sdk
 	config := sdk.GetConfig()
 	config.SetBech32PrefixForAccount(sdk.Bech32PrefixAccAddr, sdk.Bech32PrefixAccPub)
 	config.SetBech32PrefixForValidator(sdk.Bech32PrefixValAddr, sdk.Bech32PrefixValPub)
@@ -49,15 +41,14 @@ func main() {
 	config.Seal()
 
 	// TODO: setup keybase, viper object, etc. to be passed into
-	// the below functions and eliminate global vars, like we do
-	// with the cdc
+	// the below functions and eliminate global vars, like we do with the cdc
 
 	rootCmd := &cobra.Command{
 		Use:   "okchaincli",
 		Short: "Command line interface for interacting with okchaind",
 	}
 
-	// Add --chain-id to persistent flags and mark it required
+	// add --chain-id to persistent flags and mark it required
 	rootCmd.PersistentFlags().String(client.FlagChainID, "", "Chain ID of tendermint node")
 	rootCmd.PersistentFlags().String(client.FlagKeyPass, client.DefaultKeyPass, "Pass word of sender")
 
@@ -65,12 +56,13 @@ func main() {
 		return initConfig(rootCmd)
 	}
 
-	// Construct Root Command
+	// construct root command
 	rootCmd.AddCommand(
 		rpc.StatusCommand(),
 		client.ConfigCmd(app.DefaultCLIHome),
 		queryCmd(cdc),
 		txCmd(cdc),
+		debugcli.GetDebugCmd(cdc),
 		client.LineBreak,
 		lcd.ServeCommand(cdc, registerRoutes),
 		client.LineBreak,
@@ -80,11 +72,10 @@ func main() {
 		client.NewCompletionCmd(rootCmd, true),
 	)
 
-	// Add flags and prefix all env exposed with OKCHAIN
-	executor := cli.PrepareMainCmd(rootCmd, "OKDEX", app.DefaultCLIHome)
+	// add flags and prefix all env exposed with OKCHAIN
+	executor := cli.PrepareMainCmd(rootCmd, "OKCHAIN", app.DefaultCLIHome)
 
-	err := executor.Execute()
-	if err != nil {
+	if err := executor.Execute(); err != nil {
 		fmt.Printf("Failed executing CLI command: %s, exiting...\n", err)
 		os.Exit(1)
 	}
@@ -143,14 +134,6 @@ func txCmd(cdc *amino.Codec) *cobra.Command {
 	}
 
 	txCmd.RemoveCommand(cmdsToRemove...)
-
-	flags := txCmd.PersistentFlags()
-	flags.Uint64P(common.FlagConcurrentNumber, "c", 1, "concurrent thread number")
-	flags.Uint64P(common.FlagTxNumber, "x", 1, "tx number each thread will commit")
-	flags.MarkHidden(common.FlagConcurrentNumber)
-	flags.MarkHidden(common.FlagTxNumber)
-
-	//add default passphrase
 
 	return txCmd
 }

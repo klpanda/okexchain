@@ -25,42 +25,36 @@ import (
 // store keys used in all modules
 var (
 	kvStoreKeysMap = sdk.NewKVStoreKeys(
+		baseapp.MainStoreKey,
 		auth.StoreKey,
-
-		// for staking/distr rollback to cosmos-sdk
-		//staking.StoreKey, staking.DelegatorPoolKey, staking.RedelegationActonKey, staking.RedelegationKeyM, staking.UnbondingKey,
 		staking.StoreKey,
-
 		supply.StoreKey,
 		mint.StoreKey,
 		slashing.StoreKey,
-
-		// for staking/distr rollback to cosmos-sdk
-		//distr.StoreKey, distr.ValidatorsSnapshotKey, distr.DelegationSnapshotKey,
 		distr.StoreKey,
-
 		gov.StoreKey,
 		params.StoreKey,
-		token.StoreKey, token.KeyMint, token.KeyLock, token.KeyFreeze,
+		token.StoreKey, token.KeyMint, token.KeyLock,
 		order.OrderStoreKey,
 		upgrade.StoreKey,
-		// for test
-		debug.StoreKey,
-		baseapp.MainStoreKey,
 		dex.StoreKey, dex.TokenPairStoreKey,
+		debug.StoreKey,
 	)
 
 	transientStoreKeysMap = sdk.NewTransientStoreKeys(staking.TStoreKey, params.TStoreKey)
 )
 
+// GetMainStoreKey gets the main store key
 func GetMainStoreKey() *sdk.KVStoreKey {
 	return kvStoreKeysMap[baseapp.MainStoreKey]
 }
 
+// GetKVStoreKeysMap gets the map of all kv store keys
 func GetKVStoreKeysMap() map[string]*sdk.KVStoreKey {
 	return kvStoreKeysMap
 }
 
+// GetTransientStoreKeysMap gets the map of all transient store keys
 func GetTransientStoreKeysMap() map[string]*sdk.TransientStoreKey {
 	return transientStoreKeysMap
 }
