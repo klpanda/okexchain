@@ -243,7 +243,8 @@
       "supply": []
     },
     "token": {
-      "locked_asset": null,
+      "locked_assets": null,
+      "locked_fees": null,
       "params": {
         "base_fee": {
           "amount": "0.01250000",
