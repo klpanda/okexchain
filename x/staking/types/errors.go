@@ -225,12 +225,6 @@ func ErrInsufficientQuantity(codespace sdk.CodespaceType, quantity, minLimit str
 		"failed. insufficient quantity. [min limit]:%s, [quantity]:%s", minLimit, quantity)
 }
 
-// ErrInsufficientMinSelfDelegation returns an error when the msd is not enough
-func ErrInsufficientMinSelfDelegation(codespace sdk.CodespaceType, msdLimit sdk.Dec) sdk.Error {
-	return sdk.NewError(codespace, CodeInvalidMinSelfDelegation,
-		"failed. min self delegation is not allowed to be less than %s okt", msdLimit.String())
-}
-
 // ErrMoreMinSelfDelegation returns an error when the msd doesn't match the rest of votes on a validator
 func ErrMoreMinSelfDelegation(codespace sdk.CodespaceType, valAddr string) sdk.Error {
 	return sdk.NewError(codespace, CodeInvalidMinSelfDelegation,
@@ -271,4 +265,11 @@ func ErrNoDelegatorExisted(codespace sdk.CodespaceType, delAddr string) sdk.Erro
 func ErrTargetValsDuplicate(codespace sdk.CodespaceType) sdk.Error {
 	return sdk.NewError(codespace, CodeInvalidVote,
 		"failed. duplicate target validators")
+}
+
+// ErrAlreadyBinded returns an error when a delegator keeps binding a proxy before proxy register
+func ErrAlreadyBinded(codespace sdk.CodespaceType, delAddr string) sdk.Error {
+	return sdk.NewError(codespace, CodeInvalidProxy,
+		"failed. %s has already binded a proxy. it's necessary to unbind before proxy register",
+		delAddr)
 }
