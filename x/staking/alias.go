@@ -38,7 +38,6 @@ var (
 	ErrValidatorOwnerExists            = types.ErrValidatorOwnerExists
 	ErrValidatorPubKeyExists           = types.ErrValidatorPubKeyExists
 	ErrValidatorPubKeyTypeNotSupported = types.ErrValidatorPubKeyTypeNotSupported
-	ErrMinSelfDelegationInvalid        = types.ErrMinSelfDelegationInvalid
 	ErrBadDenom                        = types.ErrBadDenom
 	DefaultGenesisState                = types.DefaultGenesisState
 	NewMultiStakingHooks               = types.NewMultiStakingHooks
