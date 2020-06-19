@@ -4,11 +4,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/cosmos/cosmos-sdk/x/supply"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/x/auth"
+	"github.com/cosmos/cosmos-sdk/x/mock"
 	"github.com/stretchr/testify/require"
 	abci "github.com/tendermint/tendermint/abci/types"
 
@@ -919,20 +921,7 @@ func TestFeesTable(t *testing.T) {
 }
 
 func handleOrders(t *testing.T, baseasset string, quoteasset string, orders []*types.Order, blockheight int64) sdk.DecCoins {
-	TestTokenPairOwner := "okchain10q0rk5qnyag7wfvvt7rtphlw589m7frsmyq4ya"
-	addr, err := sdk.AccAddressFromBech32(TestTokenPairOwner)
-	require.Nil(t, err)
-	mapp, addrKeysSlice := getMockApp(t, len(orders))
-	keeper := mapp.orderKeeper
-	mapp.BeginBlock(abci.RequestBeginBlock{Header: abci.Header{Height: 2}})
-
-	var startHeight int64 = 10
-	ctx := mapp.BaseApp.NewContext(false, abci.Header{}).WithBlockHeight(startHeight)
-	mapp.supplyKeeper.SetSupply(ctx, supply.NewSupply(mapp.TotalCoinsSupply))
-
-	feeParams := types.DefaultTestParams()
-	mapp.orderKeeper.SetParams(ctx, &feeParams)
-
+	mapp, addrKeysSlice, ctx, startHeight := prepareTestTokenPair(t, baseasset, quoteasset, len(orders))
 	//init balance account0 & account1
 	decCoins, err := sdk.ParseDecCoins(fmt.Sprintf("%d%s,%d%s", 100, baseasset, 100, quoteasset))
 	require.Nil(t, err)
@@ -940,20 +929,7 @@ func handleOrders(t *testing.T, baseasset string, quoteasset string, orders []*t
 	require.Nil(t, err)
 	_, err = mapp.bankKeeper.AddCoins(ctx, addrKeysSlice[1].Address, decCoins)
 	require.Nil(t, err)
-	//init token pair
-	tokenPair := dex.TokenPair{
-		BaseAssetSymbol:  baseasset,
-		QuoteAssetSymbol: quoteasset,
-		InitPrice:        sdk.MustNewDecFromStr("10.0"),
-		MaxPriceDigit:    8,
-		MaxQuantityDigit: 8,
-		MinQuantity:      sdk.MustNewDecFromStr("0"),
-		Owner:            addr,
-		Deposits:         sdk.NewDecCoin(sdk.DefaultBondDenom, sdk.NewInt(0)),
-	}
-
-	err = mapp.dexKeeper.SaveTokenPair(ctx, &tokenPair)
-	require.Nil(t, err)
+	keeper := mapp.orderKeeper
 	acc := mapp.AccountKeeper.GetAccount(ctx, addrKeysSlice[0].Address)
 	require.NotNil(t, acc)
 	//place buy order
@@ -978,4 +954,105 @@ func handleOrders(t *testing.T, baseasset string, quoteasset string, orders []*t
 	acc1 := mapp.AccountKeeper.GetAccount(ctx, addrKeysSlice[1].Address)
 	require.NotNil(t, acc1)
 	return acc0.GetCoins()
+}
+
+func prepareTestTokenPair(
+	t *testing.T, baseasset string, quoteasset string, ordersCnt int,
+) (mockApp *MockApp, addrKeysSlice mock.AddrKeysSlice, ctx sdk.Context, startHeight int64) {
+	TestTokenPairOwner := "okchain10q0rk5qnyag7wfvvt7rtphlw589m7frsmyq4ya"
+	addr, err := sdk.AccAddressFromBech32(TestTokenPairOwner)
+	require.Nil(t, err)
+	mapp, addrKeysSlice := getMockApp(t, ordersCnt)
+	mapp.BeginBlock(abci.RequestBeginBlock{Header: abci.Header{Height: 2}})
+
+	startHeight = 10
+	ctx = mapp.BaseApp.NewContext(false, abci.Header{}).WithBlockHeight(startHeight)
+	mapp.supplyKeeper.SetSupply(ctx, supply.NewSupply(mapp.TotalCoinsSupply))
+
+	feeParams := types.DefaultTestParams()
+	mapp.orderKeeper.SetParams(ctx, &feeParams)
+
+	//init token pair
+	tokenPair := dex.TokenPair{
+		BaseAssetSymbol:  baseasset,
+		QuoteAssetSymbol: quoteasset,
+		InitPrice:        sdk.MustNewDecFromStr("10.0"),
+		MaxPriceDigit:    8,
+		MaxQuantityDigit: 8,
+		MinQuantity:      sdk.MustNewDecFromStr("0"),
+		Owner:            addr,
+		Deposits:         sdk.NewDecCoin(sdk.DefaultBondDenom, sdk.NewInt(0)),
+	}
+
+	err = mapp.dexKeeper.SaveTokenPair(ctx, &tokenPair)
+	require.Nil(t, err)
+	return mapp, addrKeysSlice, ctx, startHeight
+}
+
+func TestExpireOrders_TraverseVsIterator(t *testing.T) {
+	startTime := time.Now()
+	blockHeight := int64(10)
+	orderCnt := 1000000
+	order := types.MockOrder(
+				types.FormatOrderID(blockHeight, 1), types.TestTokenPair,
+				types.BuyOrder, "10", "1.0",
+			)
+	var orders []*types.Order
+	for i := 0; i < orderCnt; i++ {
+		orders = append(orders, order)
+	}
+
+	mapp, addrKeysSlice, ctx, _ := prepareTestTokenPair(t, "xxb", "tokt", len(orders))
+
+	//place buy order
+	for i := 0; i < len(orders); i++ {
+		orders[i].Sender = addrKeysSlice[i].Address
+		err := mapp.orderKeeper.PlaceOrder(ctx, orders[i])
+		require.NoError(t, err)
+	}
+	EndBlocker(ctx, mapp.orderKeeper)
+
+	// drop 1-9999 order
+	for i := 1; i < orderCnt; i++ {
+		orderID := types.FormatOrderID(blockHeight, int64(i))
+		mapp.orderKeeper.DropOrder(ctx, orderID)
+	}
+
+	orderNum := mapp.orderKeeper.GetBlockOrderNum(ctx, blockHeight)
+	fmt.Println(orderNum)
+	endTime := time.Now()
+	fmt.Println(endTime.Sub(startTime))
+
+	startTime = time.Now()
+	var index int64
+	for index = 0; index < orderNum; index++ {
+		orderID := types.FormatOrderID(blockHeight, index+1)
+		order := mapp.orderKeeper.GetOrder(ctx, orderID)
+		if order != nil && order.Status == types.OrderStatusOpen && !mapp.orderKeeper.IsProductLocked(ctx, order.Product) {
+			fmt.Println(order.OrderID)
+			//mapp.orderKeeper.ExpireOrder(ctx, order, nil)
+		}
+	}
+	endTime = time.Now()
+	fmt.Println(endTime.Sub(startTime))
+
+	startTime = time.Now()
+	store := ctx.KVStore(mapp.keyOrder)
+	iter := sdk.KVStoreReversePrefixIterator(store, []byte(formatOrderID(blockHeight)))
+	defer iter.Close()
+	for ; iter.Valid(); iter.Next() {
+		mapp.orderKeeper.Cdc().MustUnmarshalBinaryBare(iter.Value(), order)
+		fmt.Print(order.OrderID)
+		//mapp.orderKeeper.ExpireOrder(ctx, order, nil)
+	}
+	endTime = time.Now()
+	fmt.Println(endTime.Sub(startTime))
+}
+
+func formatOrderID(blockHeight int64) string {
+	format := "ID%010d-"
+	if blockHeight > 9999999999 {
+		format = "ID%d-"
+	}
+	return fmt.Sprintf(format, blockHeight)
 }

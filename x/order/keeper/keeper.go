@@ -526,3 +526,7 @@ func (k Keeper) FilterDelistedProducts(ctx sdk.Context, products []string) []str
 	}
 	return cleanProducts
 }
+
+func (k Keeper) Cdc() *codec.Codec {
+	return k.cdc
+}
