@@ -992,7 +992,7 @@ func prepareTestTokenPair(
 func TestExpireOrders_TraverseVsIterator(t *testing.T) {
 	startTime := time.Now()
 	blockHeight := int64(10)
-	orderCnt := 1000000
+	orderCnt := 10000
 	order := types.MockOrder(
 				types.FormatOrderID(blockHeight, 1), types.TestTokenPair,
 				types.BuyOrder, "10", "1.0",
@@ -1004,7 +1004,7 @@ func TestExpireOrders_TraverseVsIterator(t *testing.T) {
 
 	mapp, addrKeysSlice, ctx, _ := prepareTestTokenPair(t, "xxb", "tokt", len(orders))
 
-	//place buy order
+	//place orders
 	for i := 0; i < len(orders); i++ {
 		orders[i].Sender = addrKeysSlice[i].Address
 		err := mapp.orderKeeper.PlaceOrder(ctx, orders[i])
@@ -1012,24 +1012,23 @@ func TestExpireOrders_TraverseVsIterator(t *testing.T) {
 	}
 	EndBlocker(ctx, mapp.orderKeeper)
 
-	// drop 1-9999 order
-	for i := 1; i < orderCnt; i++ {
+	// drop 1~orderCnt-1 orders
+	for i := 1; i < orderCnt-2; i++ {
 		orderID := types.FormatOrderID(blockHeight, int64(i))
 		mapp.orderKeeper.DropOrder(ctx, orderID)
 	}
-
-	orderNum := mapp.orderKeeper.GetBlockOrderNum(ctx, blockHeight)
-	fmt.Println(orderNum)
+	mapp.Commit()
 	endTime := time.Now()
 	fmt.Println(endTime.Sub(startTime))
 
 	startTime = time.Now()
+	orderNum := mapp.orderKeeper.GetBlockOrderNum(ctx, blockHeight)
 	var index int64
 	for index = 0; index < orderNum; index++ {
 		orderID := types.FormatOrderID(blockHeight, index+1)
 		order := mapp.orderKeeper.GetOrder(ctx, orderID)
 		if order != nil && order.Status == types.OrderStatusOpen && !mapp.orderKeeper.IsProductLocked(ctx, order.Product) {
-			fmt.Println(order.OrderID)
+			//fmt.Println(order.OrderID)
 			//mapp.orderKeeper.ExpireOrder(ctx, order, nil)
 		}
 	}
@@ -1037,12 +1036,13 @@ func TestExpireOrders_TraverseVsIterator(t *testing.T) {
 	fmt.Println(endTime.Sub(startTime))
 
 	startTime = time.Now()
+	prefix := append(types.OrderKey, []byte(formatOrderID(blockHeight))...)
 	store := ctx.KVStore(mapp.keyOrder)
-	iter := sdk.KVStoreReversePrefixIterator(store, []byte(formatOrderID(blockHeight)))
+	iter := sdk.KVStorePrefixIterator(store, prefix)
 	defer iter.Close()
 	for ; iter.Valid(); iter.Next() {
 		mapp.orderKeeper.Cdc().MustUnmarshalBinaryBare(iter.Value(), order)
-		fmt.Print(order.OrderID)
+		//fmt.Println(order.OrderID)
 		//mapp.orderKeeper.ExpireOrder(ctx, order, nil)
 	}
 	endTime = time.Now()
