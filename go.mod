@@ -3,11 +3,12 @@ module github.com/okex/okchain
 go 1.12
 
 require (
-	github.com/btcsuite/btcd v0.0.0-20190523000118-16327141da8c // indirect
+	github.com/btcsuite/btcd v0.0.0-20190523000118-16327141da8c
 	github.com/cosmos/cosmos-sdk v0.37.8
 	github.com/cosmos/go-bip39 v0.0.0-20180819234021-555e2067c45d // indirect
 	github.com/denisenkom/go-mssqldb v0.0.0-20190515213511-eb9f6a1743f3 // indirect
 	github.com/erikstmartin/go-testdb v0.0.0-20160219214506-8d10e4a1bae5 // indirect
+	github.com/ethereum/go-ethereum v1.9.15
 	github.com/go-kit/kit v0.9.0
 	github.com/go-sql-driver/mysql v1.4.1
 	github.com/gofrs/uuid v3.2.0+incompatible // indirect
@@ -37,14 +38,12 @@ require (
 	github.com/tendermint/go-amino v0.15.1
 	github.com/tendermint/tendermint v0.32.10
 	github.com/tendermint/tm-db v0.2.0
-	golang.org/x/crypto v0.0.0-20190701094942-4def268fd1a4 // indirect
-	golang.org/x/net v0.0.0-20190724013045-ca1201d0de80 // indirect
-	golang.org/x/text v0.3.2 // indirect
+	golang.org/x/crypto v0.0.0-20200311171314-f7b00557c8c4
 	gopkg.in/yaml.v2 v2.2.7
 )
 
 replace (
-	github.com/cosmos/cosmos-sdk => github.com/okex/cosmos-sdk v0.37.9-testnet
+	github.com/cosmos/cosmos-sdk => github.com/iavl/cosmos-sdk v0.37.9-testnet
 	github.com/tendermint/iavl => github.com/okex/iavl v0.12.4-okchain
 	github.com/tendermint/tendermint => github.com/okex/tendermint v0.32.10-okchain1
 )
