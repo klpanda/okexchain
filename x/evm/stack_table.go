@@ -1,4 +1,4 @@
-package vm
+package evm
 
 func minSwapStack(n int) int {
 	return minStack(n, n)

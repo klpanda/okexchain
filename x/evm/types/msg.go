@@ -42,7 +42,7 @@ func (msg MsgContract) ValidateBasic() sdk.Error {
 		return sdk.ErrInvalidCoins("coins of amount is invalid: " + msg.Amount.String())
 	}
 	if len(msg.Payload) == 0 {
-		return ErrNoPayload()
+		return ErrNoPayload("")
 	}
 
 	return nil

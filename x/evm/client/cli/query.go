@@ -22,7 +22,7 @@ import (
 	"github.com/okex/okchain/x/evm/types"
 )
 
-var ZeroAmount = sdk.NewCoin(sdk.NativeTokenName, sdk.NewInt(0))
+var ZeroAmount = sdk.NewCoin(sdk.DefaultBondDenom, sdk.NewInt(0))
 
 func GetQueryCmd(queryRoute string, cdc *codec.Codec) *cobra.Command {
 	vmQueryCmd := &cobra.Command{

@@ -1,4 +1,4 @@
-package vm
+package evm
 
 type (
 	executionFunc func(pc *uint64, interpreter *EVMInterpreter, contract *Contract, memory *Memory, stack *Stack) ([]byte, error)

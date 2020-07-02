@@ -1,4 +1,4 @@
-package vm
+package evm
 
 import (
 	"github.com/okex/okchain/x/evm/common"

@@ -27,6 +27,7 @@ import (
 	"github.com/okex/okchain/x/dex"
 	dexClient "github.com/okex/okchain/x/dex/client"
 	distr "github.com/okex/okchain/x/distribution"
+	"github.com/okex/okchain/x/evm"
 	"github.com/okex/okchain/x/genutil"
 	"github.com/okex/okchain/x/gov"
 	"github.com/okex/okchain/x/gov/keeper"
@@ -78,6 +79,7 @@ var (
 		upgrade.AppModuleBasic{},
 		stream.AppModuleBasic{},
 		debug.AppModuleBasic{},
+		evm.AppModuleBasic{},
 	)
 
 	// module account permissions for bankKeeper and supplyKeeper
@@ -92,6 +94,7 @@ var (
 		order.ModuleName:          nil,
 		backend.ModuleName:        nil,
 		dex.ModuleName:            nil,
+		evm.ModuleName:            nil,
 	}
 )
 
@@ -126,6 +129,7 @@ type ProtocolV0 struct {
 	streamKeeper   stream.Keeper
 	upgradeKeeper  upgrade.Keeper
 	debugKeeper    debug.Keeper
+	evmKeeper      evm.Keeper
 
 	stopped     bool
 	anteHandler sdk.AnteHandler // ante handler for fee and auth
@@ -267,6 +271,7 @@ func (p *ProtocolV0) produceKeepers() {
 	orderSubspace := p.paramsKeeper.Subspace(order.DefaultParamspace)
 	upgradeSubspace := p.paramsKeeper.Subspace(upgrade.DefaultParamspace)
 	dexSubspace := p.paramsKeeper.Subspace(dex.DefaultParamspace)
+	evmSubspace := p.paramsKeeper.Subspace(evm.DefaultParamspace)
 
 	// 2.add keepers
 	p.accountKeeper = auth.NewAccountKeeper(p.cdc, p.keys[auth.StoreKey], authSubspace, auth.ProtoBaseAccount)
@@ -337,6 +342,8 @@ func (p *ProtocolV0) produceKeepers() {
 		p.cdc, p.keys[upgrade.StoreKey], p.protocolKeeper, p.stakingKeeper, p.bankKeeper, upgradeSubspace,
 	)
 	p.debugKeeper = debug.NewDebugKeeper(p.cdc, p.keys[debug.StoreKey], p.orderKeeper, auth.FeeCollectorName, p.Stop)
+	p.evmKeeper = evm.NewKeeper(p.cdc, p.keys[evm.StoreKey], p.keys[evm.CodeKey],
+		p.keys[evm.LogKey], p.keys[evm.StoreDebugKey], evmSubspace, p.accountKeeper)
 }
 
 // moduleAccountAddrs returns all the module account addresses
@@ -373,6 +380,7 @@ func (p *ProtocolV0) setManager() {
 		backend.NewAppModule(p.backendKeeper),
 		stream.NewAppModule(p.streamKeeper),
 		upgrade.NewAppModule(p.upgradeKeeper),
+		evm.NewAppModule(p.evmKeeper),
 
 		debug.NewAppModule(p.debugKeeper),
 	)
@@ -397,6 +405,7 @@ func (p *ProtocolV0) setManager() {
 		staking.ModuleName,
 		backend.ModuleName,
 		stream.ModuleName,
+		evm.ModuleName,
 		upgrade.ModuleName,
 	)
 
@@ -417,6 +426,7 @@ func (p *ProtocolV0) setManager() {
 		crisis.ModuleName,
 		genutil.ModuleName,
 		params.ModuleName,
+		evm.ModuleName,
 	)
 }
 

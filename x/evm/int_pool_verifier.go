@@ -1,6 +1,6 @@
 // +build VERIFY_EVM_INTEGER_POOL
 
-package vm
+package evm
 
 import "fmt"
 

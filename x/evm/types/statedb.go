@@ -13,7 +13,6 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/x/auth"
 	"github.com/cosmos/cosmos-sdk/x/auth/types"
-	"github.com/okex/okchain/x/evm/common"
 	"github.com/okex/okchain/x/evm/common/math"
 )
 
@@ -46,13 +45,13 @@ type CommitStateDB struct {
 	// The refund counter, also used by state transitioning.
 	refund uint64
 
-	thash, bhash common.Hash
+	thash, bhash sdk.Hash
 	txIndex      int
-	logs         map[common.Hash][]*Log
+	logs         map[sdk.Hash][]*Log
 
 	// TODO: Determine if we actually need this as we do not need preimages in
 	// the SDK, but it seems to be used elsewhere in Geth.
-	preimages map[common.Hash][]byte
+	preimages map[sdk.Hash][]byte
 
 	// DB error.
 	// State objects are used by the consensus core and VM which are
@@ -88,8 +87,8 @@ func NewCommitStateDB(ak auth.AccountKeeper, storageKey, codeKey, logKey, storag
 		storageDebugKey:   storageDebugKey,
 		stateObjects:      make(map[string]*stateObject),
 		stateObjectsDirty: make(map[string]struct{}),
-		logs:              make(map[common.Hash][]*Log),
-		preimages:         make(map[common.Hash][]byte),
+		logs:              make(map[sdk.Hash][]*Log),
+		preimages:         make(map[sdk.Hash][]byte),
 		journal:           newJournal(),
 		debug:             true,
 	}
@@ -103,8 +102,8 @@ func NewStateDB(db *CommitStateDB) *CommitStateDB {
 		storageDebugKey:   db.storageDebugKey,
 		stateObjects:      make(map[string]*stateObject),
 		stateObjectsDirty: make(map[string]struct{}),
-		logs:              make(map[common.Hash][]*Log),
-		preimages:         make(map[common.Hash][]byte),
+		logs:              make(map[sdk.Hash][]*Log),
+		preimages:         make(map[sdk.Hash][]byte),
 		journal:           newJournal(),
 		debug:             true,
 	}
@@ -117,7 +116,7 @@ func (csdb *CommitStateDB) WithContext(ctx sdk.Context) *CommitStateDB {
 }
 
 func (csdb *CommitStateDB) WithTxHash(txHash []byte) *CommitStateDB {
-	csdb.thash = common.BytesToHash(txHash)
+	csdb.thash = sdk.BytesToHash(txHash)
 	return csdb
 }
 
@@ -158,7 +157,7 @@ func (csdb *CommitStateDB) SetNonce(addr sdk.AccAddress, nonce uint64) {
 }
 
 // SetState sets the storage state with a key, value pair for an account.
-func (csdb *CommitStateDB) SetState(addr sdk.AccAddress, key, value common.Hash) {
+func (csdb *CommitStateDB) SetState(addr sdk.AccAddress, key, value sdk.Hash) {
 	so := csdb.GetOrNewStateObject(addr)
 	if so != nil {
 		so.SetState(key, value)
@@ -169,7 +168,7 @@ func (csdb *CommitStateDB) SetState(addr sdk.AccAddress, key, value common.Hash)
 func (csdb *CommitStateDB) SetCode(addr sdk.AccAddress, code []byte) {
 	so := csdb.GetOrNewStateObject(addr)
 	if so != nil {
-		so.SetCode(common.BytesToHash(crypto.Sha256(code)), code)
+		so.SetCode(sdk.BytesToHash(crypto.Sha256(code)), code)
 	}
 }
 
@@ -185,7 +184,7 @@ func (csdb *CommitStateDB) AddLog(log *Log) {
 }
 
 // AddPreimage records a SHA3 preimage seen by the VM.
-func (csdb *CommitStateDB) AddPreimage(hash common.Hash, preimage []byte) {
+func (csdb *CommitStateDB) AddPreimage(hash sdk.Hash, preimage []byte) {
 	if _, ok := csdb.preimages[hash]; !ok {
 		csdb.journal.append(addPreimageChange{hash: hash})
 
@@ -196,7 +195,7 @@ func (csdb *CommitStateDB) AddPreimage(hash common.Hash, preimage []byte) {
 }
 
 // Preimages returns a list of SHA3 preimages that have been submitted.
-func (csdb *CommitStateDB) Preimages() map[common.Hash][]byte {
+func (csdb *CommitStateDB) Preimages() map[sdk.Hash][]byte {
 	return csdb.preimages
 }
 
@@ -248,7 +247,7 @@ func (csdb *CommitStateDB) TxIndex() int {
 }
 
 // BlockHash returns the current block hash set by Prepare.
-func (csdb *CommitStateDB) BlockHash() common.Hash {
+func (csdb *CommitStateDB) BlockHash() sdk.Hash {
 	return csdb.bhash
 }
 
@@ -278,38 +277,38 @@ func (csdb *CommitStateDB) GetCodeSize(addr sdk.AccAddress) int {
 }
 
 // GetCodeHash returns the code hash for a given account.
-func (csdb *CommitStateDB) GetCodeHash(addr sdk.AccAddress) common.Hash {
+func (csdb *CommitStateDB) GetCodeHash(addr sdk.AccAddress) sdk.Hash {
 	so := csdb.getStateObject(addr)
 	if so == nil {
-		return common.Hash{}
+		return sdk.Hash{}
 	}
 
-	return common.BytesToHash(so.CodeHash())
+	return sdk.BytesToHash(so.CodeHash())
 }
 
 // GetState retrieves a value from the given account's storage store.
-func (csdb *CommitStateDB) GetState(addr sdk.AccAddress, hash common.Hash) common.Hash {
+func (csdb *CommitStateDB) GetState(addr sdk.AccAddress, hash sdk.Hash) sdk.Hash {
 	so := csdb.getStateObject(addr)
 	if so != nil {
 		return so.GetState(hash)
 	}
 
-	return common.Hash{}
+	return sdk.Hash{}
 }
 
 // GetCommittedState retrieves a value from the given account's committed
 // storage.
-func (csdb *CommitStateDB) GetCommittedState(addr sdk.AccAddress, hash common.Hash) common.Hash {
+func (csdb *CommitStateDB) GetCommittedState(addr sdk.AccAddress, hash sdk.Hash) sdk.Hash {
 	so := csdb.getStateObject(addr)
 	if so != nil {
 		return so.GetCommittedState(hash)
 	}
 
-	return common.Hash{}
+	return sdk.Hash{}
 }
 
 // GetLogs returns the current logs for a given hash in the state.
-func (csdb *CommitStateDB) GetLogs(hash common.Hash) (logs []*Log) {
+func (csdb *CommitStateDB) GetLogs(hash sdk.Hash) (logs []*Log) {
 	r, ok := csdb.logs[hash]
 	if ok {
 		return r
@@ -367,7 +366,7 @@ func (csdb *CommitStateDB) HasSuicided(addr sdk.AccAddress) bool {
 // in the cache, it will either be removed, or have it's code set and/or it's
 // state (storage) updated. In addition, the state object (account) itself will
 // be written. Finally, the root hash (version) will be returned.
-func (csdb *CommitStateDB) Commit(deleteEmptyObjects bool) (root common.Hash, err error) {
+func (csdb *CommitStateDB) Commit(deleteEmptyObjects bool) (root sdk.Hash, err error) {
 	defer csdb.clearJournalAndRefund()
 
 	// remove dirty state object entries based on the journal
@@ -416,7 +415,7 @@ func (csdb *CommitStateDB) commitLogs() {
 	sort.Strings(hs)
 
 	for _, h := range hs {
-		hash := common.HexToHash(h)
+		hash := sdk.HexToHash(h)
 		d, err := json.Marshal(csdb.logs[hash])
 		if err != nil {
 			ctx.Logger().Error(err.Error())
@@ -610,14 +609,14 @@ func (csdb *CommitStateDB) Suicide(addr sdk.AccAddress) bool {
 // Reset clears out all ephemeral state objects from the state db, but keeps
 // the underlying account mapper and store keys to avoid reloading data for the
 // next operations.
-func (csdb *CommitStateDB) Reset(_ common.Hash) error {
+func (csdb *CommitStateDB) Reset(_ sdk.Hash) error {
 	csdb.stateObjects = make(map[string]*stateObject)
 	csdb.stateObjectsDirty = make(map[string]struct{})
-	csdb.thash = common.Hash{}
-	csdb.bhash = common.Hash{}
+	csdb.thash = sdk.Hash{}
+	csdb.bhash = sdk.Hash{}
 	csdb.txIndex = 0
-	csdb.logs = make(map[common.Hash][]*Log)
-	csdb.preimages = make(map[common.Hash][]byte)
+	csdb.logs = make(map[sdk.Hash][]*Log)
+	csdb.preimages = make(map[sdk.Hash][]byte)
 
 	csdb.clearJournalAndRefund()
 	return nil
@@ -633,7 +632,7 @@ func (csdb *CommitStateDB) UpdateAccounts() {
 		accI := csdb.ak.GetAccount(csdb.ctx, addr)
 		acc, ok := accI.(*types.BaseAccount)
 		if ok {
-			if (so.Balance() != acc.GetCoins().AmountOf(sdk.DefaultBondDenom).BigInt()) || (so.Nonce() != acc.GetSequence()) {
+			if (sdk.NewDecFromBigInt(so.Balance()) != acc.GetCoins().AmountOf(sdk.DefaultBondDenom)) || (so.Nonce() != acc.GetSequence()) {
 				// If queried account's balance or nonce are invalid, update the account pointer
 				so.account = acc
 			}
@@ -656,7 +655,7 @@ func (csdb *CommitStateDB) clearJournalAndRefund() {
 
 // Prepare sets the current transaction hash and index and block hash which is
 // used when the EVM emits new state logs.
-func (csdb *CommitStateDB) Prepare(thash, bhash common.Hash, txi int) {
+func (csdb *CommitStateDB) Prepare(thash, bhash sdk.Hash, txi int) {
 	csdb.thash = thash
 	csdb.bhash = bhash
 	csdb.txIndex = txi
@@ -695,8 +694,8 @@ func (csdb *CommitStateDB) Copy() *CommitStateDB {
 		stateObjects:      make(map[string]*stateObject, len(csdb.journal.dirties)),
 		stateObjectsDirty: make(map[string]struct{}, len(csdb.journal.dirties)),
 		refund:            csdb.refund,
-		logs:              make(map[common.Hash][]*Log, len(csdb.logs)),
-		preimages:         make(map[common.Hash][]byte),
+		logs:              make(map[sdk.Hash][]*Log, len(csdb.logs)),
+		preimages:         make(map[sdk.Hash][]byte),
 		journal:           newJournal(),
 	}
 
@@ -743,7 +742,7 @@ func (csdb *CommitStateDB) Copy() *CommitStateDB {
 
 // ForEachStorage iterates over each storage items, all invokes the provided
 // callback on each key, value pair .
-func (csdb *CommitStateDB) ForEachStorage(addr sdk.AccAddress, cb func(key, value common.Hash) bool) error {
+func (csdb *CommitStateDB) ForEachStorage(addr sdk.AccAddress, cb func(key, value sdk.Hash) bool) error {
 	so := csdb.getStateObject(addr)
 	if so == nil {
 		return nil
@@ -753,7 +752,7 @@ func (csdb *CommitStateDB) ForEachStorage(addr sdk.AccAddress, cb func(key, valu
 	iter := sdk.KVStorePrefixIterator(store, so.Address().Bytes())
 
 	for ; iter.Valid(); iter.Next() {
-		key := common.BytesToHash(iter.Key())
+		key := sdk.BytesToHash(iter.Key())
 		value := iter.Value()
 
 		if value, dirty := so.dirtyStorage[key]; dirty {
@@ -761,7 +760,7 @@ func (csdb *CommitStateDB) ForEachStorage(addr sdk.AccAddress, cb func(key, valu
 			continue
 		}
 
-		cb(key, common.BytesToHash(value))
+		cb(key, sdk.BytesToHash(value))
 	}
 
 	iter.Close()

@@ -1,4 +1,4 @@
-package vm
+package evm
 
 import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -93,23 +93,23 @@ func gasSStore(evm *EVM, contract *Contract, stack *Stack, mem *Memory, memorySi
 	}
 	original := evm.StateDB.GetCommittedState(contract.Address(), common.BigToHash(x))
 	if original == current {
-		if original == (common.Hash{}) { // create slot (2.1.1)
+		if original == (sdk.Hash{}) { // create slot (2.1.1)
 			return SstoreInitGas, nil
 		}
-		if value == (common.Hash{}) { // delete slot (2.1.2b)
+		if value == (sdk.Hash{}) { // delete slot (2.1.2b)
 			evm.StateDB.AddRefund(SstoreClearRefund)
 		}
 		return SstoreCleanGas, nil // write existing slot (2.1.2)
 	}
-	if original != (common.Hash{}) {
-		if current == (common.Hash{}) { // recreate slot (2.2.1.1)
+	if original != (sdk.Hash{}) {
+		if current == (sdk.Hash{}) { // recreate slot (2.2.1.1)
 			evm.StateDB.SubRefund(SstoreClearRefund)
-		} else if value == (common.Hash{}) { // delete slot (2.2.1.2)
+		} else if value == (sdk.Hash{}) { // delete slot (2.2.1.2)
 			evm.StateDB.AddRefund(SstoreClearRefund)
 		}
 	}
 	if original == value {
-		if original == (common.Hash{}) { // reset to original inexistent slot (2.2.2.1)
+		if original == (sdk.Hash{}) { // reset to original inexistent slot (2.2.2.1)
 			evm.StateDB.AddRefund(SstoreInitRefund)
 		} else { // reset to original existing slot (2.2.2.2)
 			evm.StateDB.AddRefund(SstoreCleanRefund)

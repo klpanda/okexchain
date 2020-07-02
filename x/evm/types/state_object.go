@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/okex/okchain/x/evm/common"
 	"github.com/tendermint/tendermint/crypto"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -19,12 +18,12 @@ var (
 type (
 	// StateObject interface for interacting with state object
 	StateObject interface {
-		GetCommittedState(key common.Hash) common.Hash
-		GetState(key common.Hash) common.Hash
-		SetState(key, value common.Hash)
+		GetCommittedState(key sdk.Hash) sdk.Hash
+		GetState(key sdk.Hash) sdk.Hash
+		SetState(key, value sdk.Hash)
 
 		Code() []byte
-		SetCode(codeHash common.Hash, code []byte)
+		SetCode(codeHash sdk.Hash, code []byte)
 		CodeHash() []byte
 
 		AddBalance(amount *big.Int)
@@ -92,7 +91,7 @@ func newObject(db *CommitStateDB, accProto authexported.Account) *stateObject {
 
 // SetState updates a value in account storage. Note, the key will be prefixed
 // with the address of the state object.
-func (so *stateObject) SetState(key, value common.Hash) {
+func (so *stateObject) SetState(key, value sdk.Hash) {
 	// if the new value is the same as old, don't set
 	prev := so.GetState(key)
 	if prev == value {
@@ -111,12 +110,12 @@ func (so *stateObject) SetState(key, value common.Hash) {
 	so.setState(prefixKey, value)
 }
 
-func (so *stateObject) setState(key, value common.Hash) {
+func (so *stateObject) setState(key, value sdk.Hash) {
 	so.dirtyStorage[key] = value
 }
 
 // SetCode sets the state object's code.
-func (so *stateObject) SetCode(codeHash common.Hash, code []byte) {
+func (so *stateObject) SetCode(codeHash sdk.Hash, code []byte) {
 	prevCode := so.Code()
 
 	so.stateDB.journal.append(codeChange{
@@ -128,7 +127,7 @@ func (so *stateObject) SetCode(codeHash common.Hash, code []byte) {
 	so.setCode(codeHash, code)
 }
 
-func (so *stateObject) setCode(codeHash common.Hash, code []byte) {
+func (so *stateObject) setCode(codeHash sdk.Hash, code []byte) {
 	so.code = code
 	so.account.CodeHash = codeHash.Bytes()
 	so.dirtyCode = true
@@ -211,8 +210,8 @@ func (so *stateObject) markSuicided() {
 
 type DebugAccKV struct {
 	AccAddr sdk.AccAddress `json:"acc_addr"`
-	K       common.Hash    `json:"k"`
-	V       common.Hash    `json:"v"`
+	K       sdk.Hash       `json:"k"`
+	V       sdk.Hash       `json:"v"`
 }
 
 func (dkv *DebugAccKV) String() string {
@@ -225,7 +224,7 @@ func (dkv *DebugAccKV) MarshalJSON() ([]byte, error) {
 
 var DEBUG_KEY_PREFIX = ([]byte)("DEBUG:")
 
-func (dkv *DebugAccKV) Reset(accAddr sdk.AccAddress, k, v common.Hash) *DebugAccKV {
+func (dkv *DebugAccKV) Reset(accAddr sdk.AccAddress, k, v sdk.Hash) *DebugAccKV {
 	dkv.AccAddr = accAddr
 	dkv.K = k
 	dkv.V = v
@@ -236,11 +235,11 @@ func (dkv *DebugAccKV) Reset(accAddr sdk.AccAddress, k, v common.Hash) *DebugAcc
 func (dkv *DebugAccKV) DebugAccKVFromKV(k, v []byte) {
 	addrByte := k[len(DEBUG_KEY_PREFIX) : len(DEBUG_KEY_PREFIX)+20]
 	dkv.AccAddr = addrByte
-	dkv.K = common.BytesToHash(k[len(DEBUG_KEY_PREFIX)+20:])
-	dkv.V = common.BytesToHash(v)
+	dkv.K = sdk.BytesToHash(k[len(DEBUG_KEY_PREFIX)+20:])
+	dkv.V = sdk.BytesToHash(v)
 }
 
-func (dkv *DebugAccKV) DebugAccKVToKV() (k []byte, v common.Hash) {
+func (dkv *DebugAccKV) DebugAccKVToKV() (k []byte, v sdk.Hash) {
 	k = append(k, DEBUG_KEY_PREFIX...)
 	k = append(k, dkv.AccAddr...)
 	k = append(k, dkv.K.Bytes()...)
@@ -267,7 +266,7 @@ func (so *stateObject) commitState() {
 
 		so.originStorage[key] = value
 
-		if (value == common.Hash{}) {
+		if (value == sdk.Hash{}) {
 			store.Delete(key.Bytes())
 
 			if debugStore != nil {
@@ -343,7 +342,7 @@ func (so *stateObject) Code() []byte {
 
 // GetState retrieves a value from the account storage trie. Note, the key will
 // be prefixed with the address of the state object.
-func (so *stateObject) GetState(key common.Hash) common.Hash {
+func (so *stateObject) GetState(key sdk.Hash) sdk.Hash {
 	prefixKey := so.GetStorageByAddressKey(key.Bytes())
 
 	// if we have a dirty value for this state entry, return it
@@ -358,7 +357,7 @@ func (so *stateObject) GetState(key common.Hash) common.Hash {
 
 // GetCommittedState retrieves a value from the committed account storage trie.
 // Note, the key will be prefixed with the address of the state object.
-func (so *stateObject) GetCommittedState(key common.Hash) common.Hash {
+func (so *stateObject) GetCommittedState(key sdk.Hash) sdk.Hash {
 	prefixKey := so.GetStorageByAddressKey(key.Bytes())
 
 	// if we have the original value cached, return that
@@ -422,7 +421,7 @@ func (so *stateObject) touch() {
 
 // GetStorageByAddressKey returns a hash of the composite key for a state
 // object's storage prefixed with it's address.
-func (so stateObject) GetStorageByAddressKey(key []byte) common.Hash {
+func (so stateObject) GetStorageByAddressKey(key []byte) sdk.Hash {
 	prefix := so.Address().Bytes()
 	compositeKey := make([]byte, len(prefix)+len(key))
 

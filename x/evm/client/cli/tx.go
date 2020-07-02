@@ -38,7 +38,7 @@ func ContractCreateCmd(cdc *codec.Codec) *cobra.Command {
 			txBldr := auth.NewTxBuilderFromCLI().WithTxEncoder(utils.GetTxEncoder(cdc))
 			cliCtx := context.NewCLIContext().WithCodec(cdc)
 
-			coin := sdk.NewCoin(sdk.NativeTokenName, sdk.NewInt(0))
+			coin := sdk.NewCoin(sdk.DefaultBondDenom, sdk.NewInt(0))
 			amount := viper.GetString(flagAmount)
 			if len(amount) > 0 {
 				coinInput, err := sdk.ParseCoin(amount)
@@ -98,7 +98,7 @@ func ContractCallCmd(cdc *codec.Codec) *cobra.Command {
 			txBldr := auth.NewTxBuilderFromCLI().WithTxEncoder(utils.GetTxEncoder(cdc))
 			cliCtx := context.NewCLIContext().WithCodec(cdc)
 
-			coin := sdk.NewCoin(sdk.NativeTokenName, sdk.NewInt(0))
+			coin := sdk.NewCoin(sdk.DefaultBondDenom, sdk.NewInt(0))
 			amount := viper.GetString(flagAmount)
 			if len(amount) > 0 {
 				coinInput, err := sdk.ParseCoin(amount)

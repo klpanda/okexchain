@@ -1,4 +1,4 @@
-package vm
+package evm
 
 // ChainConfig is the core config which determines the blockchain settings.
 //
