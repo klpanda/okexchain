@@ -15,22 +15,22 @@ import (
 
 func registerQueryRoutes(cliCtx context.CLIContext, r *mux.Router) {
 	r.HandleFunc(
-		"/vm/storage/{addr}/{key}",
+		"/evm/storage/{addr}/{key}",
 		getStorageFn(cliCtx),
 	).Methods("GET")
 
 	r.HandleFunc(
-		fmt.Sprintf("/vm/%s", types.EstimateGas),
+		fmt.Sprintf("/evm/%s", types.EstimateGas),
 		estimateGasFn(cliCtx),
 	).Methods("POST")
 
 	r.HandleFunc(
-		fmt.Sprintf("/vm/%s/{addr}", types.QueryCode),
+		fmt.Sprintf("/evm/%s/{addr}", types.QueryCode),
 		getCodeFn(cliCtx),
 	).Methods("GET")
 
 	r.HandleFunc(
-		"/vm/logs/{txId}",
+		"/evm/logs/{txId}",
 		getLogFn(cliCtx),
 	).Methods("GET")
 }
@@ -46,7 +46,7 @@ func queryStorage(cliCtx context.CLIContext) http.HandlerFunc {
 			return
 		}
 
-		route := fmt.Sprintf("custom/vm/%s/%s/%s", types.QueryStorage, addr, key)
+		route := fmt.Sprintf("custom/evm/%s/%s/%s", types.QueryStorage, addr, key)
 		res, height, err := cliCtx.Query(route)
 		if err != nil {
 			return
@@ -80,7 +80,7 @@ func estimateGas(cliCtx context.CLIContext) http.HandlerFunc {
 			return
 		}
 
-		route := fmt.Sprintf("custom/vm/%s", types.EstimateGas)
+		route := fmt.Sprintf("custom/evm/%s", types.EstimateGas)
 		res, height, err := cliCtx.QueryWithData(route, d)
 		if err != nil {
 			return
@@ -101,7 +101,7 @@ func getCode(cliCtx context.CLIContext) http.HandlerFunc {
 			return
 		}
 
-		route := fmt.Sprintf("custom/vm/%s/%s", types.QueryCode, addr)
+		route := fmt.Sprintf("custom/evm/%s/%s", types.QueryCode, addr)
 		res, height, err := cliCtx.Query(route)
 		if err != nil {
 			return
@@ -125,7 +125,7 @@ func getLog(cliCtx context.CLIContext) http.HandlerFunc {
 			return
 		}
 
-		route := fmt.Sprintf("custom/vm/logs/%s", txId)
+		route := fmt.Sprintf("custom/evm/logs/%s", txId)
 		res, height, err := cliCtx.Query(route)
 		if err != nil {
 			return

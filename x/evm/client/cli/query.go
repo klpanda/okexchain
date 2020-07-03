@@ -128,7 +128,7 @@ func GetCmdQueryCode(cdc *codec.Codec) *cobra.Command {
 	return &cobra.Command{
 		Use:   "code",
 		Short: "Querying commands for Contract Code",
-		Long: strings.TrimSpace(fmt.Sprintf(`Query Contract Code by accAddr.
+		Long: strings.TrimSpace(fmt.Sprintf(`Query Contract Code by Account Address.
 Example:
 $ %s query vm code [address]`, version.ClientName)),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -139,7 +139,7 @@ $ %s query vm code [address]`, version.ClientName)),
 				return err
 			}
 
-			route := fmt.Sprintf("custom/vm/%s/%s", types.QueryCode, args[0])
+			route := fmt.Sprintf("custom/evm/%s/%s", types.QueryCode, args[0])
 			res, _, err := cliCtx.Query(route)
 			if err != nil {
 				return err
@@ -176,7 +176,7 @@ $ %s query vm code [address]`, version.ClientName)),
 				return err
 			}
 
-			route := fmt.Sprintf("custom/vm/%s/%s/%s", types.QueryStorage, addr, args[1])
+			route := fmt.Sprintf("custom/evm/%s/%s/%s", types.QueryStorage, addr, args[1])
 			res, _, err := cliCtx.Query(route)
 			if err != nil {
 				return err
@@ -201,7 +201,7 @@ $ %s query vm logs [txHash]`, version.ClientName)),
 			cliCtx := context.NewCLIContext().WithCodec(cdc)
 
 			res, _, err := cliCtx.Query(
-				fmt.Sprintf("custom/vm/logs/%s", args[0]))
+				fmt.Sprintf("custom/evm/logs/%s", args[0]))
 			if err != nil {
 				return err
 			}
@@ -236,7 +236,7 @@ $ %s query vm feecreate [code_file] [from_accaddr]`, version.ClientName)),
 				return err
 			}
 
-			res, _, err := cliCtx.QueryWithData(fmt.Sprintf("custom/vm/%s", types.EstimateGas), data)
+			res, _, err := cliCtx.QueryWithData(fmt.Sprintf("custom/evm/%s", types.EstimateGas), data)
 			if err != nil {
 				return err
 			}
@@ -306,7 +306,7 @@ $ %s query vm feecall nch1mfztsv6eq5rhtaz2l6jjp3yup3q80agsqra9qe nch1rk47h83x4nz
 				return err
 			}
 
-			res, _, err := cliCtx.QueryWithData(fmt.Sprintf("custom/vm/%s", types.EstimateGas), data)
+			res, _, err := cliCtx.QueryWithData(fmt.Sprintf("custom/evm/%s", types.EstimateGas), data)
 			if err != nil {
 				return err
 			}
@@ -351,7 +351,7 @@ $ %s query vm call nch1mfztsv6eq5rhtaz2l6jjp3yup3q80agsqra9qe nch1rk47h83x4nz474
 				return err
 			}
 
-			res, _, err := cliCtx.QueryWithData(fmt.Sprintf("custom/vm/%s", types.QueryCall), data)
+			res, _, err := cliCtx.QueryWithData(fmt.Sprintf("custom/evm/%s", types.QueryCall), data)
 			if err != nil {
 				return err
 			}
