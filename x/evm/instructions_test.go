@@ -302,7 +302,7 @@ func TestJsonTestcases(t *testing.T) {
 	}
 }
 
-func opBenchmark(bench *testing.B, op func(pc *uint64, interpreter *EVMInterpreter, contract *Contract, memory *Memory, stack *Stack) ([]byte, error), args ...string) {
+func opBenchmark(bench *testing.B, op func(pc *uint64, interpreter *EVMInterpreter, contract *Contract, memory *Memory, stack *Stack) ([]byte, sdk.Error), args ...string) {
 	var (
 		env            = newEVM()
 		stack          = newstack()
@@ -1419,7 +1419,7 @@ func TestOpReturnDataCopy(t *testing.T) {
 	stack.push(big.NewInt(10))
 	_, err := opReturnDataCopy(&pc, interpreter, contract, mem, stack)
 
-	require.Equal(t, ErrReturnDataOutOfBounds.Error(), err.Error())
+	require.Equal(t, ErrReturnDataOutOfBounds().Error(), err.Error())
 }
 
 func TestOpTimestamp(t *testing.T) {

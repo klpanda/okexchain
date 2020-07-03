@@ -15,7 +15,7 @@ func NewHandler(k Keeper) sdk.Handler {
 		case MsgContract:
 			return handleMsgContract(ctx, msg, k)
 		default:
-			errMsg := fmt.Sprintf("unrecognized dex message type: %T", msg)
+			errMsg := fmt.Sprintf("unrecognized evm message type: %T", msg)
 			return sdk.ErrUnknownRequest(errMsg).Result()
 
 		}

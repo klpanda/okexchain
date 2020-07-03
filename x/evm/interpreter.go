@@ -36,7 +36,7 @@ type hashState interface {
 type Interpreter interface {
 	// Run loops and evaluates the contract's code with the given input data and returns
 	// the return byte-slice and an error if one occurred.
-	Run(contract *Contract, input []byte, static bool) ([]byte, error)
+	Run(contract *Contract, input []byte, static bool) ([]byte, sdk.Error)
 	// CanRun tells if the contract, passed as an argument, can be
 	// run by the current interpreter. This is meant so that the
 	// caller can do something like:
@@ -75,7 +75,7 @@ func (in *EVMInterpreter) SetReturnData(d []byte) {
 // It's important to note that any errors returned by the interpreter should be
 // considered a revert-and-consume-all-gas operation except for
 // errExecutionReverted which means revert-and-keep-gas-left.
-func (in *EVMInterpreter) Run(contract *Contract, input []byte, readOnly bool) (ret []byte, err error) {
+func (in *EVMInterpreter) Run(contract *Contract, input []byte, readOnly bool) (ret []byte, err sdk.Error) {
 	if in.intPool == nil {
 		in.intPool = poolOfIntPools.get()
 		defer func() {
@@ -234,7 +234,7 @@ func (in *EVMInterpreter) Run(contract *Contract, input []byte, readOnly bool) (
 		case err != nil:
 			return nil, err
 		case operation.reverts:
-			return res, ErrExecutionReverted
+			return res, ErrExecutionReverted()
 		case operation.halts:
 			return res, nil
 		case !operation.jumps:

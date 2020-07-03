@@ -35,14 +35,12 @@ func (msg MsgContract) ValidateBasic() sdk.Error {
 	if !msg.Amount.IsValid() {
 		return sdk.ErrInvalidCoins("failed to check msg because send amount is invalid: " + msg.Amount.String())
 	}
-	if msg.Amount.IsLT(sdk.ZeroFee()) {
-		return sdk.ErrInsufficientCoins("failed to check msg because send amount must be positive")
-	}
 	if msg.Amount.Denom != sdk.DefaultBondDenom {
 		return sdk.ErrInvalidCoins("coins of amount is invalid: " + msg.Amount.String())
 	}
+
 	if len(msg.Payload) == 0 {
-		return ErrNoPayload("")
+		return ErrNoPayload()
 	}
 
 	return nil

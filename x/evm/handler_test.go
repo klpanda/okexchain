@@ -2,7 +2,6 @@ package evm
 
 import (
 	"fmt"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -20,8 +19,7 @@ func TestInvalidMsg(t *testing.T) {
 	h := NewHandler(k)
 
 	res := h(sdk.NewContext(nil, abci.Header{}, false, nil), sdk.NewTestMsg())
-	require.Nil(t, res)
-	require.True(t, strings.Contains(res.Log, "unrecognized vm message type"))
+	require.Contains(t, res.Log, "unrecognized evm message type")
 }
 
 // contract code from: https://docs.netcloth.org/contracts/contract.html
@@ -39,13 +37,12 @@ func TestMsgContractCreateAndCall(t *testing.T) {
 	handler := NewHandler(vmKeeper)
 
 	// test ContractCreate
-	msgCreate := types.NewMsgContract(acc.GetAddress(), nil, code, sdk.NewInt64Coin(sdk.NativeTokenName, 0))
+	msgCreate := types.NewMsgContract(acc.GetAddress(), nil, code, sdk.NewInt64Coin(sdk.DefaultBondDenom, 0))
 	require.NotNil(t, msgCreate)
 	require.Equal(t, msgCreate.Route(), RouterKey)
 	require.Equal(t, msgCreate.Type(), types.TypeMsgContract)
 
-	resCreate, err := handler(ctx, msgCreate)
-	require.Nil(t, err)
+	resCreate := handler(ctx, msgCreate)
 	if len(resCreate.Log) > 0 {
 		fmt.Println("logs: ", resCreate.Log)
 	}
@@ -55,7 +52,7 @@ func TestMsgContractCreateAndCall(t *testing.T) {
 	EndBlocker(ctx, vmKeeper)
 
 	// test ContractCall
-	msgCall := types.NewMsgContract(acc.GetAddress(), contractAddr, common.FromHex("a9059cbb0000000000000000000000005376329591cde25497d29de88ec553229ad10a610000000000000000000000000000000000000000000000000000000000000064"), sdk.NewInt64Coin(sdk.NativeTokenName, 10))
+	msgCall := types.NewMsgContract(acc.GetAddress(), contractAddr, common.FromHex("a9059cbb0000000000000000000000005376329591cde25497d29de88ec553229ad10a610000000000000000000000000000000000000000000000000000000000000064"), sdk.NewInt64Coin(sdk.DefaultBondDenom, 10))
 	require.NotNil(t, msgCall)
 	require.Equal(t, msgCall.Route(), RouterKey)
 	require.Equal(t, msgCall.Type(), types.TypeMsgContract)

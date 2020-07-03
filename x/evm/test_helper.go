@@ -77,7 +77,7 @@ func setupTest() (vmKeeper Keeper, ctx sdk.Context) {
 	)
 	tkeys := sdk.NewTransientStoreKeys(staking.TStoreKey, staking.TStoreKey, params.TStoreKey)
 
-	paramsKeeper := params.NewKeeper(cdc, keys[params.StoreKey], tkeys[params.TStoreKey])
+	paramsKeeper := params.NewKeeper(cdc, keys[params.StoreKey], tkeys[params.TStoreKey], params.DefaultCodespace)
 	authSubspace := paramsKeeper.Subspace(auth.DefaultParamspace)
 
 	vmSubspace := paramsKeeper.Subspace(DefaultParamspace)
@@ -113,7 +113,7 @@ func GetTestAccount() auth.BaseAccount {
 	acc := auth.NewBaseAccountWithAddress(addr)
 	acc.SetPubKey(pubKey)
 	acc.SetSequence(0)
-	acc.SetCoins(sdk.NewCoins(sdk.NewCoin(sdk.NativeTokenName, sdk.NewInt(10000000000))))
+	acc.SetCoins(sdk.NewCoins(sdk.NewCoin(sdk.DefaultBondDenom, sdk.NewInt(10000000000))))
 
 	return acc
 }
@@ -123,7 +123,7 @@ func newEVM() *EVM {
 	paramsKey := sdk.NewKVStoreKey(params.StoreKey)
 	tParamsKey := sdk.NewTransientStoreKey(params.TStoreKey)
 
-	paramsKeeper := params.NewKeeper(types.ModuleCdc, paramsKey, tParamsKey)
+	paramsKeeper := params.NewKeeper(types.ModuleCdc, paramsKey, tParamsKey, params.DefaultCodespace)
 	accountKeeper := auth.NewAccountKeeper(types.ModuleCdc, authKey, paramsKeeper.Subspace(auth.DefaultParamspace), auth.ProtoBaseAccount)
 
 	logger := log.NewNopLogger()

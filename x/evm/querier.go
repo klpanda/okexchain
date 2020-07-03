@@ -6,7 +6,6 @@ import (
 
 	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/okex/okchain/x/evm/common"
 	"github.com/okex/okchain/x/evm/keeper"
 	"github.com/okex/okchain/x/evm/types"
 	abci "github.com/tendermint/tendermint/abci/types"
@@ -48,16 +47,19 @@ func queryParameters(ctx sdk.Context, k keeper.Keeper) ([]byte, sdk.Error) {
 	return res, nil
 }
 
-func queryState(ctx sdk.Context, req abci.RequestQuery, k keeper.Keeper) (res []byte, err sdk.Error) {
+func queryState(ctx sdk.Context, req abci.RequestQuery, k keeper.Keeper) ([]byte, sdk.Error) {
 	var params types.QueryStateParams
-	err = codec.Cdc.UnmarshalJSON(req.Data, &params)
+	err := codec.Cdc.UnmarshalJSON(req.Data, &params)
 	if err != nil {
-		return nil, err
+		return nil, sdk.ErrInternal(sdk.AppendMsgToErr("could not unmarshal  JSON", err.Error()))
 	}
 
 	stateObjects := k.StateDB.WithContext(ctx).ExportStateObjects(params)
-	res, err = json.Marshal(stateObjects)
-	return
+	res, err := json.Marshal(stateObjects)
+	if err != nil {
+		return nil, sdk.ErrInternal(sdk.AppendMsgToErr("could not marshal result to JSON", err.Error()))
+	}
+	return res, nil
 }
 
 func queryCode(ctx sdk.Context, path []string, k keeper.Keeper) ([]byte, sdk.Error) {
@@ -72,7 +74,7 @@ func queryCode(ctx sdk.Context, path []string, k keeper.Keeper) ([]byte, sdk.Err
 
 func queryStorage(ctx sdk.Context, path []string, keeper keeper.Keeper) ([]byte, sdk.Error) {
 	addr, _ := sdk.AccAddressFromBech32(path[1])
-	key := common.HexToHash(path[2])
+	key := sdk.HexToHash(path[2])
 	val := keeper.GetState(ctx, addr, key)
 	bRes := types.QueryStorageResult{Value: val}
 	res, err := codec.MarshalJSONIndent(keeper.Cdc, bRes)
@@ -83,7 +85,7 @@ func queryStorage(ctx sdk.Context, path []string, keeper keeper.Keeper) ([]byte,
 }
 
 func queryTxLogs(ctx sdk.Context, path []string, keeper keeper.Keeper) ([]byte, sdk.Error) {
-	txHash := common.HexToHash(path[1])
+	txHash := sdk.HexToHash(path[1])
 	logs := keeper.GetLogs(ctx, txHash)
 
 	bRes := types.QueryLogsResult{Logs: logs}

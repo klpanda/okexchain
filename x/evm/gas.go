@@ -2,6 +2,8 @@ package evm
 
 import (
 	"math/big"
+
+	sdk "github.com/cosmos/cosmos-sdk/types"
 )
 
 // Gas costs
@@ -17,7 +19,7 @@ const (
 // calcGas returns the actual gas cost of the call.
 //
 // The returned gas is gas - base * 63 / 64.
-func callGas(availableGas, base uint64, callCost *big.Int) (uint64, error) {
+func callGas(availableGas, base uint64, callCost *big.Int) (uint64, sdk.Error) {
 	availableGas = availableGas - base
 	gas := availableGas - availableGas/64
 	// If the bit length exceeds 64 bit we know that the newly calculated "gas" for EIP150
@@ -28,7 +30,7 @@ func callGas(availableGas, base uint64, callCost *big.Int) (uint64, error) {
 	}
 
 	if !callCost.IsUint64() {
-		return 0, ErrGasUintOverflow
+		return 0, ErrGasUintOverflow()
 	}
 
 	return callCost.Uint64(), nil

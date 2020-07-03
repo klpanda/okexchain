@@ -85,9 +85,7 @@ func (a AppModule) ExportGenesis(ctx sdk.Context) json.RawMessage {
 	return types.ModuleCdc.MustMarshalJSON(kvs)
 }
 
-func (a AppModule) RegisterInvariants(sdk.InvariantRegistry) {
-	panic("implement me")
-}
+func (a AppModule) RegisterInvariants(sdk.InvariantRegistry) {}
 
 func (a AppModule) Route() string {
 	return RouterKey

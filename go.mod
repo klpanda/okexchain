@@ -3,7 +3,7 @@ module github.com/okex/okchain
 go 1.12
 
 require (
-	github.com/btcsuite/btcd v0.0.0-20190523000118-16327141da8c
+	github.com/btcsuite/btcd v0.0.0-20190807005414-4063feeff79a
 	github.com/cosmos/cosmos-sdk v0.37.8
 	github.com/cosmos/go-bip39 v0.0.0-20180819234021-555e2067c45d // indirect
 	github.com/denisenkom/go-mssqldb v0.0.0-20190515213511-eb9f6a1743f3 // indirect
@@ -28,7 +28,6 @@ require (
 	github.com/prometheus/client_golang v1.0.0
 	github.com/prometheus/common v0.6.0 // indirect
 	github.com/prometheus/procfs v0.0.3 // indirect
-	github.com/rakyll/statik v0.1.6 // indirect
 	github.com/rcrowley/go-metrics v0.0.0-20190704165056-9c2d0518ed81 // indirect
 	github.com/spf13/afero v1.2.2 // indirect
 	github.com/spf13/cobra v0.0.5
@@ -43,7 +42,7 @@ require (
 )
 
 replace (
-	github.com/cosmos/cosmos-sdk => github.com/iavl/cosmos-sdk v0.37.9-testnet
+	github.com/cosmos/cosmos-sdk => github.com/iavl/cosmos-sdk v0.0.1-testnet
 	github.com/tendermint/iavl => github.com/okex/iavl v0.12.4-okchain
 	github.com/tendermint/tendermint => github.com/okex/tendermint v0.32.10-okchain1
 )

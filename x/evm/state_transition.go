@@ -38,7 +38,7 @@ func (st StateTransition) GetHashFn(header abci.Header) func() sdk.Hash {
 	}
 }
 
-func (st StateTransition) TransitionCSDB(ctx sdk.Context, k Keeper) (*big.Int, *sdk.Result, error) {
+func (st StateTransition) TransitionCSDB(ctx sdk.Context, k Keeper) (*big.Int, *sdk.Result, sdk.Error) {
 	ctx = ctx.WithLogger(ctx.Logger().With("module", fmt.Sprintf("modules/%s", types.ModuleName)))
 
 	evmCtx := Context{
@@ -70,7 +70,7 @@ func (st StateTransition) TransitionCSDB(ctx sdk.Context, k Keeper) (*big.Int, *
 		ret         []byte
 		leftOverGas uint64
 		addr        sdk.AccAddress
-		vmerr       error
+		vmerr       sdk.Error
 	)
 
 	if st.Recipient.Empty() {
@@ -78,7 +78,7 @@ func (st StateTransition) TransitionCSDB(ctx sdk.Context, k Keeper) (*big.Int, *
 		ctx.Logger().Info(fmt.Sprintf("create contract, consumed gas = %v, leftOverGas = %v, vm err = %v ", gasLimitForVm-leftOverGas, leftOverGas, vmerr))
 	} else {
 		ret, leftOverGas, vmerr = evm.Call(st.Sender, st.Recipient, st.Payload, gasLimitForVm, st.Amount.BigInt())
-		if vmerr == ErrExecutionReverted {
+		if vmerr == ErrExecutionReverted() {
 			reason := "null"
 			if len(ret) > 4 {
 				reason = string(ret[4:])
@@ -110,12 +110,12 @@ func (st StateTransition) TransitionCSDB(ctx sdk.Context, k Keeper) (*big.Int, *
 	return nil, &sdk.Result{Data: ret, GasUsed: ctx.GasMeter().GasConsumed()}, nil
 }
 
-func DoStateTransition(ctx sdk.Context, msg types.MsgContract, k Keeper, readonly bool) (*big.Int, *sdk.Result, error) {
+func DoStateTransition(ctx sdk.Context, msg types.MsgContract, k Keeper, readonly bool) (*big.Int, *sdk.Result, sdk.Error) {
 	st := StateTransition{
 		Sender:    msg.From,
 		Recipient: msg.To,
 		Payload:   msg.Payload,
-		Amount:    msg.Amount.Amount,
+		Amount:    msg.Amount.Amount.TruncateInt(),
 		StateDB:   k.StateDB.WithContext(ctx).WithTxHash(tmhash.Sum(ctx.TxBytes())),
 	}
 
@@ -124,7 +124,7 @@ func DoStateTransition(ctx sdk.Context, msg types.MsgContract, k Keeper, readonl
 	}
 
 	if ctx.Simulate == false && ctx.GasMeter().Limit() == 0 {
-		return nil, &sdk.Result{Data: nil}, ErrWrongCtx
+		return nil, &sdk.Result{Data: nil}, ErrWrongCtx()
 	}
 
 	if ctx.Simulate {

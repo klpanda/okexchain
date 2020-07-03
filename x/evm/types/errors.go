@@ -75,47 +75,86 @@ func codeToDefaultMsg(code sdk.CodeType) string {
 }
 
 // ErrNoPayload returns no payload error
-func ErrNoPayload(msg string) sdk.Error {
-	return sdk.NewError(DefaultCodespace, codeNoPayload, codeToDefaultMsg(codeNoPayload)+": %s", msg)
+func ErrNoPayload() sdk.Error {
+	return sdk.NewError(DefaultCodespace, codeNoPayload, codeToDefaultMsg(codeNoPayload))
 }
 
 // ErrOutOfGas returns out of gas error
-func ErrOutOfGas(msg string) sdk.Error {
-	return sdk.NewError(DefaultCodespace, codeOutOfGas, codeToDefaultMsg(codeOutOfGas)+": %s", msg)
+func ErrOutOfGas() sdk.Error {
+	return sdk.NewError(DefaultCodespace, codeOutOfGas, codeToDefaultMsg(codeOutOfGas))
 }
 
 // ErrCodeStoreOutOfGas returns code storage out of gas error
-func ErrCodeStoreOutOfGas(msg string) sdk.Error {
-	return sdk.NewError(DefaultCodespace, codeCodeStoreOutOfGas, codeToDefaultMsg(codeCodeStoreOutOfGas)+": %s", msg)
+func ErrCodeStoreOutOfGas() sdk.Error {
+	return sdk.NewError(DefaultCodespace, codeCodeStoreOutOfGas, codeToDefaultMsg(codeCodeStoreOutOfGas))
 }
 
 // ErrDepth returns depth error
-func ErrDepth(msg string) sdk.Error {
-	return sdk.NewError(DefaultCodespace, codeDepth, codeToDefaultMsg(codeDepth)+": %s", msg)
+func ErrDepth() sdk.Error {
+	return sdk.NewError(DefaultCodespace, codeDepth, codeToDefaultMsg(codeDepth))
 }
 
-// ErrTraceLimitReached returns trace limit error
-func ErrTraceLimitReached(msg string) sdk.Error {
-	return sdk.NewError(DefaultCodespace, codeTraceLimitReached, codeToDefaultMsg(codeTraceLimitReached)+": %s", msg)
+// ErrTraceLimitReached
+func ErrTraceLimitReached() sdk.Error {
+	return sdk.NewError(DefaultCodespace, codeTraceLimitReached, codeToDefaultMsg(codeTraceLimitReached))
 }
 
-// ErrNoCompatibleInterpreter returns trace limit error
-func ErrNoCompatibleInterpreter(msg string) sdk.Error {
-	return sdk.NewError(DefaultCodespace, codeTraceLimitReached, codeToDefaultMsg(codeTraceLimitReached)+": %s", msg)
+// ErrNoCompatibleInterpreter
+func ErrNoCompatibleInterpreter() sdk.Error {
+	return sdk.NewError(DefaultCodespace, codeTraceLimitReached, codeToDefaultMsg(codeTraceLimitReached))
 }
 
-/*
+// ErrEmptyInputs returns empty input error
+func ErrEmptyInputs() sdk.Error {
+	return sdk.NewError(DefaultCodespace, codeEmptyInputs, codeToDefaultMsg(codeEmptyInputs))
+}
 
-ErrNoCompatibleInterpreter
-ErrEmptyInputs
-ErrInsufficientBalance
-ErrContractAddressCollision
-ErrNoCodeExist
-ErrMaxCodeSizeExceeded
-ErrWriteProtection
-ErrReturnDataOutOfBounds
-ErrExecutionReverted
-ErrInvalidJump
-ErrGasUintOverflow
-ErrWrongCtx
-*/
+// ErrInsufficientBalance returns insufficient balance error
+func ErrInsufficientBalance() sdk.Error {
+	return sdk.NewError(DefaultCodespace, codeInsufficientBalance, codeToDefaultMsg(codeInsufficientBalance))
+}
+
+// ErrContractAddressCollision
+func ErrContractAddressCollision() sdk.Error {
+	return sdk.NewError(DefaultCodespace, codeContractAddressCollision, codeToDefaultMsg(codeContractAddressCollision))
+}
+
+// ErrNoCodeExist
+func ErrNoCodeExist() sdk.Error {
+	return sdk.NewError(DefaultCodespace, codeNoCodeExist, codeToDefaultMsg(codeNoCodeExist))
+}
+
+// ErrWriteProtection
+func ErrWriteProtection() sdk.Error {
+	return sdk.NewError(DefaultCodespace, codeWriteProtection, codeToDefaultMsg(codeWriteProtection))
+}
+
+// ErrReturnDataOutOfBounds
+func ErrReturnDataOutOfBounds() sdk.Error {
+	return sdk.NewError(DefaultCodespace, codeMaxCodeSizeExceeded, codeToDefaultMsg(codeMaxCodeSizeExceeded))
+}
+
+// ErrExecutionReverted
+func ErrExecutionReverted() sdk.Error {
+	return sdk.NewError(DefaultCodespace, codeExecutionReverted, codeToDefaultMsg(codeExecutionReverted))
+}
+
+// ErrInvalidJump
+func ErrInvalidJump() sdk.Error {
+	return sdk.NewError(DefaultCodespace, codeInvalidJump, codeToDefaultMsg(codeInvalidJump))
+}
+
+// ErrGasUintOverflow
+func ErrGasUintOverflow() sdk.Error {
+	return sdk.NewError(DefaultCodespace, codeGasUintOverflow, codeToDefaultMsg(codeGasUintOverflow))
+}
+
+// ErrWrongCtx
+func ErrWrongCtx() sdk.Error {
+	return sdk.NewError(DefaultCodespace, codeWrongCtx, codeToDefaultMsg(codeWrongCtx))
+}
+
+// ErrMaxCodeSizeExceeded
+func ErrMaxCodeSizeExceeded() sdk.Error {
+	return sdk.NewError(DefaultCodespace, codeMaxCodeSizeExceeded, codeToDefaultMsg(codeMaxCodeSizeExceeded))
+}

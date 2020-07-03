@@ -16,7 +16,7 @@ func TestMsgContract(t *testing.T) {
 	coin0 := sdk.NewInt64Coin(sdk.DefaultBondDenom, 0)
 	coin123eth := sdk.NewInt64Coin("eth", 123)
 	coin0eth := sdk.NewInt64Coin("eth", 0)
-	coinNegative := sdk.Coin{sdk.DefaultBondDenom, sdk.NewInt(-123)}
+	coinNegative := sdk.Coin{Denom: sdk.DefaultBondDenom, Amount: sdk.NewDec(-123)}
 
 	payload := []byte("payload")
 	payloadEmpty := []byte("")
@@ -69,27 +69,27 @@ func TestMsgContractGetSignBytes(t *testing.T) {
 
 	// with "to" nil
 	res := msg.GetSignBytes()
-	expected := `{"type":"nch/MsgContract","value":{"amount":{"amount":"123","denom":"pnch"},"from":"nch1veex7mg3k0xqr","payload":"7061796c6f6164","to":""}}`
+	expected := `{"type":"nch/MsgContract","value":{"amount":{"amount":"123.00000000","denom":"tokt"},"from":"okchain1veex7mgjhktfh","payload":"7061796c6f6164","to":""}}`
 	require.Equal(t, expected, string(res))
 
 	// with "to" empty
 	var addrEmpty sdk.AccAddress
 	msg = NewMsgContract(addr1, addrEmpty, payload, coin123)
 	res = msg.GetSignBytes()
-	expected = `{"type":"nch/MsgContract","value":{"amount":{"amount":"123","denom":"pnch"},"from":"nch1veex7mg3k0xqr","payload":"7061796c6f6164","to":""}}`
+	expected = `{"type":"nch/MsgContract","value":{"amount":{"amount":"123.00000000","denom":"tokt"},"from":"okchain1veex7mgjhktfh","payload":"7061796c6f6164","to":""}}`
 	require.Equal(t, expected, string(res))
 
 	// with "to"
 	addr2 := sdk.AccAddress([]byte("to"))
 	msg = NewMsgContract(addr1, addr2, payload, coin123)
 	res = msg.GetSignBytes()
-	expected = `{"type":"nch/MsgContract","value":{"amount":{"amount":"123","denom":"pnch"},"from":"nch1veex7mg3k0xqr","payload":"7061796c6f6164","to":"nch1w3hsls558e"}}`
+	expected = `{"type":"nch/MsgContract","value":{"amount":{"amount":"123.00000000","denom":"tokt"},"from":"okchain1veex7mgjhktfh","payload":"7061796c6f6164","to":"okchain1w3hsvfftkk"}}`
 	require.Equal(t, expected, string(res))
 
 }
 
 func TestMsgContractGetSigners(t *testing.T) {
-	var msg = NewMsgContract(sdk.AccAddress([]byte("from")), nil, []byte("payload"), sdk.NewInt64Coin(sdk.NativeTokenName, 123))
+	var msg = NewMsgContract(sdk.AccAddress([]byte("from")), nil, []byte("payload"), sdk.NewInt64Coin(sdk.DefaultBondDenom, 123))
 	res := msg.GetSigners()
 
 	require.Equal(t, fmt.Sprintf("%v", res), "[66726F6D]")
