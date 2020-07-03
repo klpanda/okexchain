@@ -17,7 +17,7 @@ import (
 	"github.com/okex/okchain/x/evm/types"
 )
 
-func VMCmd(cdc *codec.Codec) *cobra.Command {
+func GetTxCmd(cdc *codec.Codec) *cobra.Command {
 	txCmd := &cobra.Command{
 		Use:   types.ModuleName,
 		Short: "VM transaction subcommands",
