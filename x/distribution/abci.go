@@ -17,7 +17,7 @@ func BeginBlocker(ctx sdk.Context, req abci.RequestBeginBlock, k keeper.Keeper) 
 	var previousTotalPower int64
 	for _, voteInfo := range req.LastCommitInfo.GetVotes() {
 		previousTotalPower += voteInfo.Validator.Power
-		logger.Debug( sdk.ValAddress(voteInfo.Validator.Address).String(),
+		logger.Debug(fmt.Sprintf("%X", voteInfo.Validator.Address),
 			"Power", voteInfo.Validator.Power,
 			"Singed", voteInfo.SignedLastBlock)
 	}
