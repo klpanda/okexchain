@@ -103,7 +103,7 @@ func GenPayload(abiFile, method string, args []string) (payload []byte, m abi.Me
 				return nil, emptyMethod, errors.New(fmt.Sprintf("wrong address format, actual address[%s]", addrStr))
 			}
 
-			if addrStr[:3] == "nch" {
+			if addrStr[:7] == sdk.Bech32PrefixAccAddr {
 				addr, err := sdk.AccAddressFromBech32(addrStr)
 				if err != nil {
 					return nil, emptyMethod, err

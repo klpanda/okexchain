@@ -18,6 +18,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/version"
+
 	"github.com/okex/okchain/hexutil"
 	"github.com/okex/okchain/x/evm/types"
 )
@@ -254,7 +255,7 @@ func GetCmdQueryCallFee(cdc *codec.Codec) *cobra.Command {
 		Short: "Querying fee to call contract",
 		Long: strings.TrimSpace(fmt.Sprintf(`Querying fee to call contract.
 Example:
-$ %s query vm feecall nch1mfztsv6eq5rhtaz2l6jjp3yup3q80agsqra9qe nch1rk47h83x4nz4745d63dtnpl8uwsramfgz8snr5 balanceOf 0000000000000000000000000000000000000000000000000000000000000001 0tokt ./demo.abi`, version.ClientName)),
+$ %s query vm feecall okchain1mfztsv6eq5rhtaz2l6jjp3yup3q80agsqra9qe nch1rk47h83x4nz4745d63dtnpl8uwsramfgz8snr5 balanceOf 0000000000000000000000000000000000000000000000000000000000000001 0tokt ./demo.abi`, version.ClientName)),
 		Args: cobra.ExactArgs(6),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cliCtx := context.NewCLIContext().WithCodec(cdc)
@@ -324,7 +325,7 @@ func GetCmdQueryCall(cdc *codec.Codec) *cobra.Command {
 		Short: "Querying fee to call contract",
 		Long: strings.TrimSpace(fmt.Sprintf(`call contract for query, don't create a transaction.
 Example:
-$ %s query vm call nch1mfztsv6eq5rhtaz2l6jjp3yup3q80agsqra9qe nch1rk47h83x4nz4745d63dtnpl8uwsramfgz8snr5 balanceOf ./demo.abi --amount=0tokt --args="arg1 arg2"`, version.ClientName)),
+$ %s query vm call okchain1mfztsv6eq5rhtaz2l6jjp3yup3q80agsqra9qe okchain1rk47h83x4nz4745d63dtnpl8uwsramfgz8snr5 balanceOf ./demo.abi --amount=0tokt --args="arg1 arg2"`, version.ClientName)),
 		Args: cobra.ExactArgs(4),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cliCtx := context.NewCLIContext().WithCodec(cdc)

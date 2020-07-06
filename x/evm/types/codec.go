@@ -6,7 +6,7 @@ import (
 
 // Register concrete types on codec codec
 func RegisterCodec(cdc *codec.Codec) {
-	cdc.RegisterConcrete(MsgContract{}, "nch/MsgContract", nil)
+	cdc.RegisterConcrete(MsgContract{}, "okchain/MsgContract", nil)
 }
 
 // generic sealed codec to be used throughout this module
