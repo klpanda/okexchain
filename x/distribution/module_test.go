@@ -1,6 +1,7 @@
 package distribution
 
 import (
+	"github.com/cosmos/cosmos-sdk/client"
 	"testing"
 
 	"github.com/cosmos/cosmos-sdk/codec"
@@ -21,12 +22,13 @@ func TestAppModule(t *testing.T) {
 
 	cdc := codec.New()
 	module.RegisterCodec(cdc)
+	cliCtx := client.NewContext().WithCodec(cdc)
 
-	msg := module.DefaultGenesis()
-	require.Nil(t, module.ValidateGenesis(msg))
-	require.NotNil(t, module.ValidateGenesis([]byte{}))
-	module.InitGenesis(ctx, msg)
-	exportMsg := module.ExportGenesis(ctx)
+	msg := module.DefaultGenesis(cdc)
+	require.Nil(t, module.ValidateGenesis(cdc, msg))
+	require.NotNil(t, module.ValidateGenesis(cdc, []byte{}))
+	module.InitGenesis(ctx, cdc, msg)
+	exportMsg := module.ExportGenesis(ctx, cdc)
 
 	var gs GenesisState
 	require.NotPanics(t, func() {
@@ -36,8 +38,8 @@ func TestAppModule(t *testing.T) {
 	// for coverage
 	module.BeginBlock(ctx, abci.RequestBeginBlock{})
 	module.EndBlock(ctx, abci.RequestEndBlock{})
-	module.GetQueryCmd(cdc)
-	module.GetTxCmd(cdc)
+	module.GetQueryCmd(cliCtx)
+	module.GetTxCmd(cliCtx)
 	module.NewQuerierHandler()
 	module.NewHandler()
 }

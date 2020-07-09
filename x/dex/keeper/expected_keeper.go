@@ -4,21 +4,16 @@ import (
 	"time"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/cosmos/cosmos-sdk/x/supply/exported"
+	exported "github.com/cosmos/cosmos-sdk/x/auth/types"
 	"github.com/okex/okchain/x/dex/types"
 	ordertypes "github.com/okex/okchain/x/order/types"
 	"github.com/okex/okchain/x/params"
 )
 
-// SupplyKeeper defines the expected supply Keeper
-type SupplyKeeper interface {
-	SendCoinsFromAccountToModule(ctx sdk.Context, senderAddr sdk.AccAddress,
-		recipientModule string, amt sdk.Coins) sdk.Error
-	SendCoinsFromModuleToAccount(ctx sdk.Context, senderModule string,
-		recipientAddr sdk.AccAddress, amt sdk.Coins) sdk.Error
+// BankKeeper defines the expected supply Keeper
+type AccountKeeper interface {
 	GetModuleAccount(ctx sdk.Context, moduleName string) exported.ModuleAccountI
 	GetModuleAddress(moduleName string) sdk.AccAddress
-	MintCoins(ctx sdk.Context, moduleName string, amt sdk.Coins) sdk.Error
 }
 
 // TokenKeeper defines the expected token Keeper
@@ -34,15 +29,16 @@ type IKeeper interface {
 	GetTokenPairsOrdered(ctx sdk.Context) types.TokenPairs
 	SaveTokenPair(ctx sdk.Context, tokenPair *types.TokenPair) error
 	DeleteTokenPairByName(ctx sdk.Context, owner sdk.AccAddress, tokenPairName string)
-	Deposit(ctx sdk.Context, product string, from sdk.AccAddress, amount sdk.DecCoin) sdk.Error
-	Withdraw(ctx sdk.Context, product string, to sdk.AccAddress, amount sdk.DecCoin) sdk.Error
-	GetSupplyKeeper() SupplyKeeper
+	Deposit(ctx sdk.Context, product string, from sdk.AccAddress, amount sdk.DecCoin) error
+	Withdraw(ctx sdk.Context, product string, to sdk.AccAddress, amount sdk.DecCoin) error
+	GetAccountKeeper() AccountKeeper
+	GetBankKeeper() BankKeeper
 	GetTokenKeeper() TokenKeeper
 	GetParamSubspace() params.Subspace
 	GetParams(ctx sdk.Context) (params types.Params)
 	SetParams(ctx sdk.Context, params types.Params)
 	GetFeeCollector() string
-	TransferOwnership(ctx sdk.Context, product string, from sdk.AccAddress, to sdk.AccAddress) sdk.Error
+	TransferOwnership(ctx sdk.Context, product string, from sdk.AccAddress, to sdk.AccAddress) error
 	LockTokenPair(ctx sdk.Context, product string, lock *ordertypes.ProductLock)
 	LoadProductLocks(ctx sdk.Context) *ordertypes.ProductLockMap
 	SetWithdrawInfo(ctx sdk.Context, withdrawInfo types.WithdrawInfo)
@@ -62,7 +58,12 @@ type StakingKeeper interface {
 
 // BankKeeper defines the expected bank Keeper
 type BankKeeper interface {
-	GetCoins(ctx sdk.Context, addr sdk.AccAddress) sdk.Coins
+	GetAllBalances(ctx sdk.Context, addr sdk.AccAddress) sdk.Coins
+	SendCoinsFromAccountToModule(ctx sdk.Context, senderAddr sdk.AccAddress,
+		recipientModule string, amt sdk.Coins) error
+	SendCoinsFromModuleToAccount(ctx sdk.Context, senderModule string,
+		recipientAddr sdk.AccAddress, amt sdk.Coins) error
+	MintCoins(ctx sdk.Context, moduleName string, amt sdk.Coins) error
 }
 
 // GovKeeper defines the expected gov Keeper

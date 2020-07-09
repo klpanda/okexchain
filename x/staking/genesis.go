@@ -2,8 +2,8 @@ package staking
 
 import (
 	"fmt"
+	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 
-	supplyexported "github.com/cosmos/cosmos-sdk/x/supply/exported"
 	abci "github.com/tendermint/tendermint/abci/types"
 	tmtypes "github.com/tendermint/tendermint/types"
 
@@ -18,7 +18,7 @@ import (
 // Finally, it updates the bonded validators
 // Returns final validator set after applying all declaration and delegations
 func InitGenesis(ctx sdk.Context, keeper Keeper, accountKeeper types.AccountKeeper,
-	supplyKeeper types.SupplyKeeper, data types.GenesisState) (res []abci.ValidatorUpdate) {
+	supplyKeeper types.BankKeeper, data types.GenesisState) (res []abci.ValidatorUpdate) {
 	bondedTokens, notBondedTokens := sdk.ZeroDec(), sdk.ZeroDec()
 
 	// We need to pretend to be "n blocks before genesis", where "n" is the validator update delay, so that e.g.
@@ -69,8 +69,7 @@ func InitGenesis(ctx sdk.Context, keeper Keeper, accountKeeper types.AccountKeep
 }
 
 // assume that there is only okt in pool, if not panics
-func checkTokenSum(tokenSum sdk.DecCoin, pool supplyexported.ModuleAccountI) {
-	poolCoins := pool.GetCoins()
+func checkTokenSum(tokenSum sdk.DecCoin, poolCoins sdk.Coins, pool authtypes.ModuleAccountI) {
 	if !poolCoins.IsZero() {
 		if len(poolCoins) != 1 {
 			panic(fmt.Sprintf("only okt in %s, but there are %d kinds of coins", pool.GetName(), len(poolCoins)))
@@ -93,8 +92,9 @@ func checkPools(ctx sdk.Context, keeper Keeper, bondedDecCoin, notBondedDecCoin 
 		panic(fmt.Sprintf("%s module account has not been set", types.NotBondedPoolName))
 	}
 	if isExported {
-		checkTokenSum(bondedDecCoin, bondedPool)
-		checkTokenSum(notBondedDecCoin, notBondedPool)
+		poolCoins := keeper.GetBankKeeper().GetAllBalances(ctx, bondedPool.GetAddress())
+		checkTokenSum(bondedDecCoin, poolCoins, bondedPool)
+		checkTokenSum(notBondedDecCoin, poolCoins, notBondedPool)
 	}
 }
 

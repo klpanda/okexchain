@@ -2,10 +2,11 @@ package keeper
 
 import (
 	"fmt"
+	sdkerror "github.com/cosmos/cosmos-sdk/types/errors"
+	paramstypes "github.com/cosmos/cosmos-sdk/x/params/types"
 
 	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/cosmos/cosmos-sdk/x/params"
 	"github.com/okex/okchain/x/distribution/types"
 
 	"github.com/tendermint/tendermint/libs/log"
@@ -15,11 +16,12 @@ import (
 type Keeper struct {
 	storeKey      sdk.StoreKey
 	cdc           *codec.Codec
-	paramSpace    params.Subspace
+	paramSpace    paramstypes.Subspace
 	stakingKeeper types.StakingKeeper
-	supplyKeeper  types.SupplyKeeper
+	bankKeeper    types.BankKeeper
+	accKeeper     types.AccountKeeper
 
-	codespace sdk.CodespaceType
+	codespace string
 
 	blacklistedAddrs map[string]bool
 
@@ -27,12 +29,12 @@ type Keeper struct {
 }
 
 // NewKeeper creates a new distribution Keeper instance
-func NewKeeper(cdc *codec.Codec, key sdk.StoreKey, paramSpace params.Subspace,
-	sk types.StakingKeeper, supplyKeeper types.SupplyKeeper, codespace sdk.CodespaceType,
+func NewKeeper(cdc *codec.Codec, key sdk.StoreKey, paramSpace paramstypes.Subspace,
+	sk types.StakingKeeper, accKeeper types.AccountKeeper, bankKeeper types.BankKeeper, codespace string,
 	feeCollectorName string, blacklistedAddrs map[string]bool) Keeper {
 
 	// ensure distribution module account is set
-	if addr := supplyKeeper.GetModuleAddress(types.ModuleName); addr == nil {
+	if addr := accKeeper.GetModuleAddress(types.ModuleName); addr == nil {
 		panic(fmt.Sprintf("%s module account has not been set", types.ModuleName))
 	}
 
@@ -41,7 +43,8 @@ func NewKeeper(cdc *codec.Codec, key sdk.StoreKey, paramSpace params.Subspace,
 		cdc:              cdc,
 		paramSpace:       paramSpace.WithKeyTable(ParamKeyTable()),
 		stakingKeeper:    sk,
-		supplyKeeper:     supplyKeeper,
+		bankKeeper:       bankKeeper,
+		accKeeper:        accKeeper,
 		codespace:        codespace,
 		feeCollectorName: feeCollectorName,
 		blacklistedAddrs: blacklistedAddrs,
@@ -54,9 +57,9 @@ func (k Keeper) Logger(ctx sdk.Context) log.Logger {
 }
 
 // SetWithdrawAddr sets a new address that will receive the rewards upon withdrawal
-func (k Keeper) SetWithdrawAddr(ctx sdk.Context, delegatorAddr sdk.AccAddress, withdrawAddr sdk.AccAddress) sdk.Error {
+func (k Keeper) SetWithdrawAddr(ctx sdk.Context, delegatorAddr sdk.AccAddress, withdrawAddr sdk.AccAddress) error {
 	if k.blacklistedAddrs[withdrawAddr.String()] {
-		return sdk.ErrUnauthorized(fmt.Sprintf("%s is blacklisted from receiving external funds", withdrawAddr))
+		return sdkerror.Wrap(sdkerror.ErrUnauthorized, fmt.Sprintf("%s is blacklisted from receiving external funds", withdrawAddr))
 	}
 
 	if !k.GetWithdrawAddrEnabled(ctx) {
@@ -75,7 +78,7 @@ func (k Keeper) SetWithdrawAddr(ctx sdk.Context, delegatorAddr sdk.AccAddress, w
 }
 
 // WithdrawValidatorCommission withdraws validator commission
-func (k Keeper) WithdrawValidatorCommission(ctx sdk.Context, valAddr sdk.ValAddress) (sdk.Coins, sdk.Error) {
+func (k Keeper) WithdrawValidatorCommission(ctx sdk.Context, valAddr sdk.ValAddress) (sdk.Coins, error) {
 	// fetch validator accumulated commission
 	accumCommission := k.GetValidatorAccumulatedCommission(ctx, valAddr)
 	if accumCommission.IsZero() {
@@ -88,7 +91,7 @@ func (k Keeper) WithdrawValidatorCommission(ctx sdk.Context, valAddr sdk.ValAddr
 	if !commission.IsZero() {
 		accAddr := sdk.AccAddress(valAddr)
 		withdrawAddr := k.GetDelegatorWithdrawAddr(ctx, accAddr)
-		err := k.supplyKeeper.SendCoinsFromModuleToAccount(ctx, types.ModuleName, withdrawAddr, commission)
+		err := k.bankKeeper.SendCoinsFromModuleToAccount(ctx, types.ModuleName, withdrawAddr, commission)
 		if err != nil {
 			return nil, err
 		}

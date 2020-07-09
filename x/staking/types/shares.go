@@ -12,10 +12,10 @@ import (
 type Shares = sdk.Dec
 
 // MustUnmarshalShares unmarshals the shares bytes and return it
-func MustUnmarshalShares(cdc *codec.Codec, bytes []byte) Shares {
-	var shares Shares
-	cdc.MustUnmarshalBinaryLengthPrefixed(bytes, &shares)
-	return shares
+func MustUnmarshalShares(cdc codec.Marshaler, bytes []byte) Shares {
+	var shares sdk.DecProto
+	cdc.MustUnmarshalBinaryBare(bytes, &shares)
+	return shares.Dec
 }
 
 // SharesResponse is the struct for query all the shares on a validator

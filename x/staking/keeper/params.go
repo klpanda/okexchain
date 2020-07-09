@@ -4,7 +4,8 @@ import (
 	"time"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/cosmos/cosmos-sdk/x/params"
+	gogotypes "github.com/gogo/protobuf/types"
+	"github.com/okex/okchain/x/params"
 	"github.com/okex/okchain/x/staking/types"
 )
 
@@ -25,7 +26,7 @@ func (k Keeper) UnbondingTime(ctx sdk.Context) (res time.Duration) {
 }
 
 // MaxValidators returns the param Maximum number of validators
-func (k Keeper) MaxValidators(ctx sdk.Context) (res uint16) {
+func (k Keeper) MaxValidators(ctx sdk.Context) (res uint32) {
 	k.paramstore.Get(ctx, types.KeyMaxValidators, &res)
 	return
 }
@@ -55,26 +56,26 @@ func (k Keeper) SetParams(ctx sdk.Context, params types.Params) {
 }
 
 // ParamsEpoch returns epoch from paramstore, only update the KeyEpoch after last epoch ends
-func (k Keeper) ParamsEpoch(ctx sdk.Context) (res uint16) {
+func (k Keeper) ParamsEpoch(ctx sdk.Context) (res uint32) {
 	k.paramstore.Get(ctx, types.KeyEpoch, &res)
 	return
 }
 
 // GetEpoch returns the epoch for validators updates
-func (k Keeper) GetEpoch(ctx sdk.Context) (epoch uint16) {
+func (k Keeper) GetEpoch(ctx sdk.Context) (epoch uint32) {
 	store := ctx.KVStore(k.storeKey)
 	b := store.Get(types.KeyEpoch)
 	if b == nil {
 		return types.DefaultEpoch
 	}
-	k.cdc.MustUnmarshalBinaryLengthPrefixed(b, &epoch)
+	k.cdc.MustUnmarshalJSON(b, &epoch)
 	return
 }
 
 // SetEpoch set epoch into keystore
-func (k Keeper) SetEpoch(ctx sdk.Context, epoch uint16) {
+func (k Keeper) SetEpoch(ctx sdk.Context, epoch uint32) {
 	store := ctx.KVStore(k.storeKey)
-	b := k.cdc.MustMarshalBinaryLengthPrefixed(epoch)
+	b := k.cdc.MustMarshalJSON(epoch)
 	store.Set(types.KeyEpoch, b)
 }
 
@@ -91,19 +92,20 @@ func (k Keeper) GetTheEndOfLastEpoch(ctx sdk.Context) (height int64) {
 	if b == nil {
 		return int64(0)
 	}
-	k.cdc.MustUnmarshalBinaryLengthPrefixed(b, &height)
-	return
+	h := gogotypes.Int64Value{}
+	k.cdc.MustUnmarshalBinaryLengthPrefixed(b, &h)
+	return h.Value
 }
 
 // SetTheEndOfLastEpoch sets the deadline of the current epoch
 func (k Keeper) SetTheEndOfLastEpoch(ctx sdk.Context) {
 	store := ctx.KVStore(k.storeKey)
-	b := k.cdc.MustMarshalBinaryLengthPrefixed(ctx.BlockHeight())
+	b := k.cdc.MustMarshalBinaryBare(&gogotypes.Int64Value{Value: ctx.BlockHeight()})
 	store.Set(types.KeyTheEndOfLastEpoch, b)
 }
 
 // ParamsMaxValsToAddShares returns the param MaxValsToAddShares
-func (k Keeper) ParamsMaxValsToAddShares(ctx sdk.Context) (num uint16) {
+func (k Keeper) ParamsMaxValsToAddShares(ctx sdk.Context) (num uint32) {
 	k.paramstore.Get(ctx, types.KeyMaxValsToAddShares, &num)
 	return
 }

@@ -2,13 +2,13 @@ package cli
 
 import (
 	"fmt"
+	"github.com/cosmos/cosmos-sdk/client/flags"
 	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
 
 	"github.com/cosmos/cosmos-sdk/client"
-	"github.com/cosmos/cosmos-sdk/client/context"
 	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/version"
@@ -24,7 +24,7 @@ func GetQueryCmd(queryRoute string, cdc *codec.Codec) *cobra.Command {
 		SuggestionsMinimumDistance: 2,
 		RunE:                       client.ValidateCmd,
 	}
-	stakingQueryCmd.AddCommand(client.GetCommands(
+	stakingQueryCmd.AddCommand(flags.GetCommands(
 		GetCmdQueryDelegator(queryRoute, cdc),
 		GetCmdQueryValidatorShares(queryRoute, cdc),
 		GetCmdQueryValidator(queryRoute, cdc),
@@ -53,7 +53,7 @@ $ %s query staking validator okchainvaloper1alq9na49n9yycysh889rl90g9nhe58lcs50w
 		),
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cliCtx := context.NewCLIContext().WithCodec(cdc)
+			cliCtx := client.NewContext().WithCodec(cdc).WithJSONMarshaler(cdc)
 
 			addr, err := sdk.ValAddressFromBech32(args[0])
 			if err != nil {
@@ -70,7 +70,7 @@ $ %s query staking validator okchainvaloper1alq9na49n9yycysh889rl90g9nhe58lcs50w
 			}
 
 			//return cliCtx.PrintOutput(types.MustUnmarshalValidator(cdc, res))
-			return cliCtx.PrintOutput(types.MustUnmarshalValidator(cdc, res).Standardize())
+			return cliCtx.PrintOutput(types.MustUnmarshalValidator(types.ModuleCdc, res).Standardize())
 		},
 	}
 }
@@ -91,7 +91,7 @@ $ %s query staking validators
 			),
 		),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cliCtx := context.NewCLIContext().WithCodec(cdc)
+			cliCtx := client.NewContext().WithCodec(cdc)
 
 			resKVs, _, err := cliCtx.QuerySubspace(types.ValidatorsKey, storeName)
 			if err != nil {
@@ -100,7 +100,7 @@ $ %s query staking validators
 
 			var validators types.Validators
 			for _, kv := range resKVs {
-				validators = append(validators, types.MustUnmarshalValidator(cdc, kv.Value))
+				validators = append(validators, types.MustUnmarshalValidator(types.ModuleCdc, kv.Value))
 			}
 
 			//return cliCtx.PrintOutput(validators)
@@ -125,7 +125,7 @@ $ %s query staking pool
 			),
 		),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cliCtx := context.NewCLIContext().WithCodec(cdc)
+			cliCtx := client.NewContext().WithCodec(cdc)
 
 			bz, _, err := cliCtx.QueryWithData(fmt.Sprintf("custom/%s/pool", storeName), nil)
 			if err != nil {
@@ -158,7 +158,7 @@ $ %s query staking params
 			),
 		),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cliCtx := context.NewCLIContext().WithCodec(cdc)
+			cliCtx := client.NewContext().WithCodec(cdc)
 
 			route := fmt.Sprintf("custom/%s/%s", storeName, types.QueryParameters)
 			bz, _, err := cliCtx.QueryWithData(route, nil)
@@ -189,7 +189,7 @@ $ %s query staking proxy okchain1hw4r48aww06ldrfeuq2v438ujnl6alszzzqpph
 			),
 		),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cliCtx := context.NewCLIContext().WithCodec(cdc)
+			cliCtx := client.NewContext().WithCodec(cdc)
 			proxyAddr, err := sdk.AccAddressFromBech32(args[0])
 			if err != nil {
 				return fmt.Errorf("invalid address：%s", args[0])
@@ -244,7 +244,7 @@ $ %s query staking delegator okchain1hw4r48aww06ldrfeuq2v438ujnl6alszzzqpph
 			),
 		),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cliCtx := context.NewCLIContext().WithCodec(cdc)
+			cliCtx := client.NewContext().WithCodec(cdc)
 			delAddr, err := sdk.AccAddressFromBech32(args[0])
 			if err != nil {
 				return fmt.Errorf("invalid address：%s", args[0])
@@ -357,7 +357,7 @@ $ %s query staking shares-added-to okchainvaloper1alq9na49n9yycysh889rl90g9nhe58
 			),
 		),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cliCtx := context.NewCLIContext().WithCodec(cdc)
+			cliCtx := client.NewContext().WithCodec(cdc)
 
 			valAddr, err := sdk.ValAddressFromBech32(args[0])
 			if err != nil {

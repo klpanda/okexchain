@@ -1,7 +1,11 @@
 package cli
 
 import (
+	"bufio"
 	"fmt"
+	"github.com/cosmos/cosmos-sdk/client/flags"
+	authclient "github.com/cosmos/cosmos-sdk/x/auth/client"
+	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	"os"
 
 	"github.com/okex/okchain/x/common"
@@ -14,16 +18,13 @@ import (
 	"github.com/tendermint/tendermint/crypto"
 
 	"github.com/cosmos/cosmos-sdk/client"
-	"github.com/cosmos/cosmos-sdk/client/context"
 	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/cosmos/cosmos-sdk/x/auth"
-	"github.com/cosmos/cosmos-sdk/x/auth/client/utils"
 	"github.com/okex/okchain/x/staking/types"
 )
 
 // GetTxCmd returns the transaction commands for this module
-func GetTxCmd(storeKey string, cdc *codec.Codec) *cobra.Command {
+func GetTxCmd(clientCtx client.Context) *cobra.Command {
 	stakingTxCmd := &cobra.Command{
 		Use:                        types.ModuleName,
 		Short:                      "Staking transaction subcommands",
@@ -33,16 +34,16 @@ func GetTxCmd(storeKey string, cdc *codec.Codec) *cobra.Command {
 	}
 
 	stakingTxCmd.AddCommand(
-		client.PostCommands(
-			GetCmdCreateValidator(cdc),
-			GetCmdDestroyValidator(cdc),
-			GetCmdEditValidator(cdc),
-			GetCmdDeposit(cdc),
-			GetCmdWithdraw(cdc),
-			GetCmdAddShares(cdc),
+		flags.PostCommands(
+			GetCmdCreateValidator(clientCtx.Codec),
+			GetCmdDestroyValidator(clientCtx.Codec),
+			GetCmdEditValidator(clientCtx.Codec),
+			GetCmdDeposit(clientCtx.Codec),
+			GetCmdWithdraw(clientCtx.Codec),
+			GetCmdAddShares(clientCtx.Codec),
 		)...)
 
-	stakingTxCmd.AddCommand(GetCmdProxy(cdc))
+	stakingTxCmd.AddCommand(GetCmdProxy(clientCtx.Codec))
 
 	return stakingTxCmd
 }
@@ -53,15 +54,16 @@ func GetCmdCreateValidator(cdc *codec.Codec) *cobra.Command {
 		Use:   "create-validator",
 		Short: "create new validator",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			txBldr := auth.NewTxBuilderFromCLI().WithTxEncoder(utils.GetTxEncoder(cdc))
-			cliCtx := context.NewCLIContext().WithCodec(cdc)
+			inBuf := bufio.NewReader(cmd.InOrStdin())
+			txBldr := authtypes.NewTxBuilderFromCLI(inBuf).WithTxEncoder(authclient.GetTxEncoder(cdc))
+			cliCtx := client.NewContext().WithCodec(cdc)
 
 			txBldr, msg, err := BuildCreateValidatorMsg(cliCtx, txBldr)
 			if err != nil {
 				return err
 			}
 
-			return utils.GenerateOrBroadcastMsgs(cliCtx, txBldr, []sdk.Msg{msg})
+			return authclient.GenerateOrBroadcastMsgs(cliCtx, txBldr, []sdk.Msg{msg})
 		},
 	}
 
@@ -72,10 +74,10 @@ func GetCmdCreateValidator(cdc *codec.Codec) *cobra.Command {
 	//cmd.Flags().AddFlagSet(FsMinSelfDelegation)
 
 	cmd.Flags().String(FlagIP, "",
-		fmt.Sprintf("The node's public IP. It takes effect only when used in combination with --%s", client.FlagGenerateOnly))
+		fmt.Sprintf("The node's public IP. It takes effect only when used in combination with --%s", flags.FlagGenerateOnly))
 	cmd.Flags().String(FlagNodeID, "", "The node's ID")
 
-	cmd.MarkFlagRequired(client.FlagFrom)
+	cmd.MarkFlagRequired(flags.FlagFrom)
 	cmd.MarkFlagRequired(FlagPubKey)
 	cmd.MarkFlagRequired(FlagMoniker)
 
@@ -89,8 +91,9 @@ func GetCmdEditValidator(cdc *codec.Codec) *cobra.Command {
 		Use:   "edit-validator",
 		Short: "edit an existing validator account",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			txBldr := auth.NewTxBuilderFromCLI().WithTxEncoder(auth.DefaultTxEncoder(cdc))
-			cliCtx := context.NewCLIContext().WithCodec(cdc)
+			inBuf := bufio.NewReader(cmd.InOrStdin())
+			txBldr := authtypes.NewTxBuilderFromCLI(inBuf).WithTxEncoder(authtypes.DefaultTxEncoder(cdc))
+			cliCtx := client.NewContext().WithCodec(cdc)
 
 			valAddr := cliCtx.GetFromAddress()
 			description := types.Description{
@@ -119,7 +122,7 @@ func GetCmdEditValidator(cdc *codec.Codec) *cobra.Command {
 			msg := types.NewMsgEditValidator(sdk.ValAddress(valAddr), description)
 
 			// build and sign the transaction, then broadcast to Tendermint
-			return utils.GenerateOrBroadcastMsgs(cliCtx, txBldr, []sdk.Msg{msg})
+			return authclient.GenerateOrBroadcastMsgs(cliCtx, txBldr, []sdk.Msg{&msg})
 		},
 	}
 
@@ -173,18 +176,18 @@ func PrepareFlagsForTxCreateValidator(
 	details := viper.GetString(FlagDetails)
 	identity := viper.GetString(FlagIdentity)
 
-	viper.Set(client.FlagChainID, chainID)
-	viper.Set(client.FlagFrom, viper.GetString(client.FlagName))
+	viper.Set(flags.FlagChainID, chainID)
+	viper.Set(flags.FlagFrom, viper.GetString(flags.FlagName))
 	viper.Set(FlagNodeID, nodeID)
 	viper.Set(FlagIP, ip)
-	viper.Set(FlagPubKey, sdk.MustBech32ifyConsPub(valPubKey))
+	viper.Set(FlagPubKey, sdk.MustBech32ifyPubKey(sdk.Bech32PubKeyTypeConsPub, valPubKey))
 	viper.Set(FlagMoniker, config.Moniker)
 	viper.Set(FlagWebsite, website)
 	viper.Set(FlagDetails, details)
 	viper.Set(FlagIdentity, identity)
 
 	if config.Moniker == "" {
-		viper.Set(FlagMoniker, viper.GetString(client.FlagName))
+		viper.Set(FlagMoniker, viper.GetString(flags.FlagName))
 	}
 	//if viper.GetString(FlagAmount) == "" {
 	//	viper.Set(FlagAmount, defaultAmount)
@@ -204,11 +207,11 @@ func PrepareFlagsForTxCreateValidator(
 }
 
 // BuildCreateValidatorMsg makes a new MsgCreateValidator.
-func BuildCreateValidatorMsg(cliCtx context.CLIContext, txBldr auth.TxBuilder) (auth.TxBuilder, sdk.Msg, error) {
+func BuildCreateValidatorMsg(cliCtx client.Context, txBldr authtypes.TxBuilder) (authtypes.TxBuilder, sdk.Msg, error) {
 
 	valAddr := cliCtx.GetFromAddress()
 	pkStr := viper.GetString(FlagPubKey)
-	pk, err := sdk.GetConsPubKeyBech32(pkStr)
+	pk, err := sdk.GetPubKeyFromBech32(sdk.Bech32PrefixConsPub, pkStr)
 	if err != nil {
 		return txBldr, nil, err
 	}
@@ -233,7 +236,7 @@ func BuildCreateValidatorMsg(cliCtx context.CLIContext, txBldr auth.TxBuilder) (
 		minSelfDelegation,
 	)
 
-	if viper.GetBool(client.FlagGenerateOnly) {
+	if viper.GetBool(flags.FlagGenerateOnly) {
 		ip := viper.GetString(FlagIP)
 		nodeID := viper.GetString(FlagNodeID)
 		if nodeID != "" && ip != "" {
@@ -241,5 +244,5 @@ func BuildCreateValidatorMsg(cliCtx context.CLIContext, txBldr auth.TxBuilder) (
 		}
 	}
 
-	return txBldr, msg, nil
+	return txBldr, &msg, nil
 }

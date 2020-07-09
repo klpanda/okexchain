@@ -2,6 +2,7 @@ package keeper
 
 import (
 	"fmt"
+	sdkerror "github.com/cosmos/cosmos-sdk/types/errors"
 	"time"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -36,7 +37,7 @@ func (k Keeper) GetVotingPeriod(ctx sdk.Context, content gov.Content) (votingPer
 }
 
 // check msg Delist proposal
-func (k Keeper) checkMsgDelistProposal(ctx sdk.Context, delistProposal types.DelistProposal, proposer sdk.AccAddress, initialDeposit sdk.DecCoins) sdk.Error {
+func (k Keeper) checkMsgDelistProposal(ctx sdk.Context, delistProposal types.DelistProposal, proposer sdk.AccAddress, initialDeposit sdk.DecCoins) error {
 	// check the proposer of the msg is a validator
 	if !k.stakingKeeper.IsValidator(ctx, proposer) {
 		return gov.ErrInvalidProposer(types.DefaultCodespace, "failed to submit proposal because the proposer of delist proposal should be a validator")
@@ -57,7 +58,7 @@ func (k Keeper) checkMsgDelistProposal(ctx sdk.Context, delistProposal types.Del
 	}
 
 	// check whether the proposer can afford the initial deposit
-	err = common.HasSufficientCoins(proposer, k.bankKeeper.GetCoins(ctx, proposer), initialDeposit)
+	err = common.HasSufficientCoins(proposer, k.bankKeeper.GetAllBalances(ctx, proposer), initialDeposit)
 	if err != nil {
 		return types.ErrInvalidBalanceNotEnough(fmt.Sprintf("failed to submit proposal because proposer %s didn't have enough coins to pay for the initial deposit %s", proposer, initialDeposit))
 	}
@@ -65,13 +66,13 @@ func (k Keeper) checkMsgDelistProposal(ctx sdk.Context, delistProposal types.Del
 }
 
 // CheckMsgSubmitProposal validates MsgSubmitProposal
-func (k Keeper) CheckMsgSubmitProposal(ctx sdk.Context, msg govTypes.MsgSubmitProposal) (sdkErr sdk.Error) {
-	switch content := msg.Content.(type) {
+func (k Keeper) CheckMsgSubmitProposal(ctx sdk.Context, msg govTypes.MsgSubmitProposal) (err error) {
+	switch content := msg.GetContent().(type) {
 	case types.DelistProposal:
-		sdkErr = k.checkMsgDelistProposal(ctx, content, msg.Proposer, msg.InitialDeposit)
+		err = k.checkMsgDelistProposal(ctx, content, msg.Proposer, msg.InitialDeposit)
 	default:
 		errContent := fmt.Sprintf("unrecognized dex proposal content type: %T", content)
-		sdkErr = sdk.ErrUnknownRequest(errContent)
+		err = sdkerror.Wrapf(sdkerror.ErrUnknownRequest, errContent)
 	}
 	return
 }
@@ -80,13 +81,12 @@ func (k Keeper) CheckMsgSubmitProposal(ctx sdk.Context, msg govTypes.MsgSubmitPr
 func (k Keeper) AfterSubmitProposalHandler(ctx sdk.Context, proposal govTypes.Proposal) {}
 
 // VoteHandler handles  delist proposal when voted
-func (k Keeper) VoteHandler(ctx sdk.Context, proposal govTypes.Proposal, vote govTypes.Vote) (string, sdk.Error) {
-	if _, ok := proposal.Content.(types.DelistProposal); ok {
-		delistProposal := proposal.Content.(types.DelistProposal)
+func (k Keeper) VoteHandler(ctx sdk.Context, proposal govTypes.Proposal, vote govTypes.Vote) (string, error) {
+	if delistProposal, ok := proposal.GetContent().(types.DelistProposal); ok {
 		tokenPairName := delistProposal.BaseAsset + "_" + delistProposal.QuoteAsset
 		if k.IsTokenPairLocked(ctx, tokenPairName) {
 			errContent := fmt.Sprintf("the trading pair (%s) is locked, please retry later", tokenPairName)
-			return "", sdk.ErrInternal(errContent)
+			return "", sdkerror.Wrapf(sdkerror.ErrInternal, errContent)
 		}
 	}
 	return "", nil
@@ -109,7 +109,7 @@ func (k Keeper) RejectedHandler(ctx sdk.Context, content govTypes.Content) {
 
 // AfterDepositPeriodPassed handles delist proposal when passed
 func (k Keeper) AfterDepositPeriodPassed(ctx sdk.Context, proposal govTypes.Proposal) {
-	if content, ok := proposal.Content.(types.DelistProposal); ok {
+	if content, ok := proposal.GetContent().(types.DelistProposal); ok {
 		tokenPairName := fmt.Sprintf("%s_%s", content.BaseAsset, content.QuoteAsset)
 		// change the status of the token pair in the store
 		tokenPair := k.GetTokenPair(ctx, tokenPairName)

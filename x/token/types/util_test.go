@@ -6,7 +6,6 @@ import (
 	"github.com/okex/okchain/x/common"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/cosmos/cosmos-sdk/x/auth"
 	"github.com/stretchr/testify/require"
 	"github.com/tendermint/tendermint/crypto/secp256k1"
 )
@@ -90,47 +89,13 @@ func TestDecAccount_String(t *testing.T) {
 
 	expectedStr := `Account:
  Address:       ` + addr.String() + `
- Pubkey:        ` + sdk.MustBech32ifyAccPub(pubKey) + `
+ Pubkey:        ` + sdk.MustBech32ifyPubKey(sdk.Bech32PubKeyTypeAccPub, pubKey) + `
  Coins:         0.20000000` + common.NativeToken + `
  AccountNumber: 1
  Sequence:      1`
 
 	decStr := decAccount.String()
 	require.EqualValues(t, decStr, expectedStr)
-}
-
-func TestBaseAccountToDecAccount(t *testing.T) {
-	priKey := secp256k1.GenPrivKey()
-	pubKey := priKey.PubKey()
-	addr := sdk.AccAddress(pubKey.Address())
-
-	coins := sdk.DecCoins{
-		sdk.NewDecCoinFromDec(common.NativeToken, sdk.NewDec(100)),
-	}
-
-	baseAccount := auth.BaseAccount{
-		Address:       addr,
-		Coins:         coins,
-		PubKey:        pubKey,
-		AccountNumber: 1,
-		Sequence:      1,
-	}
-
-	dec := sdk.MustNewDecFromStr("100.00000000")
-	decCoins := sdk.DecCoins{
-		sdk.NewDecCoinFromDec(common.NativeToken, dec),
-	}
-
-	expectedDecAccount := DecAccount{
-		Address:       addr,
-		Coins:         decCoins,
-		PubKey:        pubKey,
-		AccountNumber: 1,
-		Sequence:      1,
-	}
-
-	decAccount := BaseAccountToDecAccount(baseAccount)
-	require.EqualValues(t, decAccount, expectedDecAccount)
 }
 
 func TestValidCoinName(t *testing.T) {

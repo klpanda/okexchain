@@ -65,14 +65,9 @@ type ValidatorExported struct {
 
 // Import converts validator exported format to inner one by filling the zero-value of Tokens and Commission
 func (ve ValidatorExported) Import() Validator {
-	consPk, err := sdk.GetConsPubKeyBech32(ve.ConsPubKey)
-	if err != nil {
-		panic(fmt.Sprintf("failed. consensus pubkey is parsed error: %s", err.Error()))
-	}
-
 	return Validator{
 		ve.OperatorAddress,
-		consPk,
+		ve.ConsPubKey,
 		ve.Jailed,
 		ve.Status,
 		sdk.NewInt(0),
@@ -87,7 +82,7 @@ func (ve ValidatorExported) Import() Validator {
 
 // ConsAddress returns the TM validator address of exported validator
 func (ve ValidatorExported) ConsAddress() sdk.ConsAddress {
-	consPk, err := sdk.GetConsPubKeyBech32(ve.ConsPubKey)
+	consPk, err := sdk.GetPubKeyFromBech32(sdk.Bech32PubKeyTypeConsPub, ve.ConsPubKey)
 	if err != nil {
 		panic(fmt.Sprintf("failed. consensus pubkey is parsed error: %s", err.Error()))
 	}

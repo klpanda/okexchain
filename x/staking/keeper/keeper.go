@@ -10,7 +10,7 @@ import (
 
 	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/cosmos/cosmos-sdk/x/params"
+	paramstypes "github.com/cosmos/cosmos-sdk/x/params/types"
 	"github.com/okex/okchain/x/staking/types"
 )
 
@@ -23,27 +23,28 @@ var _ types.ValidatorSet = Keeper{}
 type Keeper struct {
 	storeKey           sdk.StoreKey
 	storeTKey          sdk.StoreKey
-	cdc                *codec.Codec
-	supplyKeeper       types.SupplyKeeper
+	cdc                codec.Marshaler
+	accKeeper          types.AccountKeeper
+	bankKeeper         types.BankKeeper
 	hooks              types.StakingHooks
-	paramstore         params.Subspace
+	paramstore         paramstypes.Subspace
 	validatorCache     map[string]cachedValidator
 	validatorCacheList *list.List
 
 	// codespace
-	codespace sdk.CodespaceType
+	codespace string
 }
 
 // NewKeeper creates a new staking Keeper instance
-func NewKeeper(cdc *codec.Codec, key, tkey sdk.StoreKey, supplyKeeper types.SupplyKeeper,
-	paramstore params.Subspace, codespace sdk.CodespaceType) Keeper {
+func NewKeeper(cdc codec.Marshaler, key, tkey sdk.StoreKey, accKeeper types.AccountKeeper, bankKeeper types.BankKeeper,
+	paramstore paramstypes.Subspace, codespace string) Keeper {
 
 	// ensure bonded and not bonded module accounts are set
-	if addr := supplyKeeper.GetModuleAddress(types.BondedPoolName); addr == nil {
+	if addr := accKeeper.GetModuleAddress(types.BondedPoolName); addr == nil {
 		panic(fmt.Sprintf("%s module account has not been set", types.BondedPoolName))
 	}
 
-	if addr := supplyKeeper.GetModuleAddress(types.NotBondedPoolName); addr == nil {
+	if addr := accKeeper.GetModuleAddress(types.NotBondedPoolName); addr == nil {
 		panic(fmt.Sprintf("%s module account has not been set", types.NotBondedPoolName))
 	}
 
@@ -51,7 +52,8 @@ func NewKeeper(cdc *codec.Codec, key, tkey sdk.StoreKey, supplyKeeper types.Supp
 		storeKey:           key,
 		storeTKey:          tkey,
 		cdc:                cdc,
-		supplyKeeper:       supplyKeeper,
+		accKeeper:          accKeeper,
+		bankKeeper:         bankKeeper,
 		paramstore:         paramstore.WithKeyTable(ParamKeyTable()),
 		hooks:              nil,
 		validatorCache:     make(map[string]cachedValidator, aminoCacheSize),
@@ -75,25 +77,26 @@ func (k *Keeper) SetHooks(sh types.StakingHooks) *Keeper {
 }
 
 // Codespace returns the codespace
-func (k Keeper) Codespace() sdk.CodespaceType {
+func (k Keeper) Codespace() string {
 	return k.codespace
 }
 
 // GetLastTotalPower loads the last total validator power
-func (k Keeper) GetLastTotalPower(ctx sdk.Context) (power sdk.Int) {
+func (k Keeper) GetLastTotalPower(ctx sdk.Context) sdk.Int {
 	store := ctx.KVStore(k.storeKey)
 	b := store.Get(types.LastTotalPowerKey)
 	if b == nil {
 		return sdk.ZeroInt()
 	}
-	k.cdc.MustUnmarshalBinaryLengthPrefixed(b, &power)
-	return
+	ip := sdk.IntProto{}
+	k.cdc.MustUnmarshalBinaryLengthPrefixed(b, &ip)
+	return ip.Int
 }
 
 // SetLastTotalPower sets the last total validator power
 func (k Keeper) SetLastTotalPower(ctx sdk.Context, power sdk.Int) {
 	store := ctx.KVStore(k.storeKey)
-	b := k.cdc.MustMarshalBinaryLengthPrefixed(power)
+	b := k.cdc.MustMarshalBinaryBare(&sdk.IntProto{Int: power})
 	store.Set(types.LastTotalPowerKey, b)
 }
 
@@ -121,7 +124,7 @@ func (k Keeper) GetOperAddrFromValidatorAddr(ctx sdk.Context, va string) (sdk.Va
 	validators := k.GetAllValidators(ctx)
 
 	for _, validator := range validators {
-		if strings.Compare(strings.ToUpper(va), validator.ConsPubKey.Address().String()) == 0 {
+		if strings.Compare(strings.ToUpper(va), sdk.MustGetPubKeyFromBech32(sdk.Bech32PubKeyTypeConsPub, validator.ConsPubKey).Address().String()) == 0 {
 			return validator.OperatorAddress, true
 		}
 	}
@@ -134,8 +137,16 @@ func (k Keeper) GetOperAndValidatorAddr(ctx sdk.Context) types.OVPairs {
 	var ovPairs types.OVPairs
 
 	for _, validator := range validators {
-		ovPair := types.OVPair{OperAddr: validator.OperatorAddress, ValAddr: validator.ConsPubKey.Address().String()}
+		ovPair := types.OVPair{OperAddr: validator.OperatorAddress, ValAddr: sdk.MustGetPubKeyFromBech32(sdk.Bech32PubKeyTypeConsPub,validator.ConsPubKey).Address().String()}
 		ovPairs = append(ovPairs, ovPair)
 	}
 	return ovPairs
+}
+
+func (k Keeper) GetBankKeeper() types.BankKeeper {
+	return k.bankKeeper
+}
+
+func (k Keeper) GetAccKeeper() types.AccountKeeper {
+	return k.accKeeper
 }

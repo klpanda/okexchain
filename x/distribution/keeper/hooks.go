@@ -32,14 +32,14 @@ func (h Hooks) AfterValidatorRemoved(ctx sdk.Context, _ sdk.ConsAddress, valAddr
 		// remainder to community pool
 		if !remainder.IsZero() {
 			feePool := h.k.GetFeePool(ctx)
-			feePool.CommunityPool = feePool.CommunityPool.Add(remainder)
+			feePool.CommunityPool = feePool.CommunityPool.Add(remainder...)
 			h.k.SetFeePool(ctx, feePool)
 		}
 		// add to validator account
 		if !coins.IsZero() {
 			accAddr := sdk.AccAddress(valAddr)
 			withdrawAddr := h.k.GetDelegatorWithdrawAddr(ctx, accAddr)
-			err := h.k.supplyKeeper.SendCoinsFromModuleToAccount(ctx, types.ModuleName, withdrawAddr, coins)
+			err := h.k.bankKeeper.SendCoinsFromModuleToAccount(ctx, types.ModuleName, withdrawAddr, coins)
 			if err != nil {
 				panic(err)
 			}

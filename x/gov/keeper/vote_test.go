@@ -2,10 +2,10 @@ package keeper
 
 import (
 	"fmt"
+	sdkGovtypes "github.com/cosmos/cosmos-sdk/x/gov/types"
 	"testing"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	sdkGov "github.com/cosmos/cosmos-sdk/x/gov"
 	"github.com/stretchr/testify/require"
 
 	"github.com/okex/okchain/x/gov/types"
@@ -49,7 +49,7 @@ func TestKeeper_AddVote(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, "", votefee)
 	vote, ok := keeper.GetVote(ctx, proposalID, Addrs[0])
-	expectedVote := sdkGov.Vote{ProposalID: proposalID, Voter: Addrs[0], Option: types.OptionYes}
+	expectedVote := sdkGovtypes.Vote{ProposalID: proposalID, Voter: Addrs[0], Option: types.OptionYes}
 	require.True(t, ok)
 	require.Equal(t, expectedVote, vote)
 
@@ -57,7 +57,7 @@ func TestKeeper_AddVote(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, "", votefee)
 	vote, ok = keeper.GetVote(ctx, proposalID, Addrs[0])
-	expectedVote = sdkGov.Vote{ProposalID: proposalID, Voter: Addrs[0], Option: types.OptionNo}
+	expectedVote = sdkGovtypes.Vote{ProposalID: proposalID, Voter: Addrs[0], Option: types.OptionNo}
 	require.True(t, ok)
 	require.Equal(t, expectedVote, vote)
 }
@@ -85,12 +85,12 @@ func TestKeeper_GetVote(t *testing.T) {
 	}
 	vote, found := keeper.GetVote(ctx, proposalID, Addrs[0])
 	require.True(t, found)
-	require.True(t, vote.Equals(expectedVote))
+	require.Equal(t, vote, expectedVote)
 
 	// get vote from db
 	vote, found = keeper.GetVote(ctx, proposalID, Addrs[0])
 	require.True(t, found)
-	require.True(t, vote.Equals(expectedVote))
+	require.Equal(t, vote, expectedVote)
 }
 
 func TestKeeper_GetVotes(t *testing.T) {

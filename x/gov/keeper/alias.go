@@ -1,10 +1,10 @@
 package keeper
 
 import (
-	sdkGov "github.com/cosmos/cosmos-sdk/x/gov"
+	sdkGovtypes "github.com/cosmos/cosmos-sdk/x/gov/types"
 )
 
 var (
 	// NewRouter is alias of cm gov NewRouter
-	NewRouter = sdkGov.NewRouter
+	NewRouter = sdkGovtypes.NewRouter
 )

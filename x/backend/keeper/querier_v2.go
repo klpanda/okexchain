@@ -3,6 +3,7 @@ package keeper
 import (
 	"encoding/json"
 	"fmt"
+	sdkerror "github.com/cosmos/cosmos-sdk/types/errors"
 	"time"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -11,16 +12,16 @@ import (
 	abci "github.com/tendermint/tendermint/abci/types"
 )
 
-func queryTickerFromMarketKeeperV2(ctx sdk.Context, path []string, req abci.RequestQuery, keeper Keeper) ([]byte, sdk.Error) {
+func queryTickerFromMarketKeeperV2(ctx sdk.Context, path []string, req abci.RequestQuery, keeper Keeper) ([]byte, error) {
 	params := types.QueryTickerParams{}
 	if err := keeper.cdc.UnmarshalJSON(req.Data, &params); err != nil {
-		return nil, sdk.ErrInternal(err.Error())
+		return nil, sdkerror.Wrap(sdkerror.ErrInternal, err.Error())
 	}
 
 	keeper.marketKeeper.InitTokenPairMap(ctx, keeper.dexKeeper)
 	tickers, err := keeper.marketKeeper.GetTickers()
 	if err != nil {
-		return nil, sdk.ErrInternal(err.Error())
+		return nil, sdkerror.Wrap(sdkerror.ErrInternal, err.Error())
 	}
 
 	result := types.DefaultTickerV2(params.Product)
@@ -49,17 +50,17 @@ func queryTickerFromMarketKeeperV2(ctx sdk.Context, path []string, req abci.Requ
 
 	res, err := json.Marshal(result)
 	if err != nil {
-		return nil, sdk.ErrInternal(err.Error())
+		return nil, sdkerror.Wrap(sdkerror.ErrInternal, err.Error())
 	}
 
 	return res, nil
 }
 
-func queryTickerListFromMarketKeeperV2(ctx sdk.Context, path []string, req abci.RequestQuery, keeper Keeper) ([]byte, sdk.Error) {
+func queryTickerListFromMarketKeeperV2(ctx sdk.Context, path []string, req abci.RequestQuery, keeper Keeper) ([]byte, error) {
 	keeper.marketKeeper.InitTokenPairMap(ctx, keeper.dexKeeper)
 	tickers, err := keeper.marketKeeper.GetTickers()
 	if err != nil {
-		return nil, sdk.ErrInternal(err.Error())
+		return nil, sdkerror.Wrap(sdkerror.ErrInternal, err.Error())
 	}
 
 	var tickerList []types.TickerV2
@@ -84,16 +85,16 @@ func queryTickerListFromMarketKeeperV2(ctx sdk.Context, path []string, req abci.
 
 	res, err := json.Marshal(tickerList)
 	if err != nil {
-		return nil, sdk.ErrInternal(err.Error())
+		return nil, sdkerror.Wrap(sdkerror.ErrInternal, err.Error())
 	}
 
 	return res, nil
 }
 
-func queryTickerV2(ctx sdk.Context, path []string, req abci.RequestQuery, keeper Keeper) ([]byte, sdk.Error) {
+func queryTickerV2(ctx sdk.Context, path []string, req abci.RequestQuery, keeper Keeper) ([]byte, error) {
 	params := types.QueryTickerParams{}
 	if err := keeper.cdc.UnmarshalJSON(req.Data, &params); err != nil {
-		return nil, sdk.ErrUnknownRequest(sdk.AppendMsgToErr("incorrectly formatted request data, ", err.Error()))
+		return nil, sdkerror.Wrap(sdkerror.ErrUnknownRequest, fmt.Sprintf("incorrectly formatted request data, %s", err.Error()))
 	}
 
 	products := []string{params.Product}
@@ -125,13 +126,13 @@ func queryTickerV2(ctx sdk.Context, path []string, req abci.RequestQuery, keeper
 
 	res, err := json.Marshal(result)
 	if err != nil {
-		return nil, sdk.ErrInternal(err.Error())
+		return nil, sdkerror.Wrap(sdkerror.ErrInternal, err.Error())
 	}
 
 	return res, nil
 }
 
-func queryTickerListV2(ctx sdk.Context, path []string, req abci.RequestQuery, keeper Keeper) ([]byte, sdk.Error) {
+func queryTickerListV2(ctx sdk.Context, path []string, req abci.RequestQuery, keeper Keeper) ([]byte, error) {
 	tickers := keeper.getAllTickers()
 	var tickerList []types.TickerV2
 	for _, t := range tickers {
@@ -153,12 +154,12 @@ func queryTickerListV2(ctx sdk.Context, path []string, req abci.RequestQuery, ke
 	}
 	res, err := common.JSONMarshalV2(tickerList)
 	if err != nil {
-		return nil, sdk.ErrInternal(err.Error())
+		return nil, sdkerror.Wrap(sdkerror.ErrInternal, err.Error())
 	}
 	return res, nil
 }
 
-func queryInstrumentsV2(ctx sdk.Context, path []string, req abci.RequestQuery, keeper Keeper) ([]byte, sdk.Error) {
+func queryInstrumentsV2(ctx sdk.Context, path []string, req abci.RequestQuery, keeper Keeper) ([]byte, error) {
 	tokenPairs := keeper.dexKeeper.GetTokenPairs(ctx)
 
 	var result []*types.InstrumentV2
@@ -171,17 +172,17 @@ func queryInstrumentsV2(ctx sdk.Context, path []string, req abci.RequestQuery, k
 
 	res, err := json.Marshal(result)
 	if err != nil {
-		return nil, sdk.ErrInternal(err.Error())
+		return nil, sdkerror.Wrap(sdkerror.ErrInternal, err.Error())
 	}
 
 	return res, nil
 }
 
-func queryOrderListV2(ctx sdk.Context, path []string, req abci.RequestQuery, keeper Keeper) ([]byte, sdk.Error) {
+func queryOrderListV2(ctx sdk.Context, path []string, req abci.RequestQuery, keeper Keeper) ([]byte, error) {
 	var params types.QueryOrderParamsV2
 	err := keeper.cdc.UnmarshalJSON(req.Data, &params)
 	if err != nil {
-		return nil, sdk.ErrInternal(err.Error())
+		return nil, sdkerror.Wrap(sdkerror.ErrInternal, err.Error())
 	}
 
 	orders := keeper.getOrderListV2(ctx, params.Product, params.Address, params.Side, params.IsOpen, params.After, params.Before, params.Limit)
@@ -199,17 +200,17 @@ func queryOrderListV2(ctx sdk.Context, path []string, req abci.RequestQuery, kee
 
 	res, err := json.Marshal(result)
 	if err != nil {
-		return nil, sdk.ErrInternal(err.Error())
+		return nil, sdkerror.Wrap(sdkerror.ErrInternal, err.Error())
 	}
 
 	return res, nil
 }
 
-func queryOrderV2(ctx sdk.Context, path []string, req abci.RequestQuery, keeper Keeper) ([]byte, sdk.Error) {
+func queryOrderV2(ctx sdk.Context, path []string, req abci.RequestQuery, keeper Keeper) ([]byte, error) {
 	var params types.QueryOrderParamsV2
 	err := keeper.cdc.UnmarshalJSON(req.Data, &params)
 	if err != nil {
-		return nil, sdk.ErrInternal(err.Error())
+		return nil, sdkerror.Wrap(sdkerror.ErrInternal, err.Error())
 	}
 
 	order := keeper.getOrderByIDV2(ctx, params.OrderID)
@@ -222,17 +223,17 @@ func queryOrderV2(ctx sdk.Context, path []string, req abci.RequestQuery, keeper 
 
 	res, err := json.Marshal(result)
 	if err != nil {
-		return nil, sdk.ErrInternal(err.Error())
+		return nil, sdkerror.Wrap(sdkerror.ErrInternal, err.Error())
 	}
 
 	return res, nil
 }
 
-func queryCandleListFromMarketKeeperV2(ctx sdk.Context, path []string, req abci.RequestQuery, keeper Keeper) ([]byte, sdk.Error) {
+func queryCandleListFromMarketKeeperV2(ctx sdk.Context, path []string, req abci.RequestQuery, keeper Keeper) ([]byte, error) {
 	var params types.QueryKlinesParams
 	err := keeper.cdc.UnmarshalJSON(req.Data, &params)
 	if err != nil {
-		return nil, sdk.ErrUnknownRequest(sdk.AppendMsgToErr("incorrectly formatted request data", err.Error()))
+		return nil, sdkerror.Wrap(sdkerror.ErrUnknownRequest, fmt.Sprintf("incorrectly formatted request data %s", err.Error()))
 	}
 
 	ctx.Logger().Debug(fmt.Sprintf("queryCandleList : %+v", params))
@@ -240,42 +241,42 @@ func queryCandleListFromMarketKeeperV2(ctx sdk.Context, path []string, req abci.
 	keeper.marketKeeper.InitTokenPairMap(ctx, keeper.dexKeeper)
 	restData, err := keeper.getCandlesByMarketKeeper(params.Product, params.Granularity, params.Size)
 	if err != nil {
-		return nil, sdk.ErrInternal(err.Error())
+		return nil, sdkerror.Wrap(sdkerror.ErrInternal, err.Error())
 	}
 
 	res, err := json.Marshal(restData)
 	if err != nil {
-		return nil, sdk.ErrInternal(err.Error())
+		return nil, sdkerror.Wrap(sdkerror.ErrInternal, err.Error())
 	}
 
 	return res, nil
 }
 
-func queryCandleListV2(ctx sdk.Context, path []string, req abci.RequestQuery, keeper Keeper) ([]byte, sdk.Error) {
+func queryCandleListV2(ctx sdk.Context, path []string, req abci.RequestQuery, keeper Keeper) ([]byte, error) {
 	var params types.QueryKlinesParams
 	err := keeper.cdc.UnmarshalJSON(req.Data, &params)
 	if err != nil {
-		return nil, sdk.ErrUnknownRequest(sdk.AppendMsgToErr("incorrectly formatted request data", err.Error()))
+		return nil, sdkerror.Wrap(sdkerror.ErrUnknownRequest, fmt.Sprintf("incorrectly formatted request data %s", err.Error()))
 	}
 	ctx.Logger().Debug(fmt.Sprintf("queryCandleList : %+v", params))
 	restData, err := keeper.GetCandles(params.Product, params.Granularity, params.Size)
 	if err != nil {
-		return nil, sdk.ErrInternal(err.Error())
+		return nil, sdkerror.Wrap(sdkerror.ErrInternal, err.Error())
 	}
 
 	res, err := json.Marshal(restData)
 	if err != nil {
-		return nil, sdk.ErrInternal(err.Error())
+		return nil, sdkerror.Wrap(sdkerror.ErrInternal, err.Error())
 	}
 
 	return res, nil
 }
 
-func queryMatchResultsV2(ctx sdk.Context, path []string, req abci.RequestQuery, keeper Keeper) ([]byte, sdk.Error) {
+func queryMatchResultsV2(ctx sdk.Context, path []string, req abci.RequestQuery, keeper Keeper) ([]byte, error) {
 	var params types.QueryMatchParamsV2
 	err := keeper.cdc.UnmarshalJSON(req.Data, &params)
 	if err != nil {
-		return nil, sdk.ErrUnknownRequest(sdk.AppendMsgToErr("incorrectly formatted request data", err.Error()))
+		return nil, sdkerror.Wrap(sdkerror.ErrUnknownRequest, fmt.Sprintf("incorrectly formatted request data %s", err.Error()))
 	}
 
 	matches := keeper.getMatchResultsV2(ctx, params.Product, params.After, params.Before, params.Limit)
@@ -285,20 +286,20 @@ func queryMatchResultsV2(ctx sdk.Context, path []string, req abci.RequestQuery, 
 
 	res, err := common.JSONMarshalV2(matches)
 	if err != nil {
-		return nil, sdk.ErrInternal(err.Error())
+		return nil, sdkerror.Wrap(sdkerror.ErrInternal, err.Error())
 	}
 	return res, nil
 }
 
-func queryFeeDetailsV2(ctx sdk.Context, path []string, req abci.RequestQuery, keeper Keeper) ([]byte, sdk.Error) {
+func queryFeeDetailsV2(ctx sdk.Context, path []string, req abci.RequestQuery, keeper Keeper) ([]byte, error) {
 	var params types.QueryFeeDetailsParamsV2
 	err := keeper.cdc.UnmarshalJSON(req.Data, &params)
 	if err != nil {
-		return nil, sdk.ErrUnknownRequest(sdk.AppendMsgToErr("incorrectly formatted request data", err.Error()))
+		return nil, sdkerror.Wrap(sdkerror.ErrUnknownRequest, fmt.Sprintf("incorrectly formatted request data %s", err.Error()))
 	}
 	_, err = sdk.AccAddressFromBech32(params.Address)
 	if err != nil {
-		return nil, sdk.ErrUnknownRequest(sdk.AppendMsgToErr("invalid address", err.Error()))
+		return nil, sdkerror.Wrap(sdkerror.ErrUnknownRequest, fmt.Sprintf("invalid address %s", err.Error()))
 	}
 
 	feeDetails := keeper.getFeeDetailsV2(ctx, params.Address, params.After, params.Before, params.Limit)
@@ -308,17 +309,17 @@ func queryFeeDetailsV2(ctx sdk.Context, path []string, req abci.RequestQuery, ke
 
 	res, err := common.JSONMarshalV2(feeDetails)
 	if err != nil {
-		return nil, sdk.ErrInternal(err.Error())
+		return nil, sdkerror.Wrap(sdkerror.ErrInternal, err.Error())
 	}
 
 	return res, nil
 }
 
-func queryDealsV2(ctx sdk.Context, path []string, req abci.RequestQuery, keeper Keeper) ([]byte, sdk.Error) {
+func queryDealsV2(ctx sdk.Context, path []string, req abci.RequestQuery, keeper Keeper) ([]byte, error) {
 	var params types.QueryDealsParamsV2
 	err := keeper.cdc.UnmarshalJSON(req.Data, &params)
 	if err != nil {
-		return nil, sdk.ErrUnknownRequest(sdk.AppendMsgToErr("incorrectly formatted request data", err.Error()))
+		return nil, sdkerror.Wrap(sdkerror.ErrUnknownRequest, fmt.Sprintf("incorrectly formatted request data %s", err.Error()))
 	}
 
 	deals := keeper.getDealsV2(ctx, params.Address, params.Product, params.Side, params.After, params.Before, params.Limit)
@@ -328,19 +329,19 @@ func queryDealsV2(ctx sdk.Context, path []string, req abci.RequestQuery, keeper 
 
 	res, err := common.JSONMarshalV2(deals)
 	if err != nil {
-		return nil, sdk.ErrInternal(err.Error())
+		return nil, sdkerror.Wrap(sdkerror.ErrInternal, err.Error())
 	}
 
 	return res, nil
 }
 
-func queryTxListV2(ctx sdk.Context, path []string, req abci.RequestQuery, keeper Keeper) ([]byte, sdk.Error) {
+func queryTxListV2(ctx sdk.Context, path []string, req abci.RequestQuery, keeper Keeper) ([]byte, error) {
 	var params types.QueryTxListParamsV2
 	if err := keeper.cdc.UnmarshalJSON(req.Data, &params); err != nil {
-		return nil, sdk.ErrUnknownRequest(sdk.AppendMsgToErr("incorrectly formatted request data", err.Error()))
+		return nil, sdkerror.Wrap(sdkerror.ErrUnknownRequest, fmt.Sprintf("incorrectly formatted request data%s", err.Error()))
 	}
 	if _, err := sdk.AccAddressFromBech32(params.Address); err != nil {
-		return nil, sdk.ErrUnknownRequest(sdk.AppendMsgToErr("invalid address", err.Error()))
+		return nil, sdkerror.Wrap(sdkerror.ErrUnknownRequest, fmt.Sprintf("invalid address %s", err.Error()))
 	}
 
 	txs := keeper.getTransactionListV2(ctx, params.Address, params.TxType, params.After, params.Before, params.Limit)
@@ -350,7 +351,7 @@ func queryTxListV2(ctx sdk.Context, path []string, req abci.RequestQuery, keeper
 
 	res, err := common.JSONMarshalV2(txs)
 	if err != nil {
-		return nil, sdk.ErrInternal(err.Error())
+		return nil, sdkerror.Wrap(sdkerror.ErrInternal, err.Error())
 	}
 
 	return res, nil

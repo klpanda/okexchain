@@ -2,8 +2,8 @@ package token
 
 import (
 	"encoding/json"
+	"github.com/cosmos/cosmos-sdk/client"
 
-	"github.com/cosmos/cosmos-sdk/client/context"
 	"github.com/cosmos/cosmos-sdk/codec"
 	"github.com/cosmos/cosmos-sdk/types/module"
 	"github.com/gorilla/mux"
@@ -32,14 +32,14 @@ func (AppModuleBasic) RegisterCodec(cdc *codec.Codec) {
 }
 
 // nolint
-func (AppModuleBasic) DefaultGenesis() json.RawMessage {
-	return tokenTypes.ModuleCdc.MustMarshalJSON(defaultGenesisState())
+func (AppModuleBasic) DefaultGenesis(cdc codec.JSONMarshaler) json.RawMessage {
+	return cdc.MustMarshalJSON(defaultGenesisState())
 }
 
 // validateGenesis module validate genesis from json raw message
-func (AppModuleBasic) ValidateGenesis(bz json.RawMessage) error {
+func (AppModuleBasic) ValidateGenesis(cdc codec.JSONMarshaler, bz json.RawMessage) error {
 	var data GenesisState
-	err := tokenTypes.ModuleCdc.UnmarshalJSON(bz, &data)
+	err := cdc.UnmarshalJSON(bz, &data)
 	if err != nil {
 		return err
 	}
@@ -47,16 +47,16 @@ func (AppModuleBasic) ValidateGenesis(bz json.RawMessage) error {
 }
 
 // RegisterRESTRoutes register rest routes
-func (AppModuleBasic) RegisterRESTRoutes(ctx context.CLIContext, rtr *mux.Router) {
+func (AppModuleBasic) RegisterRESTRoutes(ctx client.Context, rtr *mux.Router) {
 	rest.RegisterRoutes(ctx, rtr, ModuleName)
 }
 
 // GetTxCmd gets the root tx command of this module
-func (AppModuleBasic) GetTxCmd(cdc *codec.Codec) *cobra.Command {
-	return cli.GetTxCmd(tokenTypes.StoreKey, cdc)
+func (AppModuleBasic) GetTxCmd(ctx client.Context) *cobra.Command {
+	return cli.GetTxCmd(tokenTypes.StoreKey, ctx.Codec)
 }
 
 // GetQueryCmd gets the root query command of this module
-func (AppModuleBasic) GetQueryCmd(cdc *codec.Codec) *cobra.Command {
-	return cli.GetQueryCmd(tokenTypes.StoreKey, cdc)
+func (AppModuleBasic) GetQueryCmd(ctx client.Context) *cobra.Command {
+	return cli.GetQueryCmd(tokenTypes.StoreKey, ctx.Codec)
 }

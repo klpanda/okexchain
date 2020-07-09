@@ -1,15 +1,15 @@
 package v0_9
 
 import (
+	sdkparamstypes "github.com/cosmos/cosmos-sdk/x/params/types"
 	"time"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	sdkparams "github.com/cosmos/cosmos-sdk/x/params"
 )
 
 // const
 const (
-	ModuleName = sdkparams.ModuleName
+	ModuleName = sdkparamstypes.ModuleName
 )
 
 type (

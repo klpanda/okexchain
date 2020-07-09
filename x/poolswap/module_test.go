@@ -2,9 +2,12 @@ package poolswap
 
 import (
 	"encoding/json"
+	"github.com/cosmos/cosmos-sdk/client"
+	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
+	"github.com/cosmos/cosmos-sdk/server/api"
+	"github.com/cosmos/cosmos-sdk/std"
 	"testing"
 
-	cliLcd "github.com/cosmos/cosmos-sdk/client/lcd"
 	"github.com/cosmos/cosmos-sdk/codec"
 	"github.com/okex/okchain/x/poolswap/types"
 	"github.com/stretchr/testify/require"
@@ -23,16 +26,20 @@ func TestAppModule(t *testing.T) {
 	require.EqualValues(t, QuerierRoute, module.QuerierRoute())
 
 	cdc := ModuleCdc
-	//module.RegisterCodec(cdc)
+	interfaceRegistry := codectypes.NewInterfaceRegistry()
+	appCodec := codec.NewHybridCodec(cdc, interfaceRegistry)
+	std.RegisterInterfaces(interfaceRegistry)
 
-	msg := module.DefaultGenesis()
-	require.Nil(t, module.ValidateGenesis(msg))
-	require.NotNil(t, module.ValidateGenesis([]byte{}))
+	cliCtx := client.NewContext().WithCodec(cdc).WithJSONMarshaler(appCodec)
 
-	module.InitGenesis(ctx, msg)
+	msg := module.DefaultGenesis(appCodec)
+	require.Nil(t, module.ValidateGenesis(appCodec, msg))
+	require.NotNil(t, module.ValidateGenesis(appCodec, []byte{}))
+
+	module.InitGenesis(ctx, appCodec, msg)
 	params := keeper.GetParams(ctx)
 	require.EqualValues(t, types.DefaultParams().FeeRate, params.FeeRate)
-	exportMsg := module.ExportGenesis(ctx)
+	exportMsg := module.ExportGenesis(ctx, appCodec)
 
 	var gs GenesisState
 	ModuleCdc.MustUnmarshalJSON(exportMsg, &gs)
@@ -41,12 +48,12 @@ func TestAppModule(t *testing.T) {
 	// for coverage
 	module.BeginBlock(ctx, abci.RequestBeginBlock{})
 	module.EndBlock(ctx, abci.RequestEndBlock{})
-	module.GetQueryCmd(cdc)
-	module.GetTxCmd(cdc)
+	module.GetQueryCmd(cliCtx)
+	module.GetTxCmd(cliCtx)
 	module.NewQuerierHandler()
 	module.NewHandler()
-	rs := cliLcd.NewRestServer(cdc, nil)
-	module.RegisterRESTRoutes(rs.CliCtx, rs.Mux)
+	rs := api.New(cliCtx, nil)
+	module.RegisterRESTRoutes(rs.ClientCtx, rs.Router)
 	module.RegisterInvariants(nil)
 	module.RegisterCodec(codec.New())
 }

@@ -2,15 +2,15 @@ package rest
 
 import (
 	"fmt"
+	"github.com/cosmos/cosmos-sdk/client"
+	authclient "github.com/cosmos/cosmos-sdk/x/auth/client"
 	"github.com/okex/okchain/x/common"
 	"net/http"
 
 	"github.com/gorilla/mux"
 
-	"github.com/cosmos/cosmos-sdk/client/context"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/rest"
-	"github.com/cosmos/cosmos-sdk/x/auth/client/utils"
 	"github.com/okex/okchain/x/staking/types"
 )
 
@@ -25,7 +25,7 @@ func contains(stringSlice []string, txType string) bool {
 }
 
 // queries staking txs
-func queryTxs(cliCtx context.CLIContext, action string, delegatorAddr string) (*sdk.SearchTxsResult, error) {
+func queryTxs(cliCtx client.Context, action string, delegatorAddr string) (*sdk.SearchTxsResult, error) {
 	page := 1
 	limit := 100
 	events := []string{
@@ -33,10 +33,10 @@ func queryTxs(cliCtx context.CLIContext, action string, delegatorAddr string) (*
 		fmt.Sprintf("%s.%s='%s'", sdk.EventTypeMessage, sdk.AttributeKeySender, delegatorAddr),
 	}
 
-	return utils.QueryTxsByEvents(cliCtx, events, page, limit)
+	return authclient.QueryTxsByEvents(cliCtx, events, page, limit, "")
 }
 
-func queryDelegator(cliCtx context.CLIContext, endpoint string) http.HandlerFunc {
+func queryDelegator(cliCtx client.Context, endpoint string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		bech32DelAddr := mux.Vars(r)["delegatorAddr"]
 
@@ -70,7 +70,7 @@ func queryDelegator(cliCtx context.CLIContext, endpoint string) http.HandlerFunc
 	}
 }
 
-func queryValidator(cliCtx context.CLIContext, endpoint string) http.HandlerFunc {
+func queryValidator(cliCtx client.Context, endpoint string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		bech32ValAddr := mux.Vars(r)["validatorAddr"]
 

@@ -2,14 +2,14 @@ package rest
 
 import (
 	"fmt"
+	"github.com/cosmos/cosmos-sdk/client"
+	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	"io/ioutil"
 	"net/http"
 	"strconv"
 
-	"github.com/cosmos/cosmos-sdk/client/context"
 	"github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/rest"
-	"github.com/cosmos/cosmos-sdk/x/auth"
 	"github.com/gorilla/mux"
 	"github.com/okex/okchain/x/common"
 	"github.com/okex/okchain/x/order/keeper"
@@ -17,13 +17,13 @@ import (
 )
 
 // nolint
-func RegisterRoutesV2(cliCtx context.CLIContext, r *mux.Router) {
+func RegisterRoutesV2(cliCtx client.Context, r *mux.Router) {
 	r.HandleFunc("/instruments/{instrument_id}/book", depthBookHandlerV2(cliCtx)).Methods("GET")
 	r.HandleFunc("/order/placeorder", broadcastPlaceOrderRequest(cliCtx)).Methods("POST")
 	r.HandleFunc("/order/cancelorder", broadcastCancelOrderRequest(cliCtx)).Methods("POST")
 }
 
-func depthBookHandlerV2(cliCtx context.CLIContext) http.HandlerFunc {
+func depthBookHandlerV2(cliCtx client.Context) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		vars := mux.Vars(r)
 		product := vars["instrument_id"]
@@ -61,8 +61,8 @@ func depthBookHandlerV2(cliCtx context.CLIContext) http.HandlerFunc {
 
 // BroadcastReq defines a tx broadcasting request.
 type BroadcastReq struct {
-	Tx   auth.StdTx `json:"tx"`
-	Mode string     `json:"mode"`
+	Tx   authtypes.StdTx `json:"tx"`
+	Mode string          `json:"mode"`
 }
 
 type placeCancelOrderResponse struct {
@@ -77,7 +77,7 @@ type placeCancelOrderResponse struct {
 // BroadcastTxRequest implements a tx broadcasting handler that is responsible
 // for broadcasting a valid and signed tx to a full node. The tx can be
 // broadcasted via a sync|async|block mechanism.
-func broadcastPlaceOrderRequest(cliCtx context.CLIContext) http.HandlerFunc {
+func broadcastPlaceOrderRequest(cliCtx client.Context) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req BroadcastReq
 
@@ -107,7 +107,7 @@ func broadcastPlaceOrderRequest(cliCtx context.CLIContext) http.HandlerFunc {
 			return
 		}
 		orderID := ""
-		events := res.Events
+		events := res.Logs[0].Events
 		if len(events) > 0 {
 			attributes := events[0].Attributes
 			for i := 0; i < len(attributes); i++ {
@@ -135,7 +135,7 @@ func broadcastPlaceOrderRequest(cliCtx context.CLIContext) http.HandlerFunc {
 	}
 }
 
-func broadcastCancelOrderRequest(cliCtx context.CLIContext) http.HandlerFunc {
+func broadcastCancelOrderRequest(cliCtx client.Context) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req BroadcastReq
 

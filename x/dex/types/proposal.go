@@ -2,6 +2,7 @@ package types
 
 import (
 	"fmt"
+	sdkerror "github.com/cosmos/cosmos-sdk/types/errors"
 	"strings"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -62,32 +63,32 @@ func (DelistProposal) ProposalType() string {
 }
 
 // ValidateBasic validates delist proposal
-func (drp DelistProposal) ValidateBasic() sdk.Error {
+func (drp DelistProposal) ValidateBasic() error {
 	if len(strings.TrimSpace(drp.Title)) == 0 {
-		return govtypes.ErrInvalidProposalContent(DefaultCodespace, "failed to submit delist proposal because title is blank")
+		return sdkerror.Wrapf(govtypes.ErrInvalidProposalContent, "failed to submit delist proposal because title is blank")
 	}
 	if len(drp.Title) > govtypes.MaxTitleLength {
-		return govtypes.ErrInvalidProposalContent(DefaultCodespace, fmt.Sprintf("failed to submit delist proposal because title is longer than max length of %d", govtypes.MaxTitleLength))
+		return sdkerror.Wrapf(govtypes.ErrInvalidProposalContent, fmt.Sprintf("failed to submit delist proposal because title is longer than max length of %d", govtypes.MaxTitleLength))
 	}
 
 	if len(drp.Description) == 0 {
-		return govtypes.ErrInvalidProposalContent(DefaultCodespace, "failed to submit delist proposal because  description is blank")
+		return sdkerror.Wrapf(govtypes.ErrInvalidProposalContent, "failed to submit delist proposal because  description is blank")
 	}
 
 	if len(drp.Description) > govtypes.MaxDescriptionLength {
-		return govtypes.ErrInvalidProposalContent(DefaultCodespace, fmt.Sprintf("failed to submit delist proposal because  description is longer than max length of %d", govtypes.MaxDescriptionLength))
+		return sdkerror.Wrapf(govtypes.ErrInvalidProposalContent, fmt.Sprintf("failed to submit delist proposal because  description is longer than max length of %d", govtypes.MaxDescriptionLength))
 	}
 
 	if drp.ProposalType() != proposalTypeDelist {
-		return govtypes.ErrInvalidProposalType(DefaultCodespace, drp.ProposalType())
+		return sdkerror.Wrapf(govtypes.ErrInvalidProposalType, drp.ProposalType())
 	}
 
 	if drp.Proposer.Empty() {
-		return sdk.ErrInvalidAddress(drp.Proposer.String())
+		return sdkerror.Wrapf(sdkerror.ErrInvalidAddress, drp.Proposer.String())
 	}
 
 	if drp.BaseAsset == drp.QuoteAsset {
-		return sdk.ErrInvalidCoins(fmt.Sprintf("failed to submit delist proposal because baseasset is same as quoteasset"))
+		return sdkerror.Wrapf(sdkerror.ErrInvalidCoins, fmt.Sprintf("failed to submit delist proposal because baseasset is same as quoteasset"))
 	}
 
 	return nil

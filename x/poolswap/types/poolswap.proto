@@ -1,0 +1,41 @@
+syntax = "proto3";
+package okchain.poolswap;
+
+import "gogoproto/gogo.proto";
+import "cosmos_proto/cosmos.proto";
+import "cosmos/cosmos.proto";
+
+option go_package = "github.com/okex/okchain/x/poolswap/types";
+
+message MsgAddLiquidity {
+    option (gogoproto.equal) = true;
+    string min_liquidity = 1 [(gogoproto.customtype) = "github.com/cosmos/cosmos-sdk/types.Dec", (gogoproto.nullable) = false];
+    cosmos.DecCoin max_base_amount = 2 [(gogoproto.nullable) = false];
+    cosmos.DecCoin quote_amount = 3 [(gogoproto.nullable) = false];;
+    int64 deadline = 4;
+    bytes sender = 5 [(gogoproto.casttype) = "github.com/cosmos/cosmos-sdk/types.AccAddress"];
+}
+
+message MsgRemoveLiquidity {
+    option (gogoproto.equal) = true;
+    string liquidity = 1 [(gogoproto.customtype) = "github.com/cosmos/cosmos-sdk/types.Dec", (gogoproto.nullable) = false];
+    cosmos.DecCoin min_base_amount = 2 [(gogoproto.nullable) = false];
+    cosmos.DecCoin min_quote_amount = 3 [(gogoproto.nullable) = false];
+    int64 deadline = 4;
+    bytes sender = 5 [(gogoproto.casttype) = "github.com/cosmos/cosmos-sdk/types.AccAddress"];
+}
+
+message MsgCreateExchange {
+    option (gogoproto.equal) = true;
+    string token = 1;
+    bytes sender = 2 [(gogoproto.casttype) = "github.com/cosmos/cosmos-sdk/types.AccAddress"];
+}
+
+message MsgTokenToNativeToken {
+    option (gogoproto.equal) = true;
+    cosmos.DecCoin sold_token_amount = 1 [(gogoproto.nullable) = false];
+    cosmos.DecCoin min_bought_token_amount = 2 [(gogoproto.nullable) = false];
+    int64 deadline = 3;
+    bytes recipient = 4 [(gogoproto.casttype) = "github.com/cosmos/cosmos-sdk/types.AccAddress"];
+    bytes sender = 5 [(gogoproto.casttype) = "github.com/cosmos/cosmos-sdk/types.AccAddress"];
+}

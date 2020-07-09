@@ -14,7 +14,7 @@ func TestValidatorSMProxyDelegationSmoke(t *testing.T) {
 	params := DefaultParams()
 
 	originVaSet := addrVals[1:]
-	params.MaxValidators = uint16(len(originVaSet))
+	params.MaxValidators = uint32(len(originVaSet))
 	params.Epoch = 2
 	params.UnbondingTime = time.Millisecond * 300
 
@@ -102,7 +102,7 @@ func TestDelegator(t *testing.T) {
 	_, _, mk := CreateTestInput(t, false, SufficientInitPower)
 
 	params := DefaultParams()
-	params.MaxValidators = uint16(len(addrVals)) - 1
+	params.MaxValidators = uint32(len(addrVals)) - 1
 	params.Epoch = 2
 	params.UnbondingTime = time.Millisecond * 300
 
@@ -194,7 +194,7 @@ func TestProxy(t *testing.T) {
 	params := DefaultParams()
 
 	originVaSet := addrVals[1:]
-	params.MaxValidators = uint16(len(originVaSet))
+	params.MaxValidators = uint32(len(originVaSet))
 	params.Epoch = 2
 	params.UnbondingTime = time.Millisecond * 300
 
@@ -301,7 +301,7 @@ func TestRebindProxy(t *testing.T) {
 	params := DefaultParams()
 
 	originVaSet := addrVals[1:]
-	params.MaxValidators = uint16(len(originVaSet))
+	params.MaxValidators = uint32(len(originVaSet))
 	params.Epoch = 2
 	params.UnbondingTime = time.Millisecond * 300
 
@@ -379,7 +379,7 @@ func TestLimitedProxy(t *testing.T) {
 	params := DefaultParams()
 
 	originVaSet := addrVals[1:]
-	params.MaxValidators = uint16(len(originVaSet))
+	params.MaxValidators = uint32(len(originVaSet))
 	params.Epoch = 2
 	params.UnbondingTime = time.Millisecond * 300
 

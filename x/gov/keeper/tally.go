@@ -2,14 +2,14 @@ package keeper
 
 import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	sdkGov "github.com/cosmos/cosmos-sdk/x/gov"
+	sdkGovtypes "github.com/cosmos/cosmos-sdk/x/gov/types"
 
 	"github.com/okex/okchain/x/gov/types"
 	"github.com/okex/okchain/x/staking/exported"
 )
 
 func tallyDelegatorVotes(
-	ctx sdk.Context, keeper Keeper, currValidators map[string]sdkGov.ValidatorGovInfo, proposalID uint64,
+	ctx sdk.Context, keeper Keeper, currValidators map[string]sdkGovtypes.ValidatorGovInfo, proposalID uint64,
 	voteP *types.Vote, voterPower, totalVotedPower *sdk.Dec, results map[types.VoteOption]sdk.Dec,
 ) {
 	// iterate over all the votes
@@ -52,7 +52,7 @@ func tallyDelegatorVotes(
 }
 
 func tallyValidatorVotes(
-	currValidators map[string]sdkGov.ValidatorGovInfo, voteP *types.Vote, voterPower,
+	currValidators map[string]sdkGovtypes.ValidatorGovInfo, voteP *types.Vote, voterPower,
 	totalPower, totalVotedPower *sdk.Dec, results map[types.VoteOption]sdk.Dec,
 ) {
 	// iterate over the validators again to tally their voting power
@@ -85,11 +85,11 @@ func preTally(
 	totalVotedPower = sdk.ZeroDec()
 	totalPower := sdk.ZeroDec()
 	voterPower := sdk.ZeroDec()
-	currValidators := make(map[string]sdkGov.ValidatorGovInfo)
+	currValidators := make(map[string]sdkGovtypes.ValidatorGovInfo)
 
 	// fetch all the current validators except candidate, insert them into currValidators
 	keeper.sk.IterateBondedValidatorsByPower(ctx, func(index int64, validator exported.ValidatorI) (stop bool) {
-		currValidators[validator.GetOperator().String()] = sdkGov.NewValidatorGovInfo(
+		currValidators[validator.GetOperator().String()] = sdkGovtypes.NewValidatorGovInfo(
 			validator.GetOperator(),
 			validator.GetBondedTokens(),
 			validator.GetDelegatorShares(),

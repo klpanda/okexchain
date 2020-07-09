@@ -3,11 +3,10 @@ package rest
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/cosmos/cosmos-sdk/client"
 	"net/http"
 	"strconv"
 
-	"github.com/cosmos/cosmos-sdk/client/context"
-	"github.com/cosmos/cosmos-sdk/codec"
 	"github.com/cosmos/cosmos-sdk/types/rest"
 	"github.com/gorilla/mux"
 
@@ -17,12 +16,12 @@ import (
 )
 
 // RegisterRoutes - Central function to define routes that get registered by the main application
-func RegisterRoutes(cliCtx context.CLIContext, r *mux.Router) {
+func RegisterRoutes(cliCtx client.Context, r *mux.Router) {
 	r.HandleFunc("/order/depthbook", orderBookHandler(cliCtx)).Methods("GET")
 	r.HandleFunc("/order/{orderID}", orderDetailHandler(cliCtx)).Methods("GET")
 }
 
-func orderDetailHandler(cliCtx context.CLIContext) http.HandlerFunc {
+func orderDetailHandler(cliCtx client.Context) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		vars := mux.Vars(r)
 		orderID := vars["orderID"]
@@ -34,7 +33,7 @@ func orderDetailHandler(cliCtx context.CLIContext) http.HandlerFunc {
 		}
 
 		order2 := &types.Order{}
-		codec.Cdc.MustUnmarshalJSON(res, order2)
+		cliCtx.Codec.MustUnmarshalJSON(res, order2)
 		response := common.GetBaseResponse(order2)
 		resBytes, err2 := json.Marshal(response)
 		if err2 != nil {
@@ -45,7 +44,7 @@ func orderDetailHandler(cliCtx context.CLIContext) http.HandlerFunc {
 	}
 }
 
-func orderBookHandler(cliCtx context.CLIContext) http.HandlerFunc {
+func orderBookHandler(cliCtx client.Context) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		product := r.URL.Query().Get("product")
 		sizeStr := r.URL.Query().Get("size")
@@ -81,7 +80,7 @@ func orderBookHandler(cliCtx context.CLIContext) http.HandlerFunc {
 		}
 
 		bookRes := &keeper.BookRes{}
-		codec.Cdc.MustUnmarshalJSON(res, bookRes)
+		cliCtx.Codec.MustUnmarshalJSON(res, bookRes)
 		response := common.GetBaseResponse(bookRes)
 		resBytes, err2 := json.Marshal(response)
 		if err2 != nil {

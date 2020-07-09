@@ -2,12 +2,11 @@ package staking
 
 import (
 	"fmt"
+	bankkeeper "github.com/cosmos/cosmos-sdk/x/bank/keeper"
 	"testing"
 	"time"
 
 	"github.com/okex/okchain/x/common"
-
-	"github.com/cosmos/cosmos-sdk/x/supply"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/okex/okchain/x/staking/exported"
@@ -25,21 +24,21 @@ import (
 func TestInitGenesis(t *testing.T) {
 	ctx, _, mKeeper := CreateTestInput(t, false, 1000)
 	keeper := mKeeper.Keeper
-	supplyKeeper := mKeeper.SupplyKeeper
-	clearNotBondedPool(t, ctx, supplyKeeper)
+	supplyKeeper := mKeeper.BankKeeper
+	clearNotBondedPool(t, ctx, mKeeper.AccKeeper, mKeeper.BankKeeper)
 	valTokens := int64(1)
 
 	params := keeper.GetParams(ctx)
 	validators := make([]Validator, 2)
 	// initialize the validators
 	validators[0].OperatorAddress = sdk.ValAddress(Addrs[0])
-	validators[0].ConsPubKey = PKs[0]
+	validators[0].ConsPubKey = sdk.MustBech32ifyPubKey(sdk.Bech32PubKeyTypeConsPub, PKs[0])
 	validators[0].Description = types.NewDescription("hoop", "", "", "")
 	validators[0].Status = sdk.Bonded
 	validators[0].DelegatorShares = sdk.NewDec(valTokens)
 	validators[0].MinSelfDelegation = sdk.OneDec()
 	validators[1].OperatorAddress = sdk.ValAddress(Addrs[1])
-	validators[1].ConsPubKey = PKs[1]
+	validators[1].ConsPubKey = sdk.MustBech32ifyPubKey(sdk.Bech32PubKeyTypeConsPub, PKs[1])
 	validators[1].Description = types.NewDescription("bloop", "", "", "")
 	validators[1].Status = sdk.Bonded
 	validators[1].DelegatorShares = sdk.NewDec(valTokens)
@@ -95,10 +94,10 @@ func TestInitGenesis(t *testing.T) {
 
 	newCtx, _, newMKeeper := CreateTestInput(t, false, 1000)
 	newKeeper := newMKeeper.Keeper
-	newSupplyKeeper := newMKeeper.SupplyKeeper
-	clearNotBondedPool(t, newCtx, newSupplyKeeper)
-	_ = newSupplyKeeper.SendCoinsFromAccountToModule(newCtx, Addrs[11], types.NotBondedPoolName, coinsToModuleAcc)
-	InitGenesis(newCtx, newKeeper, nil, newSupplyKeeper, actualGenesis)
+	newBankKeeper := newMKeeper.BankKeeper
+	clearNotBondedPool(t, newCtx, newMKeeper.AccKeeper, newBankKeeper)
+	_ = newBankKeeper.SendCoinsFromAccountToModule(newCtx, Addrs[11], types.NotBondedPoolName, coinsToModuleAcc)
+	InitGenesis(newCtx, newKeeper, nil, newBankKeeper, actualGenesis)
 	// 0x11
 	require.Equal(t, actualGenesis.LastValidatorPowers[0].Power, newKeeper.GetLastValidatorPower(newCtx, actualGenesis.LastValidatorPowers[0].Address))
 	require.Equal(t, actualGenesis.LastValidatorPowers[1].Power, newKeeper.GetLastValidatorPower(newCtx, actualGenesis.LastValidatorPowers[1].Address))
@@ -117,11 +116,11 @@ func TestInitGenesis(t *testing.T) {
 	require.Equal(t, actualGenesis.Validators[1].Import(), resVal)
 	// 0x22
 	resVal, found = newKeeper.GetValidatorByConsAddr(newCtx,
-		sdk.GetConsAddress(sdk.MustGetConsPubKeyBech32(actualGenesis.Validators[0].ConsPubKey)))
+		sdk.GetConsAddress(sdk.MustGetPubKeyFromBech32(sdk.Bech32PubKeyTypeConsPub, actualGenesis.Validators[0].ConsPubKey)))
 	require.True(t, found)
 	require.Equal(t, actualGenesis.Validators[0].Import(), resVal)
 	resVal, found = newKeeper.GetValidatorByConsAddr(newCtx,
-		sdk.GetConsAddress(sdk.MustGetConsPubKeyBech32(actualGenesis.Validators[1].ConsPubKey)))
+		sdk.GetConsAddress(sdk.MustGetPubKeyFromBech32(sdk.Bech32PubKeyTypeConsPub,actualGenesis.Validators[1].ConsPubKey)))
 	require.True(t, found)
 	require.Equal(t, actualGenesis.Validators[1].Import(), resVal)
 	// 0x23
@@ -170,19 +169,19 @@ func TestInitGenesis(t *testing.T) {
 	exportGenesis.Validators[0].Status = sdk.Unbonding
 	newCtx, _, newMKeeper = CreateTestInput(t, false, 1000)
 	newKeeper = newMKeeper.Keeper
-	newSupplyKeeper = newMKeeper.SupplyKeeper
-	clearNotBondedPool(t, newCtx, newSupplyKeeper)
-	_ = newSupplyKeeper.SendCoinsFromAccountToModule(newCtx, Addrs[11], types.NotBondedPoolName, coinsToModuleAcc)
-	InitGenesis(newCtx, newKeeper, nil, newSupplyKeeper, exportGenesis)
+	newBankKeeper = newMKeeper.BankKeeper
+	clearNotBondedPool(t, newCtx, newKeeper.GetAccKeeper(), newBankKeeper)
+	_ = newBankKeeper.SendCoinsFromAccountToModule(newCtx, Addrs[11], types.NotBondedPoolName, coinsToModuleAcc)
+	InitGenesis(newCtx, newKeeper, nil, newBankKeeper, exportGenesis)
 	// 0x43
 	require.Equal(t, []sdk.ValAddress{exportGenesis.Validators[0].OperatorAddress}, newKeeper.GetValidatorQueueTimeSlice(newCtx, exportGenesis.Validators[0].UnbondingCompletionTime))
 }
 
-func clearNotBondedPool(t *testing.T, ctx sdk.Context, supplyKeeper supply.Keeper) {
-	notBondedPool := supplyKeeper.GetModuleAccount(ctx, types.NotBondedPoolName)
+func clearNotBondedPool(t *testing.T, ctx sdk.Context, accKeeper types.AccountKeeper, bankKeeper bankkeeper.BaseKeeper) {
+	notBondedPool := accKeeper.GetModuleAccount(ctx, types.NotBondedPoolName)
 	zeroCoins := sdk.NewCoins(sdk.NewInt64Coin(common.NativeToken, 0))
-	require.NoError(t, notBondedPool.SetCoins(zeroCoins))
-	supplyKeeper.SetModuleAccount(ctx, notBondedPool)
+	require.NoError(t, bankKeeper.SetBalances(ctx, notBondedPool.GetAddress(), zeroCoins))
+	accKeeper.SetModuleAccount(ctx, notBondedPool)
 }
 
 func TestInitGenesisLargeValidatorSet(t *testing.T) {
@@ -191,7 +190,7 @@ func TestInitGenesisLargeValidatorSet(t *testing.T) {
 
 	ctx, _, mKeeper := CreateTestInput(t, false, 1000)
 	keeper := mKeeper.Keeper
-	supplyKeeper := mKeeper.SupplyKeeper
+	bankKeeper := mKeeper.BankKeeper
 	params := keeper.GetParams(ctx)
 	delegators := []Delegator{}
 	validators := make([]Validator, size)
@@ -211,7 +210,7 @@ func TestInitGenesisLargeValidatorSet(t *testing.T) {
 	}
 
 	genesisState := NewGenesisState(params, validators, delegators)
-	vals := InitGenesis(ctx, keeper, nil, supplyKeeper, genesisState)
+	vals := InitGenesis(ctx, keeper, nil, bankKeeper, genesisState)
 
 	require.EqualValues(t, len(vals), keeper.GetParams(ctx).MaxValidators)
 }

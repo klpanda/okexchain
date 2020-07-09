@@ -13,8 +13,8 @@ import (
 
 // Keeper of the swap store
 type Keeper struct {
-	supplyKeeper types.SupplyKeeper
-	tokenKeeper  types.TokenKeeper
+	bankKeeper  types.BankKeeper
+	tokenKeeper types.TokenKeeper
 
 	storeKey   sdk.StoreKey
 	cdc        *codec.Codec
@@ -22,13 +22,13 @@ type Keeper struct {
 }
 
 // NewKeeper creates a swap keeper
-func NewKeeper(supplyKeeper types.SupplyKeeper, tokenKeeper types.TokenKeeper, cdc *codec.Codec, key sdk.StoreKey, paramspace types.ParamSubspace) Keeper {
+func NewKeeper(bankKeeper types.BankKeeper, tokenKeeper types.TokenKeeper, cdc *codec.Codec, key sdk.StoreKey, paramspace types.ParamSubspace) Keeper {
 	keeper := Keeper{
-		supplyKeeper: supplyKeeper,
-		tokenKeeper:  tokenKeeper,
-		storeKey:     key,
-		cdc:          cdc,
-		paramSpace:   paramspace.WithKeyTable(types.ParamKeyTable()),
+		bankKeeper:  bankKeeper,
+		tokenKeeper: tokenKeeper,
+		storeKey:    key,
+		cdc:         cdc,
+		paramSpace:  paramspace.WithKeyTable(types.ParamKeyTable()),
 	}
 	return keeper
 }
@@ -94,30 +94,30 @@ func (k Keeper) GetPoolTokenAmount(ctx sdk.Context, poolTokenName string) (sdk.D
 
 // MintPoolCoinsToUser mints coins and send them to the specified user address
 func (k Keeper) MintPoolCoinsToUser(ctx sdk.Context, coins sdk.DecCoins, addr sdk.AccAddress) error {
-	err := k.supplyKeeper.MintCoins(ctx, types.ModuleName, coins)
+	err := k.bankKeeper.MintCoins(ctx, types.ModuleName, coins)
 	if err != nil {
 		return err
 	}
-	return k.supplyKeeper.SendCoinsFromModuleToAccount(ctx, types.ModuleName, addr, coins)
+	return k.bankKeeper.SendCoinsFromModuleToAccount(ctx, types.ModuleName, addr, coins)
 }
 
 // BurnPoolCoinsFromUser sends coins to account module and burns them
 func (k Keeper) BurnPoolCoinsFromUser(ctx sdk.Context, coins sdk.DecCoins, addr sdk.AccAddress) error {
-	err := k.supplyKeeper.SendCoinsFromAccountToModule(ctx, addr, types.ModuleName, coins)
+	err := k.bankKeeper.SendCoinsFromAccountToModule(ctx, addr, types.ModuleName, coins)
 	if err != nil {
 		return err
 	}
-	return k.supplyKeeper.BurnCoins(ctx, types.ModuleName, coins)
+	return k.bankKeeper.BurnCoins(ctx, types.ModuleName, coins)
 }
 
 // SendCoinsToPool sends coins from user account to module account
 func (k Keeper) SendCoinsToPool(ctx sdk.Context, coins sdk.DecCoins, addr sdk.AccAddress) error {
-	return k.supplyKeeper.SendCoinsFromAccountToModule(ctx, addr, types.ModuleName, coins)
+	return k.bankKeeper.SendCoinsFromAccountToModule(ctx, addr, types.ModuleName, coins)
 }
 
 // SendCoinsFromPoolToAccount sends coins from module account to user account
 func (k Keeper) SendCoinsFromPoolToAccount(ctx sdk.Context, coins sdk.DecCoins, addr sdk.AccAddress) error {
-	return k.supplyKeeper.SendCoinsFromModuleToAccount(ctx, types.ModuleName, addr, coins)
+	return k.bankKeeper.SendCoinsFromModuleToAccount(ctx, types.ModuleName, addr, coins)
 }
 
 // nolint

@@ -2,6 +2,7 @@ package token
 
 import (
 	"fmt"
+	sdkerror "github.com/cosmos/cosmos-sdk/types/errors"
 
 	"github.com/okex/okchain/x/token/types"
 
@@ -12,7 +13,7 @@ import (
 
 // NewQuerier is the module level router for state queries
 func NewQuerier(keeper Keeper) sdk.Querier {
-	return func(ctx sdk.Context, path []string, req abci.RequestQuery) (res []byte, err sdk.Error) {
+	return func(ctx sdk.Context, path []string, req abci.RequestQuery) (res []byte, err error) {
 		switch path[0] {
 		case types.QueryInfo:
 			return queryInfo(ctx, path[1:], req, keeper)
@@ -33,19 +34,19 @@ func NewQuerier(keeper Keeper) sdk.Querier {
 		case types.QueryTokenV2:
 			return queryTokenV2(ctx, path[1:], req, keeper)
 		default:
-			return nil, sdk.ErrUnknownRequest("unknown token query endpoint")
+			return nil, sdkerror.Wrap(sdkerror.ErrUnknownRequest, "unknown token query endpoint")
 		}
 	}
 }
 
 // nolint: unparam
-func queryInfo(ctx sdk.Context, path []string, req abci.RequestQuery, keeper Keeper) ([]byte, sdk.Error) {
+func queryInfo(ctx sdk.Context, path []string, req abci.RequestQuery, keeper Keeper) ([]byte, error) {
 	name := path[0]
 
 	token := keeper.GetTokenInfo(ctx, name)
 
 	if token.Symbol == "" {
-		return nil, sdk.ErrInvalidCoins("unknown token")
+		return nil, sdkerror.Wrap(sdkerror.ErrInvalidCoins, "unknown token")
 	}
 
 	bz, err := codec.MarshalJSONIndent(keeper.cdc, token)
@@ -55,12 +56,12 @@ func queryInfo(ctx sdk.Context, path []string, req abci.RequestQuery, keeper Kee
 	return bz, nil
 }
 
-func queryTokens(ctx sdk.Context, path []string, req abci.RequestQuery, keeper Keeper) ([]byte, sdk.Error) {
+func queryTokens(ctx sdk.Context, path []string, req abci.RequestQuery, keeper Keeper) ([]byte, error) {
 	var tokens []types.Token
 	if len(path) > 0 && path[0] != "" {
 		ownerAddr, err := sdk.AccAddressFromBech32(path[0])
 		if err != nil {
-			return nil, sdk.ErrInvalidAddress(fmt.Sprintf("invalid address：%s", path[0]))
+			return nil, sdkerror.Wrap(sdkerror.ErrInvalidAddress, fmt.Sprintf("invalid address：%s", path[0]))
 		}
 		tokens = keeper.GetUserTokensInfo(ctx, ownerAddr)
 	} else {
@@ -74,7 +75,7 @@ func queryTokens(ctx sdk.Context, path []string, req abci.RequestQuery, keeper K
 	return bz, nil
 }
 
-func queryCurrency(ctx sdk.Context, path []string, req abci.RequestQuery, keeper Keeper) ([]byte, sdk.Error) {
+func queryCurrency(ctx sdk.Context, path []string, req abci.RequestQuery, keeper Keeper) ([]byte, error) {
 	tokens := keeper.GetCurrenciesInfo(ctx)
 
 	bz, err := codec.MarshalJSONIndent(keeper.cdc, tokens)
@@ -84,18 +85,18 @@ func queryCurrency(ctx sdk.Context, path []string, req abci.RequestQuery, keeper
 	return bz, nil
 }
 
-func queryAccount(ctx sdk.Context, path []string, req abci.RequestQuery, keeper Keeper) ([]byte, sdk.Error) {
+func queryAccount(ctx sdk.Context, path []string, req abci.RequestQuery, keeper Keeper) ([]byte, error) {
 	addr, err := sdk.AccAddressFromBech32(path[0])
 	if err != nil {
-		return nil, sdk.ErrInvalidAddress(fmt.Sprintf("invalid address：%s", path[0]))
+		return nil, sdkerror.Wrap(sdkerror.ErrInvalidAddress, fmt.Sprintf("invalid address：%s", path[0]))
 	}
 
 	//var queryPage QueryPage
 	var accountParam types.AccountParam
 	//var symbol string
-	err = codec.Cdc.UnmarshalJSON(req.Data, &accountParam)
+	err = keeper.cdc.UnmarshalJSON(req.Data, &accountParam)
 	if err != nil {
-		return nil, sdk.ErrUnknownRequest(err.Error())
+		return nil, sdkerror.Wrap(sdkerror.ErrUnknownRequest, err.Error())
 	}
 
 	coinsInfo := keeper.GetCoinsInfo(ctx, addr)
@@ -141,22 +142,22 @@ func queryAccount(ctx sdk.Context, path []string, req abci.RequestQuery, keeper 
 	return bz, nil
 }
 
-func queryParameters(ctx sdk.Context, keeper Keeper) ([]byte, sdk.Error) {
+func queryParameters(ctx sdk.Context, keeper Keeper) ([]byte, error) {
 	params := keeper.GetParams(ctx)
 	res, err := codec.MarshalJSONIndent(keeper.cdc, params)
 	if err != nil {
-		return nil, sdk.ErrInternal(sdk.AppendMsgToErr("could not marshal result to JSON", err.Error()))
+		return nil, sdkerror.Wrap(sdkerror.ErrInternal, "could not marshal result to JSON" + err.Error())
 	}
 	return res, nil
 }
 
-func queryKeysNum(ctx sdk.Context, keeper Keeper) ([]byte, sdk.Error) {
+func queryKeysNum(ctx sdk.Context, keeper Keeper) ([]byte, error) {
 	tokenStoreKeyNum, lockStoreKeyNum := keeper.getNumKeys(ctx)
 	res, err := codec.MarshalJSONIndent(keeper.cdc,
 		map[string]int64{"token": tokenStoreKeyNum,
 			"lock": lockStoreKeyNum})
 	if err != nil {
-		return nil, sdk.ErrInternal(sdk.AppendMsgToErr("could not marshal result to JSON", err.Error()))
+		return nil, sdkerror.Wrap(sdkerror.ErrInternal, "could not marshal result to JSON" + err.Error())
 	}
 	return res, nil
 }

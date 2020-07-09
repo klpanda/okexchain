@@ -103,7 +103,7 @@ func TestPlaceOrderAndCancelOrder(t *testing.T) {
 	}
 	require.EqualValues(t, expectCoins.String(), acc.GetCoins().String())
 	// check fee pool
-	feeCollector := testInput.SupplyKeeper.GetModuleAccount(ctx, auth.FeeCollectorName)
+	feeCollector := testInput.BankKeeper.GetModuleAccount(ctx, auth.FeeCollectorName)
 	collectedFees := feeCollector.GetCoins()
 	require.EqualValues(t, "0.00000100"+common.NativeToken, collectedFees.String())
 	// check depth book
@@ -182,7 +182,7 @@ func TestPlaceOrderAndExpireOrder(t *testing.T) {
 	}
 	require.EqualValues(t, expectCoins.String(), acc.GetCoins().String())
 	// check fee pool
-	feeCollector := testInput.SupplyKeeper.GetModuleAccount(ctx, auth.FeeCollectorName)
+	feeCollector := testInput.BankKeeper.GetModuleAccount(ctx, auth.FeeCollectorName)
 	collectedFees := feeCollector.GetCoins()
 	require.EqualValues(t, "0.00000100"+common.NativeToken, collectedFees.String())
 	// check depth book

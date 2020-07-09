@@ -6,8 +6,6 @@ import (
 
 	"github.com/tendermint/tendermint/crypto/secp256k1"
 
-	"github.com/cosmos/cosmos-sdk/x/auth"
-
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/okex/okchain/x/common"
 	"github.com/stretchr/testify/require"
@@ -21,7 +19,7 @@ func TestMsg(t *testing.T) {
 	msgList := NewMsgList(addr, common.TestToken, common.NativeToken, sdk.NewDec(10))
 	msgDeposit := NewMsgDeposit(product, sdk.NewDecCoin(common.NativeToken, sdk.NewInt(100)), addr)
 	msgWithdraw := NewMsgWithdraw(product, sdk.NewDecCoin(common.NativeToken, sdk.NewInt(100)), addr)
-	msgTransferOwnership := NewMsgTransferOwnership(addr, addr, product)
+	msgTransferOwnership := NewMsgTransferOwnership(addr, addr, product, nil, nil)
 
 	// test msg.Route()、msg.Type()、msg.GetSigners()、GetSignBytes()
 	type Want struct {
@@ -35,13 +33,13 @@ func TestMsg(t *testing.T) {
 		msg  sdk.Msg
 		want Want
 	}{
-		{"msgList", msgList,
+		{"msgList", &msgList,
 			Want{"dex", "list", sdk.MustSortJSON(ModuleCdc.MustMarshalJSON(msgList)), []sdk.AccAddress{addr}}},
-		{"msgDeposit", msgDeposit,
+		{"msgDeposit", &msgDeposit,
 			Want{"dex", typeMsgDeposit, sdk.MustSortJSON(ModuleCdc.MustMarshalJSON(msgDeposit)), []sdk.AccAddress{addr}}},
-		{"msgWithdraw", msgWithdraw,
+		{"msgWithdraw", &msgWithdraw,
 			Want{"dex", typeMsgWithdraw, sdk.MustSortJSON(ModuleCdc.MustMarshalJSON(msgWithdraw)), []sdk.AccAddress{addr}}},
-		{"msgTransferOwnership", msgTransferOwnership,
+		{"msgTransferOwnership", &msgTransferOwnership,
 			Want{"dex", typeMsgTransferOwnership, sdk.MustSortJSON(ModuleCdc.MustMarshalJSON(msgTransferOwnership)), []sdk.AccAddress{addr}}},
 	}
 	for _, tt := range tests {
@@ -71,26 +69,32 @@ func TestMsg(t *testing.T) {
 	toPriKey := secp256k1.GenPrivKey()
 	toPubKey := toPriKey.PubKey()
 	toAddr := sdk.AccAddress(toPubKey.Address())
+
+	deposit1 := NewMsgDeposit(product, sdk.DecCoin{"", sdk.NewDec(1)}, addr)
+	deposit2 := NewMsgDeposit(product, sdk.NewDecCoin(common.NativeToken, sdk.NewInt(1)), nil)
+	withDraw1 := NewMsgWithdraw(product, sdk.DecCoin{"", sdk.NewDec(1)}, addr)
+	withDraw2 := NewMsgWithdraw(product, sdk.NewDecCoin(common.NativeToken, sdk.NewInt(1)), nil)
+
 	testBasics := []struct {
 		name   string
 		msg    sdk.Msg
 		result bool
 	}{
-		{"msgList", msgList, true},
-		{"msgDeposit", msgDeposit, true},
-		{"msgWithdraw", msgWithdraw, true},
+		{"msgList", &msgList, true},
+		{"msgDeposit", &msgDeposit, true},
+		{"msgWithdraw", &msgWithdraw, true},
 
-		{"deposit-invalid-amount", NewMsgDeposit(product, sdk.DecCoin{"", sdk.NewDec(1)}, addr), false},
-		{"deposit-no-depositor", NewMsgDeposit(product, sdk.NewDecCoin(common.NativeToken, sdk.NewInt(1)), nil), false},
-		{"withdraw-invalid-amount", NewMsgWithdraw(product, sdk.DecCoin{"", sdk.NewDec(1)}, addr), false},
-		{"withdraw-no-depositor", NewMsgWithdraw(product, sdk.NewDecCoin(common.NativeToken, sdk.NewInt(1)), nil), false},
+		{"deposit-invalid-amount", &deposit1, false},
+		{"deposit-no-depositor", &deposit2, false},
+		{"withdraw-invalid-amount", &withDraw1, false},
+		{"withdraw-no-depositor", &withDraw2, false},
 
-		{"transfer-no-sign", NewMsgTransferOwnership(fromAddr, toAddr, product), false},
-		{"transfer-no-from", NewMsgTransferOwnership(nil, toAddr, product), false},
-		{"transfer-no-to", NewMsgTransferOwnership(fromAddr, nil, product), false},
-		{"transfer-no-product", NewMsgTransferOwnership(fromAddr, toAddr, ""), false},
-		{"transfer-worng-pk", MsgTransferOwnership{fromAddr, fromAddr, product, auth.StdSignature{PubKey: fromPubKey}}, false},
-		{"transfer-wright-pk", MsgTransferOwnership{fromAddr, fromAddr, product, auth.StdSignature{PubKey: toPubKey}}, false},
+		{"transfer-no-sign", &MsgTransferOwnership{fromAddr, toAddr, product, nil, nil}, false},
+		{"transfer-no-from", &MsgTransferOwnership{nil, toAddr, product, nil, nil}, false},
+		{"transfer-no-to", &MsgTransferOwnership{fromAddr, nil, product, nil, nil}, false},
+		{"transfer-no-product", &MsgTransferOwnership{fromAddr, toAddr, "", nil, nil}, false},
+		{"transfer-worng-pk", &MsgTransferOwnership{fromAddr, fromAddr, product, fromPubKey.Bytes(), nil}, false},
+		{"transfer-wright-pk", &MsgTransferOwnership{fromAddr, fromAddr, product, toPubKey.Bytes(), nil}, false},
 	}
 	for _, tb := range testBasics {
 		t.Run(tb.name, func(t *testing.T) {

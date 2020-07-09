@@ -61,32 +61,35 @@ func TestKeeper_CheckMsgSubmitProposal(t *testing.T) {
 
 	content := types.NewDelistProposal("delist xxb_okb", "delist asset from dex", tokenPair.Owner, tokenPair.BaseAssetSymbol, tokenPair.QuoteAssetSymbol)
 	content.Proposer = tokenPair.Owner
-	proposal := govTypes.NewMsgSubmitProposal(content, sdk.DecCoins{sdk.NewDecCoin(common.NativeToken, sdk.NewInt(150))}, tokenPair.Owner)
-
+	proposal, err := govTypes.NewMsgSubmitProposal(content, sdk.DecCoins{sdk.NewDecCoin(common.NativeToken, sdk.NewInt(150))}, tokenPair.Owner)
+	require.Nil(t, err)
 	// error case : fail to check proposal because product(token pair) not exist
-	err := testInput.DexKeeper.CheckMsgSubmitProposal(ctx, proposal)
+	err = testInput.DexKeeper.CheckMsgSubmitProposal(ctx, *proposal)
 	require.Error(t, err)
 	// SaveTokenPair
 	saveErr := testInput.DexKeeper.SaveTokenPair(ctx, tokenPair)
 	require.Nil(t, saveErr)
 
 	// successful case : check proposal successfully
-	err = testInput.DexKeeper.CheckMsgSubmitProposal(ctx, proposal)
+	err = testInput.DexKeeper.CheckMsgSubmitProposal(ctx, *proposal)
 	require.NoError(t, err)
 
 	// error case:  fail to check proposal because the proposer can't afford the initial deposit
-	proposal1 := govTypes.NewMsgSubmitProposal(content, sdk.DecCoins{sdk.NewDecCoin(common.NativeToken, sdk.NewInt(500000))}, tokenPair.Owner)
-	err = testInput.DexKeeper.CheckMsgSubmitProposal(ctx, proposal1)
+	proposal1, err := govTypes.NewMsgSubmitProposal(content, sdk.DecCoins{sdk.NewDecCoin(common.NativeToken, sdk.NewInt(500000))}, tokenPair.Owner)
+	require.Nil(t, err)
+	err = testInput.DexKeeper.CheckMsgSubmitProposal(ctx, *proposal1)
 	require.Error(t, err)
 
 	// error case: fail to check proposal because initial deposit must not be less than 100.00000000okb
-	proposal2 := govTypes.NewMsgSubmitProposal(content, sdk.DecCoins{sdk.NewDecCoin(common.NativeToken, sdk.NewInt(1))}, tokenPair.Owner)
-	err = testInput.DexKeeper.CheckMsgSubmitProposal(ctx, proposal2)
+	proposal2, err := govTypes.NewMsgSubmitProposal(content, sdk.DecCoins{sdk.NewDecCoin(common.NativeToken, sdk.NewInt(1))}, tokenPair.Owner)
+	require.Nil(t, err)
+	err = testInput.DexKeeper.CheckMsgSubmitProposal(ctx, *proposal2)
 	require.Error(t, err)
 
 	// error case: fail to check proposal because the proposal is nil
-	proposal3 := govTypes.NewMsgSubmitProposal(nil, sdk.DecCoins{sdk.NewDecCoin(common.NativeToken, sdk.NewInt(1))}, tokenPair.Owner)
-	err = testInput.DexKeeper.CheckMsgSubmitProposal(ctx, proposal3)
+	proposal3, err := govTypes.NewMsgSubmitProposal(nil, sdk.DecCoins{sdk.NewDecCoin(common.NativeToken, sdk.NewInt(1))}, tokenPair.Owner)
+	require.Nil(t, err)
+	err = testInput.DexKeeper.CheckMsgSubmitProposal(ctx, *proposal3)
 	require.Error(t, err)
 
 }
@@ -119,7 +122,9 @@ func TestKeeper_AfterDepositPeriodPassed(t *testing.T) {
 
 	content := types.NewDelistProposal("delist xxb_okb", "delist asset from dex", tokenPair.Owner, tokenPair.BaseAssetSymbol, tokenPair.QuoteAssetSymbol)
 	content.Proposer = tokenPair.Owner
-	proposal := govTypes.Proposal{Content: content}
+	any, err := govTypes.ContentToAny(content)
+	require.Nil(t, err)
+	proposal := govTypes.Proposal{Content: any}
 
 	testInput.DexKeeper.AfterDepositPeriodPassed(ctx, proposal)
 
@@ -129,7 +134,9 @@ func TestKeeper_AfterSubmitProposalHandler(t *testing.T) {
 	testInput := createTestInputWithBalance(t, 1, 10000)
 	ctx := testInput.Ctx
 	content := types.NewDelistProposal("delist xxb_okb", "delist asset from dex", nil, "", "")
-	proposal := govTypes.Proposal{Content: content}
+	any, err := govTypes.ContentToAny(content)
+	require.Nil(t, err)
+	proposal := govTypes.Proposal{Content: any}
 
 	testInput.DexKeeper.AfterSubmitProposalHandler(ctx, proposal)
 }
@@ -140,8 +147,10 @@ func TestKeeper_VoteHandler(t *testing.T) {
 	tokenPair := GetBuiltInTokenPair()
 
 	content := types.NewDelistProposal("delist xxb_okb", "delist asset from dex", nil, tokenPair.BaseAssetSymbol, tokenPair.QuoteAssetSymbol)
-	proposal := govTypes.Proposal{Content: content}
-	_, err := testInput.DexKeeper.VoteHandler(ctx, proposal, govTypes.Vote{})
+	any, err := govTypes.ContentToAny(content)
+	require.Nil(t, err)
+	proposal := govTypes.Proposal{Content: any}
+	_, err = testInput.DexKeeper.VoteHandler(ctx, proposal, govTypes.Vote{})
 	require.Nil(t, err)
 
 	// SaveTokenPair

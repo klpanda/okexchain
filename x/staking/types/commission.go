@@ -2,28 +2,9 @@ package types
 
 import (
 	"fmt"
-	"github.com/cosmos/cosmos-sdk/config"
 	"time"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
-)
-
-type (
-	// Commission defines a commission parameters for a given validator
-	Commission struct {
-		CommissionRates `json:"commission_rates" yaml:"commission_rates"`
-		UpdateTime      time.Time `json:"update_time" yaml:"update_time"` // the last time the commission rate was changed
-	}
-
-	// CommissionRates defines the initial commission rates to be used for creating a validator
-	CommissionRates struct {
-		// the commission rate charged to delegators, as a fraction
-		Rate sdk.Dec `json:"rate" yaml:"rate"`
-		// maximum commission rate which validator can ever charge, as a fraction
-		MaxRate sdk.Dec `json:"max_rate" yaml:"max_rate"`
-		// maximum daily increase of the validator commission, as a fraction
-		MaxChangeRate sdk.Dec `json:"max_change_rate" yaml:"max_change_rate"`
-	}
 )
 
 // NewCommissionRates returns an initialized validator commission rates
@@ -52,16 +33,8 @@ func NewCommissionWithTime(rate, maxRate, maxChangeRate sdk.Dec, updatedAt time.
 	}
 }
 
-// Equal checks if the given Commission object is equal to the receiving Commission object
-func (c Commission) Equal(c2 Commission) bool {
-	return c.Rate.Equal(c2.Rate) &&
-		c.MaxRate.Equal(c2.MaxRate) &&
-		c.MaxChangeRate.Equal(c2.MaxChangeRate) &&
-		c.UpdateTime.Equal(c2.UpdateTime)
-}
-
 // String implements the Stringer interface for a Commission
-func (c Commission) String() string {
+func (c *Commission) String() string {
 	return fmt.Sprintf("rate: %s, maxRate: %s, maxChangeRate: %s, updateTime: %s",
 		c.Rate, c.MaxRate, c.MaxChangeRate, c.UpdateTime,
 	)
@@ -69,7 +42,7 @@ func (c Commission) String() string {
 
 // Validate performs basic sanity validation checks of initial commission parameters
 // If validation fails, an SDK error is returned
-func (c CommissionRates) Validate() sdk.Error {
+func (c CommissionRates) Validate() error {
 	switch {
 	case c.MaxRate.LT(sdk.ZeroDec()):
 		// max rate cannot be negative
@@ -101,9 +74,9 @@ func (c CommissionRates) Validate() sdk.Error {
 
 // ValidateNewRate performs basic sanity validation checks of a new commission rate
 // If validation fails, an SDK error is returned.
-func (c Commission) ValidateNewRate(newRate sdk.Dec, blockTime time.Time) sdk.Error {
+func (c Commission) ValidateNewRate(newRate sdk.Dec, blockTime time.Time) error {
 	switch {
-	case blockTime.Sub(c.UpdateTime).Hours() < config.DefaultValidateRateUpdateInterval:
+	case blockTime.Sub(c.UpdateTime).Hours() < DefaultValidateRateUpdateInterval:
 		// new rate cannot be changed more than once within 24 hours
 		return ErrCommissionUpdateTime(DefaultCodespace)
 

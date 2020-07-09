@@ -1,16 +1,17 @@
 package cli
 
 import (
+	"bufio"
 	"fmt"
 	"github.com/cosmos/cosmos-sdk/client"
+	"github.com/cosmos/cosmos-sdk/client/flags"
+	authclient "github.com/cosmos/cosmos-sdk/x/auth/client"
+	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	"strings"
 
-	"github.com/cosmos/cosmos-sdk/client/context"
 	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/version"
-	"github.com/cosmos/cosmos-sdk/x/auth"
-	"github.com/cosmos/cosmos-sdk/x/auth/client/utils"
 	"github.com/okex/okchain/x/staking/types"
 	"github.com/spf13/cobra"
 )
@@ -30,13 +31,14 @@ $ %s tx staking destroy-validator --from mykey
 				version.ClientName),
 		),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			txBldr := auth.NewTxBuilderFromCLI().WithTxEncoder(auth.DefaultTxEncoder(cdc))
-			cliCtx := context.NewCLIContext().WithCodec(cdc)
+			inBuf := bufio.NewReader(cmd.InOrStdin())
+			txBldr := authtypes.NewTxBuilderFromCLI(inBuf).WithTxEncoder(authtypes.DefaultTxEncoder(cdc))
+			cliCtx := client.NewContext().WithCodec(cdc)
 
 			delAddr := cliCtx.GetFromAddress()
 
 			msg := types.NewMsgDestroyValidator(delAddr)
-			return utils.GenerateOrBroadcastMsgs(cliCtx, txBldr, []sdk.Msg{msg})
+			return authclient.GenerateOrBroadcastMsgs(cliCtx, txBldr, []sdk.Msg{&msg})
 
 		},
 	}
@@ -59,8 +61,9 @@ $ %s tx staking deposit 1000%s --from mykey
 			),
 		),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			txBldr := auth.NewTxBuilderFromCLI().WithTxEncoder(auth.DefaultTxEncoder(cdc))
-			cliCtx := context.NewCLIContext().WithCodec(cdc)
+			inBuf := bufio.NewReader(cmd.InOrStdin())
+			txBldr := authtypes.NewTxBuilderFromCLI(inBuf).WithTxEncoder(authtypes.DefaultTxEncoder(cdc))
+			cliCtx := client.NewContext().WithCodec(cdc)
 
 			amount, err := sdk.ParseDecCoin(args[0])
 			if err != nil {
@@ -69,7 +72,7 @@ $ %s tx staking deposit 1000%s --from mykey
 
 			delAddr := cliCtx.GetFromAddress()
 			msg := types.NewMsgDeposit(delAddr, amount)
-			return utils.GenerateOrBroadcastMsgs(cliCtx, txBldr, []sdk.Msg{msg})
+			return authclient.GenerateOrBroadcastMsgs(cliCtx, txBldr, []sdk.Msg{&msg})
 		},
 	}
 	return cmd
@@ -91,8 +94,9 @@ $ %s tx staking withdraw 1%s
 			),
 		),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			txBldr := auth.NewTxBuilderFromCLI().WithTxEncoder(auth.DefaultTxEncoder(cdc))
-			cliCtx := context.NewCLIContext().WithCodec(cdc)
+			inBuf := bufio.NewReader(cmd.InOrStdin())
+			txBldr := authtypes.NewTxBuilderFromCLI(inBuf).WithTxEncoder(authtypes.DefaultTxEncoder(cdc))
+			cliCtx := client.NewContext().WithCodec(cdc)
 
 			amount, err := sdk.ParseDecCoin(args[0])
 			if err != nil {
@@ -101,7 +105,7 @@ $ %s tx staking withdraw 1%s
 
 			delAddr := cliCtx.GetFromAddress()
 			msg := types.NewMsgWithdraw(delAddr, amount)
-			return utils.GenerateOrBroadcastMsgs(cliCtx, txBldr, []sdk.Msg{msg})
+			return authclient.GenerateOrBroadcastMsgs(cliCtx, txBldr, []sdk.Msg{&msg})
 		},
 	}
 	return cmd
@@ -122,8 +126,9 @@ func GetCmdAddShares(cdc *codec.Codec) *cobra.Command {
 				sdk.DefaultBondDenom, version.ClientName),
 		),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			txBldr := auth.NewTxBuilderFromCLI().WithTxEncoder(auth.DefaultTxEncoder(cdc))
-			cliCtx := context.NewCLIContext().WithCodec(cdc)
+			inBuf := bufio.NewReader(cmd.InOrStdin())
+			txBldr := authtypes.NewTxBuilderFromCLI(inBuf).WithTxEncoder(authtypes.DefaultTxEncoder(cdc))
+			cliCtx := client.NewContext().WithCodec(cdc)
 
 			delAddr := cliCtx.GetFromAddress()
 			valAddrs, err := getValsSet(args[0])
@@ -132,7 +137,7 @@ func GetCmdAddShares(cdc *codec.Codec) *cobra.Command {
 			}
 
 			msg := types.NewMsgAddShares(delAddr, valAddrs)
-			return utils.GenerateOrBroadcastMsgs(cliCtx, txBldr, []sdk.Msg{msg})
+			return authclient.GenerateOrBroadcastMsgs(cliCtx, txBldr, []sdk.Msg{&msg})
 
 		},
 	}
@@ -147,7 +152,7 @@ func GetCmdProxy(cdc *codec.Codec) *cobra.Command {
 	}
 
 	proxyCmd.AddCommand(
-		client.PostCommands(
+		flags.PostCommands(
 			GetCmdRegProxy(cdc),
 			GetCmdUnregProxy(cdc),
 			GetCmdBindProxy(cdc),
@@ -172,13 +177,14 @@ $ %s tx staking proxy reg --from mykey
 				version.ClientName),
 		),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			txBldr := auth.NewTxBuilderFromCLI().WithTxEncoder(auth.DefaultTxEncoder(cdc))
-			cliCtx := context.NewCLIContext().WithCodec(cdc)
+			inBuf := bufio.NewReader(cmd.InOrStdin())
+			txBldr := authtypes.NewTxBuilderFromCLI(inBuf).WithTxEncoder(authtypes.DefaultTxEncoder(cdc))
+			cliCtx := client.NewContext().WithCodec(cdc)
 
 			delAddr := cliCtx.GetFromAddress()
 
 			msg := types.NewMsgRegProxy(delAddr, true)
-			return utils.GenerateOrBroadcastMsgs(cliCtx, txBldr, []sdk.Msg{msg})
+			return authclient.GenerateOrBroadcastMsgs(cliCtx, txBldr, []sdk.Msg{&msg})
 		},
 	}
 }
@@ -198,13 +204,14 @@ $ %s tx staking proxy unreg --from mykey
 				version.ClientName),
 		),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			txBldr := auth.NewTxBuilderFromCLI().WithTxEncoder(auth.DefaultTxEncoder(cdc))
-			cliCtx := context.NewCLIContext().WithCodec(cdc)
+			inBuf := bufio.NewReader(cmd.InOrStdin())
+			txBldr := authtypes.NewTxBuilderFromCLI(inBuf).WithTxEncoder(authtypes.DefaultTxEncoder(cdc))
+			cliCtx := client.NewContext().WithCodec(cdc)
 
 			delAddr := cliCtx.GetFromAddress()
 
 			msg := types.NewMsgRegProxy(delAddr, false)
-			return utils.GenerateOrBroadcastMsgs(cliCtx, txBldr, []sdk.Msg{msg})
+			return authclient.GenerateOrBroadcastMsgs(cliCtx, txBldr, []sdk.Msg{&msg})
 		},
 	}
 }
@@ -224,8 +231,9 @@ $ %s tx staking proxy bind okchain10q0rk5qnyag7wfvvt7rtphlw589m7frsmyq4ya --from
 				version.ClientName),
 		),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			txBldr := auth.NewTxBuilderFromCLI().WithTxEncoder(auth.DefaultTxEncoder(cdc))
-			cliCtx := context.NewCLIContext().WithCodec(cdc)
+			inBuf := bufio.NewReader(cmd.InOrStdin())
+			txBldr := authtypes.NewTxBuilderFromCLI(inBuf).WithTxEncoder(authtypes.DefaultTxEncoder(cdc))
+			cliCtx := client.NewContext().WithCodec(cdc)
 
 			delAddr := cliCtx.GetFromAddress()
 
@@ -234,7 +242,7 @@ $ %s tx staking proxy bind okchain10q0rk5qnyag7wfvvt7rtphlw589m7frsmyq4ya --from
 				return fmt.Errorf("invalid address：%s", args[0])
 			}
 			msg := types.NewMsgBindProxy(delAddr, proxyAddress)
-			return utils.GenerateOrBroadcastMsgs(cliCtx, txBldr, []sdk.Msg{msg})
+			return authclient.GenerateOrBroadcastMsgs(cliCtx, txBldr, []sdk.Msg{&msg})
 		},
 	}
 }
@@ -254,13 +262,14 @@ $ %s tx staking proxy unbind --from mykey
 				version.ClientName),
 		),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			txBldr := auth.NewTxBuilderFromCLI().WithTxEncoder(auth.DefaultTxEncoder(cdc))
-			cliCtx := context.NewCLIContext().WithCodec(cdc)
+			inBuf := bufio.NewReader(cmd.InOrStdin())
+			txBldr := authtypes.NewTxBuilderFromCLI(inBuf).WithTxEncoder(authtypes.DefaultTxEncoder(cdc))
+			cliCtx := client.NewContext().WithCodec(cdc)
 
 			delAddr := cliCtx.GetFromAddress()
 
 			msg := types.NewMsgUnbindProxy(delAddr)
-			return utils.GenerateOrBroadcastMsgs(cliCtx, txBldr, []sdk.Msg{msg})
+			return authclient.GenerateOrBroadcastMsgs(cliCtx, txBldr, []sdk.Msg{&msg})
 		},
 	}
 }

@@ -2,8 +2,7 @@ package app
 
 import (
 	"encoding/json"
-
-	"github.com/cosmos/cosmos-sdk/x/slashing"
+	slashingtypes "github.com/cosmos/cosmos-sdk/x/slashing/types"
 
 	"github.com/cosmos/cosmos-sdk/codec"
 	"github.com/okex/okchain/app/protocol"
@@ -17,7 +16,7 @@ import (
 
 // ExportAppStateAndValidators exports the state of okchain for a genesis file
 func (app *OKChainApp) ExportAppStateAndValidators(forZeroHeight bool, jailWhiteList []string,
-) (appState json.RawMessage, validators []tmtypes.GenesisValidator, err error) {
+) (appState json.RawMessage, validators []tmtypes.GenesisValidator, cp *abci.ConsensusParams, err error) {
 	// as if they could withdraw from the start of the next block
 	ctx := app.NewContext(true, abci.Header{Height: app.LastBlockHeight()})
 
@@ -32,11 +31,11 @@ func (app *OKChainApp) ExportAppStateAndValidators(forZeroHeight bool, jailWhite
 
 	appState, err = codec.MarshalJSONIndent(curProtocol.GetCodec(), genesisState)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	validators = staking.GetLatestGenesisValidator(ctx, curProtocol.GetStakingKeeper())
-	return appState, validators, nil
+	return appState, validators, app.BaseApp.GetConsensusParams(ctx),nil
 }
 
 // prepare for fresh start at zero height
@@ -108,7 +107,7 @@ func (app *OKChainApp) prepForZeroHeightGenesis(ctx sdk.Context, jailWhiteList [
 	// handle slashing state
 	curProtocol.GetSlashingKeeper().IterateValidatorSigningInfos(
 		ctx,
-		func(addr sdk.ConsAddress, info slashing.ValidatorSigningInfo) (stop bool) {
+		func(addr sdk.ConsAddress, info slashingtypes.ValidatorSigningInfo) (stop bool) {
 			info.StartHeight = 0
 			curProtocol.GetSlashingKeeper().SetValidatorSigningInfo(ctx, addr, info)
 			return false

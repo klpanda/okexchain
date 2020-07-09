@@ -2,11 +2,11 @@ package token
 
 import (
 	"fmt"
+	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	"testing"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/x/mock"
-	"github.com/cosmos/cosmos-sdk/x/supply"
 	"github.com/stretchr/testify/require"
 	abci "github.com/tendermint/tendermint/abci/types"
 
@@ -97,11 +97,11 @@ func TestKeeper_LockCoins(t *testing.T) {
 	mapp.BeginBlock(abci.RequestBeginBlock{Header: abci.Header{Height: 2}})
 	ctx := mapp.BaseApp.NewContext(false, abci.Header{})
 
-	genAccs, testAccounts := CreateGenAccounts(1,
+	genAccs, genBals, testAccounts := CreateGenAccounts(1,
 		sdk.DecCoins{
 			sdk.NewDecCoinFromDec(common.NativeToken, sdk.NewDec(1000000000)),
 		})
-	mock.SetGenesis(mapp.App, types.DecAccountArrToBaseAccountArr(genAccs))
+	mock.SetGenesis(mapp.App, genAccs, genBals)
 
 	expectedLockedCoins := sdk.DecCoins{
 		sdk.NewDecCoinFromDec(common.NativeToken, sdk.NewDec(100)),
@@ -131,13 +131,13 @@ func TestKeeper_UnlockCoins(t *testing.T) {
 
 	mapp.BeginBlock(abci.RequestBeginBlock{Header: abci.Header{Height: 2}})
 	ctx := mapp.BaseApp.NewContext(false, abci.Header{})
-	mapp.supplyKeeper.SetSupply(ctx, supply.NewSupply(mapp.TotalCoinsSupply))
+	mapp.BankKeeper.SetSupply(ctx, banktypes.NewSupply(mapp.TotalCoinsSupply))
 
-	genAccs, testAccounts := CreateGenAccounts(1,
+	genAccs, genBals, testAccounts := CreateGenAccounts(1,
 		sdk.DecCoins{
 			sdk.NewDecCoinFromDec(common.NativeToken, sdk.NewDec(1000000000)),
 		})
-	mock.SetGenesis(mapp.App, types.DecAccountArrToBaseAccountArr(genAccs))
+	mock.SetGenesis(mapp.App, genAccs, genBals)
 
 	lockCoins := sdk.DecCoins{
 		sdk.NewDecCoinFromDec(common.NativeToken, sdk.NewDec(100)),
@@ -185,9 +185,9 @@ func TestKeeper_BurnLockedCoins(t *testing.T) {
 	ctx := mapp.BaseApp.NewContext(false, abci.Header{})
 
 	initCoins := sdk.DecCoins{sdk.NewDecCoinFromDec(common.NativeToken, sdk.NewDec(1000000000))}
-	genAccs, testAccounts := CreateGenAccounts(1, initCoins)
-	mock.SetGenesis(mapp.App, types.DecAccountArrToBaseAccountArr(genAccs))
-	mapp.supplyKeeper.SetSupply(ctx, supply.NewSupply(initCoins))
+	genAccs, genBals, testAccounts := CreateGenAccounts(1, initCoins)
+	mock.SetGenesis(mapp.App, genAccs, genBals)
+	mapp.BankKeeper.SetSupply(ctx, banktypes.NewSupply(initCoins))
 
 	lockCoins := sdk.DecCoins{
 		sdk.NewDecCoinFromDec(common.NativeToken, sdk.NewDec(100)),
@@ -220,11 +220,11 @@ func TestKeeper_ReceiveLockedCoins(t *testing.T) {
 	mapp.BeginBlock(abci.RequestBeginBlock{Header: abci.Header{Height: 2}})
 	ctx := mapp.BaseApp.NewContext(false, abci.Header{})
 
-	genAccs, testAccounts := CreateGenAccounts(1,
+	genAccs, genBals, testAccounts := CreateGenAccounts(1,
 		sdk.DecCoins{
 			sdk.NewDecCoinFromDec(common.NativeToken, sdk.NewDec(1000)),
 		})
-	mock.SetGenesis(mapp.App, types.DecAccountArrToBaseAccountArr(genAccs))
+	mock.SetGenesis(mapp.App, genAccs, genBals)
 
 	lockCoins := sdk.DecCoins{
 		sdk.NewDecCoinFromDec(common.NativeToken, sdk.NewDec(100)),
@@ -248,17 +248,17 @@ func TestKeeper_SetCoins(t *testing.T) {
 	mapp.BeginBlock(abci.RequestBeginBlock{Header: abci.Header{Height: 2}})
 	ctx := mapp.BaseApp.NewContext(false, abci.Header{})
 
-	genAccs, testAccounts := CreateGenAccounts(2,
+	genAccs, genBals, testAccounts := CreateGenAccounts(2,
 		sdk.DecCoins{
 			sdk.NewDecCoinFromDec(common.NativeToken, sdk.NewDec(1000)),
 		})
-	mock.SetGenesis(mapp.App, types.DecAccountArrToBaseAccountArr(genAccs))
+	mock.SetGenesis(mapp.App, genAccs, genBals)
 
 	// issue raw token
 	coins := sdk.DecCoins{
 		sdk.NewDecCoinFromDec(common.NativeToken, sdk.NewDec(100)),
 	}
-	err := keeper.bankKeeper.SetCoins(ctx, testAccounts[0].baseAccount.Address, coins)
+	err := keeper.bankKeeper.SetBalances(ctx, testAccounts[0].baseAccount.Address, coins)
 	require.Nil(t, err)
 
 	require.EqualValues(t, keeper.GetCoins(ctx, testAccounts[0].baseAccount.Address), coins)

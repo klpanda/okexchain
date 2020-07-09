@@ -2,10 +2,11 @@ package token
 
 import (
 	"encoding/json"
+	"github.com/cosmos/cosmos-sdk/codec"
+	"github.com/gogo/protobuf/grpc"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/module"
-	authTypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	abci "github.com/tendermint/tendermint/abci/types"
 
 	"github.com/okex/okchain/x/common/version"
@@ -20,16 +21,14 @@ var (
 type AppModule struct {
 	AppModuleBasic
 	keeper       Keeper
-	supplyKeeper authTypes.SupplyKeeper
 	version      version.ProtocolVersionType
 }
 
 // NewAppModule creates a new AppModule object
-func NewAppModule(v version.ProtocolVersionType, keeper Keeper, supplyKeeper authTypes.SupplyKeeper) AppModule {
+func NewAppModule(v version.ProtocolVersionType, keeper Keeper) AppModule {
 	return AppModule{
 		AppModuleBasic: AppModuleBasic{},
 		keeper:         keeper,
-		supplyKeeper:   supplyKeeper,
 		version:        v,
 	}
 }
@@ -44,8 +43,8 @@ func (am AppModule) RegisterInvariants(ir sdk.InvariantRegistry) {
 }
 
 // Route module message route name
-func (AppModule) Route() string {
-	return tokenTypes.RouterKey
+func (am AppModule) Route() sdk.Route {
+	return sdk.NewRoute(tokenTypes.RouterKey, NewTokenHandler(am.keeper, am.version))
 }
 
 // nolint
@@ -63,8 +62,10 @@ func (am AppModule) NewQuerierHandler() sdk.Querier {
 	return NewQuerier(am.keeper)
 }
 
+func (am AppModule) RegisterQueryService(grpc.Server) {}
+
 // nolint
-func (am AppModule) InitGenesis(ctx sdk.Context, data json.RawMessage) []abci.ValidatorUpdate {
+func (am AppModule) InitGenesis(ctx sdk.Context, cdc codec.JSONMarshaler, data json.RawMessage) []abci.ValidatorUpdate {
 	var genesisState GenesisState
 	tokenTypes.ModuleCdc.MustUnmarshalJSON(data, &genesisState)
 	initGenesis(ctx, am.keeper, genesisState)
@@ -72,7 +73,7 @@ func (am AppModule) InitGenesis(ctx sdk.Context, data json.RawMessage) []abci.Va
 }
 
 // nolint
-func (am AppModule) ExportGenesis(ctx sdk.Context) json.RawMessage {
+func (am AppModule) ExportGenesis(ctx sdk.Context, cdc codec.JSONMarshaler) json.RawMessage {
 	gs := ExportGenesis(ctx, am.keeper)
 	return tokenTypes.ModuleCdc.MustMarshalJSON(gs)
 }

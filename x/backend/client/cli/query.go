@@ -4,11 +4,11 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/cosmos/cosmos-sdk/client/flags"
 	"strconv"
 
 	"github.com/cosmos/cosmos-sdk/client"
 
-	"github.com/cosmos/cosmos-sdk/client/context"
 	"github.com/cosmos/cosmos-sdk/codec"
 	"github.com/okex/okchain/x/backend/types"
 	orderTypes "github.com/okex/okchain/x/order/types"
@@ -24,7 +24,7 @@ func GetQueryCmd(queryRoute string, cdc *codec.Codec) *cobra.Command {
 		Short: "Querying commands for the backend module",
 	}
 
-	queryCmd.AddCommand(client.GetCommands(
+	queryCmd.AddCommand(flags.GetCommands(
 		GetCmdMatches(queryRoute, cdc),
 		GetCmdDeals(queryRoute, cdc),
 		GetCmdFeeDetails(queryRoute, cdc),
@@ -44,7 +44,7 @@ func GetCmdMatches(queryRoute string, cdc *codec.Codec) *cobra.Command {
 		Use:   "matches",
 		Short: "get match result list",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cliCtx := context.NewCLIContext().WithCodec(cdc)
+			cliCtx := client.NewContext().WithCodec(cdc)
 
 			flags := cmd.Flags()
 			product, errProduct := flags.GetString("product")
@@ -87,7 +87,7 @@ func GetCmdDeals(queryRoute string, cdc *codec.Codec) *cobra.Command {
 		Use:   "deals",
 		Short: "get deal list",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cliCtx := context.NewCLIContext().WithCodec(cdc)
+			cliCtx := client.NewContext().WithCodec(cdc)
 
 			flags := cmd.Flags()
 			addr, errAddr := flags.GetString("address")
@@ -134,7 +134,7 @@ func GetCmdCandles(queryRoute string, cdc *codec.Codec) *cobra.Command {
 		Use:   "klines",
 		Short: "get kline list",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cliCtx := context.NewCLIContext().WithCodec(cdc)
+			cliCtx := client.NewContext().WithCodec(cdc)
 
 			flags := cmd.Flags()
 			granularity, errGranularity := flags.GetInt("granularity")
@@ -179,7 +179,7 @@ func GetCmdTickers(queryRoute string, cdc *codec.Codec) *cobra.Command {
 		Use:   "tickers",
 		Short: "get latest ticker list",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cliCtx := context.NewCLIContext().WithCodec(cdc)
+			cliCtx := client.NewContext().WithCodec(cdc)
 
 			flags := cmd.Flags()
 			count, errCnt := flags.GetInt("count")
@@ -230,7 +230,7 @@ func GetCmdFeeDetails(queryRoute string, cdc *codec.Codec) *cobra.Command {
 		Short: "get fee detail list of a user",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cliCtx := context.NewCLIContext().WithCodec(cdc)
+			cliCtx := client.NewContext().WithCodec(cdc)
 			addr := args[0]
 			flags := cmd.Flags()
 			page, errPage := flags.GetInt("page")
@@ -269,7 +269,7 @@ func GetCmdOrderList(queryRoute string, cdc *codec.Codec) *cobra.Command {
 		Short: "get order list",
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cliCtx := context.NewCLIContext().WithCodec(cdc)
+			cliCtx := client.NewContext().WithCodec(cdc)
 			if args[0] != "open" && args[0] != "closed" {
 				return fmt.Errorf(fmt.Sprintf("order status should be open/closed"))
 			}
@@ -322,7 +322,7 @@ func GetCmdTxList(queryRoute string, cdc *codec.Codec) *cobra.Command {
 		Short: "get tx list",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cliCtx := context.NewCLIContext().WithCodec(cdc)
+			cliCtx := client.NewContext().WithCodec(cdc)
 			addr := args[0]
 			flags := cmd.Flags()
 			txType, errTxType := flags.GetInt64("type")
@@ -367,7 +367,7 @@ func GetBlockTxHashesCommand(queryRoute string, cdc *codec.Codec) *cobra.Command
 		Short: "Get txs hash list for a the block at given height",
 		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cliCtx := context.NewCLIContext().WithCodec(cdc)
+			cliCtx := client.NewContext().WithCodec(cdc)
 			height, err := strconv.ParseInt(args[0], 10, 64)
 			if err != nil {
 				return err
@@ -391,7 +391,7 @@ func GetBlockTxHashesCommand(queryRoute string, cdc *codec.Codec) *cobra.Command
 }
 
 // GetBlockTxHashes return tx hashes in the block of the given height
-func GetBlockTxHashes(cliCtx context.CLIContext, height *int64) ([]string, error) {
+func GetBlockTxHashes(cliCtx client.Context, height *int64) ([]string, error) {
 	// get the node
 	node, err := cliCtx.GetNode()
 	if err != nil {
@@ -412,7 +412,7 @@ func GetBlockTxHashes(cliCtx context.CLIContext, height *int64) ([]string, error
 			return nil, err
 		}
 
-		err = tmliteProxy.ValidateBlockMeta(res.BlockMeta, check)
+		err = tmliteProxy.ValidateHeader(&res.Block.Header, check)
 		if err != nil {
 			return nil, err
 		}

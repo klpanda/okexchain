@@ -2,18 +2,18 @@ package rest
 
 import (
 	"fmt"
+	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/okex/okchain/x/common"
 	"net/http"
 
 	"github.com/gorilla/mux"
 
-	"github.com/cosmos/cosmos-sdk/client/context"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/rest"
 	"github.com/okex/okchain/x/staking/types"
 )
 
-func registerQueryRoutes(cliCtx context.CLIContext, r *mux.Router) {
+func registerQueryRoutes(cliCtx client.Context, r *mux.Router) {
 	// query delegator info
 	r.HandleFunc(
 		"/staking/delegators/{delegatorAddr}",
@@ -83,27 +83,27 @@ func registerQueryRoutes(cliCtx context.CLIContext, r *mux.Router) {
 }
 
 // HTTP request handler to query the proxy relationship on a proxy delegator
-func delegatorProxyHandlerFn(cliCtx context.CLIContext) http.HandlerFunc {
+func delegatorProxyHandlerFn(cliCtx client.Context) http.HandlerFunc {
 	return queryDelegator(cliCtx, fmt.Sprintf("custom/%s/%s", types.QuerierRoute, types.QueryProxy))
 }
 
 // HTTP request handler to query the info of delegator's unbonding delegation
-func delegatorUnbondingDelegationsHandlerFn(cliCtx context.CLIContext) http.HandlerFunc {
+func delegatorUnbondingDelegationsHandlerFn(cliCtx client.Context) http.HandlerFunc {
 	return queryDelegator(cliCtx, fmt.Sprintf("custom/%s/%s", types.QuerierRoute, types.QueryUnbondingDelegation))
 }
 
 // HTTP request handler to query the info of a delegator
-func delegatorHandlerFn(cliCtx context.CLIContext) http.HandlerFunc {
+func delegatorHandlerFn(cliCtx client.Context) http.HandlerFunc {
 	return queryDelegator(cliCtx, fmt.Sprintf("custom/%s/%s", types.QuerierRoute, types.QueryDelegator))
 }
 
 // HTTP request handler to query the all shares added to a validator
-func validatorAllSharesHandlerFn(cliCtx context.CLIContext) http.HandlerFunc {
+func validatorAllSharesHandlerFn(cliCtx client.Context) http.HandlerFunc {
 	return queryValidator(cliCtx, fmt.Sprintf("custom/%s/%s", types.QuerierRoute, types.QueryValidatorAllShares))
 }
 
 // HTTP request handler to query list of validators
-func validatorsHandlerFn(cliCtx context.CLIContext) http.HandlerFunc {
+func validatorsHandlerFn(cliCtx client.Context) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		_, page, limit, err := rest.ParseHTTPArgsWithLimit(r, 0)
 		if err != nil {
@@ -141,12 +141,12 @@ func validatorsHandlerFn(cliCtx context.CLIContext) http.HandlerFunc {
 }
 
 // HTTP request handler to query the validator information from a given validator address
-func validatorHandlerFn(cliCtx context.CLIContext) http.HandlerFunc {
+func validatorHandlerFn(cliCtx client.Context) http.HandlerFunc {
 	return queryValidator(cliCtx, "custom/staking/validator")
 }
 
 // HTTP request handler to query the pool information
-func poolHandlerFn(cliCtx context.CLIContext) http.HandlerFunc {
+func poolHandlerFn(cliCtx client.Context) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		cliCtx, ok := rest.ParseQueryHeightOrReturnBadRequest(w, cliCtx, r)
 		if !ok {
@@ -165,7 +165,7 @@ func poolHandlerFn(cliCtx context.CLIContext) http.HandlerFunc {
 }
 
 // HTTP request handler to query the staking params values
-func paramsHandlerFn(cliCtx context.CLIContext) http.HandlerFunc {
+func paramsHandlerFn(cliCtx client.Context) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		cliCtx, ok := rest.ParseQueryHeightOrReturnBadRequest(w, cliCtx, r)
 		if !ok {
@@ -183,7 +183,7 @@ func paramsHandlerFn(cliCtx context.CLIContext) http.HandlerFunc {
 	}
 }
 
-func addressHandlerFn(cliCtx context.CLIContext) http.HandlerFunc {
+func addressHandlerFn(cliCtx client.Context) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		cliCtx, ok := rest.ParseQueryHeightOrReturnBadRequest(w, cliCtx, r)
 		if !ok {
@@ -201,16 +201,16 @@ func addressHandlerFn(cliCtx context.CLIContext) http.HandlerFunc {
 }
 
 // HTTP request handler to query one validator address
-func validatorAddressHandlerFn(cliCtx context.CLIContext) http.HandlerFunc {
+func validatorAddressHandlerFn(cliCtx client.Context) http.HandlerFunc {
 	return queryValidatorAddr(cliCtx, "custom/staking/validatorAddress")
 }
 
 // HTTP request handler to query one validator's account address
-func accountAddressHandlerFn(cliCtx context.CLIContext) http.HandlerFunc {
+func accountAddressHandlerFn(cliCtx client.Context) http.HandlerFunc {
 	return queryValidatorAddr(cliCtx, "custom/staking/validatorAccAddress")
 }
 
-func queryValidatorAddr(cliCtx context.CLIContext, endpoint string) http.HandlerFunc {
+func queryValidatorAddr(cliCtx client.Context, endpoint string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		cliCtx, ok := rest.ParseQueryHeightOrReturnBadRequest(w, cliCtx, r)
 		if !ok {

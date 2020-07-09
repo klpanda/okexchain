@@ -4,12 +4,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	"sort"
 	"strings"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/cosmos/cosmos-sdk/x/auth"
-
 	"github.com/okex/okchain/x/common"
 	"github.com/okex/okchain/x/token/types"
 )
@@ -77,7 +76,7 @@ func validateGenesis(data GenesisState) error {
 // and the keeper's address to pubkey map
 func initGenesis(ctx sdk.Context, keeper Keeper, data GenesisState) {
 	// if module account dosen't exist, it will create automatically
-	moduleAcc := keeper.supplyKeeper.GetModuleAccount(ctx, types.ModuleName)
+	moduleAcc := keeper.accKeeper.GetModuleAccount(ctx, types.ModuleName)
 	if moduleAcc == nil {
 		panic(fmt.Sprintf("%s module account has not been set", types.ModuleName))
 	}
@@ -128,7 +127,7 @@ func ExportGenesis(ctx sdk.Context, keeper Keeper) (data GenesisState) {
 }
 
 // IssueOKT issues okt in initchain
-func IssueOKT(ctx sdk.Context, k Keeper, genesisState json.RawMessage, acc auth.Account) error {
+func IssueOKT(ctx sdk.Context, k Keeper, genesisState json.RawMessage, acc authtypes.AccountI) error {
 	var data GenesisState
 	types.ModuleCdc.MustUnmarshalJSON(genesisState, &data)
 	for _, t := range data.Tokens {
@@ -140,7 +139,7 @@ func IssueOKT(ctx sdk.Context, k Keeper, genesisState json.RawMessage, acc auth.
 			coins = append(coins, sdk.NewDecCoinFromDec(t.Symbol, t.TotalSupply))
 			sort.Sort(coins)
 
-			err := k.bankKeeper.SetCoins(ctx, t.Owner, coins)
+			err := k.bankKeeper.SetBalances(ctx, t.Owner, coins)
 			if err != nil {
 				return err
 			}

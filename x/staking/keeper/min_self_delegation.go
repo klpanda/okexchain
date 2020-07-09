@@ -9,7 +9,7 @@ import (
 
 // WithdrawMinSelfDelegation withdraws the msd from validator
 func (k Keeper) WithdrawMinSelfDelegation(ctx sdk.Context, delAddr sdk.AccAddress, validator types.Validator,
-) (completionTime time.Time, err sdk.Error) {
+) (completionTime time.Time, err error) {
 	// 0.check the msd on validator
 	if validator.MinSelfDelegation.IsZero() {
 		return completionTime, types.ErrNoMinSelfDelegation(types.DefaultCodespace, validator.OperatorAddress.String())
@@ -61,10 +61,10 @@ func (k Keeper) WithdrawMinSelfDelegation(ctx sdk.Context, delAddr sdk.AccAddres
 
 // AddSharesAsMinSelfDelegation adds shares of equal value of default msd (0.001okt) to validator itself during the creation
 func (k Keeper) AddSharesAsMinSelfDelegation(ctx sdk.Context, delAddr sdk.AccAddress, validator *types.Validator,
-	defaultMSDToken sdk.DecCoin) (err sdk.Error) {
+	defaultMSDToken sdk.DecCoin) (err error) {
 	// 0. transfer account's okt (0.001okt as default) into bondPool
 	coins := defaultMSDToken.ToCoins()
-	err = k.supplyKeeper.DelegateCoinsFromAccountToModule(ctx, delAddr, types.BondedPoolName, coins)
+	err = k.bankKeeper.DelegateCoinsFromAccountToModule(ctx, delAddr, types.BondedPoolName, coins)
 	if err != nil {
 		return err
 	}

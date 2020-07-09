@@ -2,6 +2,7 @@ package keeper
 
 import (
 	"fmt"
+	sdkerror "github.com/cosmos/cosmos-sdk/types/errors"
 	"time"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -43,7 +44,7 @@ func (k Keeper) GetVotingPeriod(ctx sdk.Context, content gov.Content) (votingPer
 }
 
 // CheckMsgSubmitProposal implements ProposalHandler interface
-func (k Keeper) CheckMsgSubmitProposal(ctx sdk.Context, msg gov.MsgSubmitProposal) sdk.Error {
+func (k Keeper) CheckMsgSubmitProposal(ctx sdk.Context, msg gov.MsgSubmitProposal) error {
 	// check message sender is current validator
 	if !k.stakingKeeper.IsValidator(ctx, msg.Proposer) {
 		return gov.ErrInvalidProposer(types.DefaultCodespace,
@@ -52,14 +53,14 @@ func (k Keeper) CheckMsgSubmitProposal(ctx sdk.Context, msg gov.MsgSubmitProposa
 	// check initial deposit more than or equal to ratio of MinDeposit
 	initDeposit := k.GetParams(ctx).AppUpgradeMinDeposit.MulDec(sdk.NewDecWithPrec(1, 1))
 	if err := common.HasSufficientCoins(msg.Proposer, msg.InitialDeposit, initDeposit); err != nil {
-		return sdk.NewError(types.DefaultCodespace, token.CodeInvalidAsset, err.Error())
+		return sdkerror.New(types.DefaultCodespace, token.CodeInvalidAsset, err.Error())
 	}
 	// check proposer has sufficient coins
-	if err := common.HasSufficientCoins(msg.Proposer, k.bankKeeper.GetCoins(ctx, msg.Proposer), msg.InitialDeposit); err != nil {
-		return sdk.NewError(types.DefaultCodespace, token.CodeInvalidAsset, err.Error())
+	if err := common.HasSufficientCoins(msg.Proposer, k.bankKeeper.GetAllBalances(ctx, msg.Proposer), msg.InitialDeposit); err != nil {
+		return sdkerror.New(types.DefaultCodespace, token.CodeInvalidAsset, err.Error())
 	}
 
-	upgradeProposal := msg.Content.(types.AppUpgradeProposal)
+	upgradeProposal := msg.GetContent().(types.AppUpgradeProposal)
 	if !k.protocolKeeper.IsValidVersion(ctx, upgradeProposal.ProtocolDefinition.Version) {
 		return types.ErrInvalidVersion(types.DefaultCodespace, upgradeProposal.ProtocolDefinition.Version)
 	}
@@ -76,7 +77,7 @@ func (k Keeper) CheckMsgSubmitProposal(ctx sdk.Context, msg gov.MsgSubmitProposa
 }
 
 // nolint
-func (Keeper) VoteHandler(_ sdk.Context, _ gov.Proposal, _ gov.Vote) (string, sdk.Error) {
+func (Keeper) VoteHandler(_ sdk.Context, _ gov.Proposal, _ gov.Vote) (string, error) {
 	return "", nil
 }
 func (Keeper) AfterSubmitProposalHandler(_ sdk.Context, _ gov.Proposal) {}
@@ -85,22 +86,22 @@ func (Keeper) RejectedHandler(_ sdk.Context, _ gov.Content)             {}
 
 // NewAppUpgradeProposalHandler creates a new upgrade handler for gov module
 func NewAppUpgradeProposalHandler(k *Keeper) gov.Handler {
-	return func(ctx sdk.Context, proposal *gov.Proposal) sdk.Error {
-		switch c := proposal.Content.(type) {
+	return func(ctx sdk.Context, proposal *gov.Proposal) error {
+		switch c := proposal.GetContent().(type) {
 		case types.AppUpgradeProposal:
 			return handleAppUpgradeProposal(ctx, k, proposal)
 
 		default:
 			errMsg := fmt.Sprintf("unrecognized param proposal content type: %s", c.ProposalType())
-			return sdk.ErrUnknownRequest(errMsg)
+			return sdkerror.Wrap(sdkerror.ErrUnknownRequest, errMsg)
 		}
 	}
 }
 
-func handleAppUpgradeProposal(ctx sdk.Context, k *Keeper, proposal *gov.Proposal) sdk.Error {
+func handleAppUpgradeProposal(ctx sdk.Context, k *Keeper, proposal *gov.Proposal) error {
 	logger := ctx.Logger().With("module", types.ModuleName)
 	logger.Info("Begin to Execute AppUpgradeProposal")
-	upgradeProposal := proposal.Content.(types.AppUpgradeProposal)
+	upgradeProposal := proposal.GetContent().(types.AppUpgradeProposal)
 	if _, found := k.protocolKeeper.GetUpgradeConfig(ctx); found {
 		logger.Error("Execute AppUpgradeProposal Failure", "info",
 			fmt.Sprintf("App Upgrade Switch Period is in process."))

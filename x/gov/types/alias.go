@@ -42,7 +42,7 @@ const (
 	StoreKey              = sdkGovTypes.StoreKey
 	RouterKey             = sdkGovTypes.RouterKey
 	QuerierRoute          = sdkGovTypes.QuerierRoute
-	DefaultParamspace     = sdkGovTypes.DefaultParamspace
+	DefaultParamspace     = sdkGovTypes.ModuleName
 	TypeMsgDeposit        = sdkGovTypes.TypeMsgDeposit
 	TypeMsgVote           = sdkGovTypes.TypeMsgVote
 	TypeMsgSubmitProposal = sdkGovTypes.TypeMsgSubmitProposal
@@ -57,9 +57,9 @@ const (
 	QueryVote      = sdkGovTypes.QueryVote
 	QueryTally     = sdkGovTypes.QueryTally
 
-	ParamDeposit    = sdkGovTypes.ParamDeposit
-	ParamVoting     = sdkGovTypes.ParamVoting
-	ParamTallying   = sdkGovTypes.ParamTallying
+	ParamDeposit  = sdkGovTypes.ParamDeposit
+	ParamVoting   = sdkGovTypes.ParamVoting
+	ParamTallying = sdkGovTypes.ParamTallying
 
 	MaxDescriptionLength = sdkGovTypes.MaxDescriptionLength
 )
@@ -89,46 +89,51 @@ var (
 
 	ParamKeyTable = sdkGovTypes.ParamKeyTable
 
-	ParamStoreKeyDepositParams    = sdkGovTypes.ParamStoreKeyDepositParams
-	ParamStoreKeyVotingParams     = sdkGovTypes.ParamStoreKeyVotingParams
-	ParamStoreKeyTallyParams      = sdkGovTypes.ParamStoreKeyTallyParams
+	ParamStoreKeyDepositParams = sdkGovTypes.ParamStoreKeyDepositParams
+	ParamStoreKeyVotingParams  = sdkGovTypes.ParamStoreKeyVotingParams
+	ParamStoreKeyTallyParams   = sdkGovTypes.ParamStoreKeyTallyParams
 
 	NewAppModule = sdkGov.NewAppModule
 
-	NewTallyResultFromMap     = sdkGov.NewTallyResultFromMap
-	EmptyTallyResult          = sdkGov.EmptyTallyResult
-	RegisterProposalType      = sdkGov.RegisterProposalType
-	RegisterProposalTypeCodec = sdkGov.RegisterProposalTypeCodec
-	RegisterCodec             = sdkGov.RegisterCodec
+	NewTallyResultFromMap     = sdkGovTypes.NewTallyResultFromMap
+	EmptyTallyResult          = sdkGovTypes.EmptyTallyResult
+	RegisterProposalType      = sdkGovTypes.RegisterProposalType
+	RegisterProposalTypeCodec = sdkGovTypes.RegisterProposalTypeCodec
+	RegisterCodec             = sdkGovTypes.RegisterCodec
 
-	ActiveProposalByTimeKey   = sdkGov.ActiveProposalByTimeKey
-	ActiveProposalQueueKey    = sdkGov.ActiveProposalQueueKey
-	InactiveProposalByTimeKey = sdkGov.InactiveProposalByTimeKey
-	InactiveProposalQueueKey  = sdkGov.InactiveProposalQueueKey
+	ActiveProposalByTimeKey   = sdkGovTypes.ActiveProposalByTimeKey
+	ActiveProposalQueueKey    = sdkGovTypes.ActiveProposalQueueKey
+	InactiveProposalByTimeKey = sdkGovTypes.InactiveProposalByTimeKey
+	InactiveProposalQueueKey  = sdkGovTypes.InactiveProposalQueueKey
 
-	NewMsgSubmitProposal    = sdkGov.NewMsgSubmitProposal
-	NewMsgDeposit           = sdkGov.NewMsgDeposit
-	NewMsgVote              = sdkGov.NewMsgVote
-	NewDepositParams        = sdkGov.NewDepositParams
-	NewTallyParams          = sdkGov.NewTallyParams
-	NewVotingParams         = sdkGov.NewVotingParams
-	NewParams               = sdkGov.NewParams
-	NewTextProposal         = sdkGov.NewTextProposal
-	ContentFromProposalType = sdkGov.ContentFromProposalType
-	IsValidProposalType     = sdkGov.IsValidProposalType
-	ProposalHandler         = sdkGov.ProposalHandler
-	ModuleCdc               = sdkGov.ModuleCdc
+	NewMsgSubmitProposal    = sdkGovTypes.NewMsgSubmitProposal
+	NewMsgDeposit           = sdkGovTypes.NewMsgDeposit
+	NewMsgVote              = sdkGovTypes.NewMsgVote
+	NewDepositParams        = sdkGovTypes.NewDepositParams
+	NewTallyParams          = sdkGovTypes.NewTallyParams
+	NewVotingParams         = sdkGovTypes.NewVotingParams
+	NewParams               = sdkGovTypes.NewParams
+	NewTextProposal         = sdkGovTypes.NewTextProposal
+	ContentFromProposalType = sdkGovTypes.ContentFromProposalType
+	IsValidProposalType     = sdkGovTypes.IsValidProposalType
+	ProposalHandler         = sdkGovTypes.ProposalHandler
+	ModuleCdc               = sdkGovTypes.ModuleCdc
 
-	ValidateAbstract         = sdkGov.ValidateAbstract
-	ProposalStatusFromString = sdkGovTypes.ProposalStatusFromString
-	VoteOptionFromString     = sdkGovTypes.VoteOptionFromString
-	NewQueryVoteParams       = sdkGovTypes.NewQueryVoteParams
-	NewQueryProposalParams   = sdkGovTypes.NewQueryProposalParams
-	NewQueryDepositParams    = sdkGovTypes.NewQueryDepositParams
+	ValidateAbstract            = sdkGovTypes.ValidateAbstract
+	ProposalStatusFromString    = sdkGovTypes.ProposalStatusFromString
+	VoteOptionFromString        = sdkGovTypes.VoteOptionFromString
+	NewQueryVoteParams          = sdkGovTypes.NewQueryVoteParams
+	NewQueryProposalParams      = sdkGovTypes.NewQueryProposalParams
+	NewQueryProposalVotesParams = sdkGovTypes.NewQueryProposalVotesParams
+	NewQueryDepositParams       = sdkGovTypes.NewQueryDepositParams
 
 	NewQueryProposalsParams = sdkGovTypes.NewQueryProposalsParams
 	VoteKey                 = sdkGovTypes.VoteKey
 	DepositKey              = sdkGovTypes.DepositKey
+	ContentToAny            = sdkGovTypes.ContentToAny
+
+	GetProposalIDFromBytes = sdkGovTypes.GetProposalIDFromBytes
+	GetProposalIDBytes     = sdkGovTypes.GetProposalIDBytes
 )
 
 type (
@@ -156,4 +161,5 @@ type (
 	QueryDepositParams   = sdkGovTypes.QueryDepositParams
 	QueryVoteParams      = sdkGovTypes.QueryVoteParams
 	QueryProposalsParams = sdkGovTypes.QueryProposalsParams
+	BankKeeper           = sdkGovTypes.BankKeeper
 )

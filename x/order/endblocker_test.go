@@ -2,6 +2,7 @@ package order
 
 import (
 	"fmt"
+	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	"math/rand"
 	"strconv"
 	"testing"
@@ -9,10 +10,9 @@ import (
 
 	"github.com/okex/okchain/x/order/keeper"
 
-	"github.com/cosmos/cosmos-sdk/x/supply"
+	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/cosmos/cosmos-sdk/x/auth"
 	"github.com/stretchr/testify/require"
 	abci "github.com/tendermint/tendermint/abci/types"
 
@@ -29,7 +29,7 @@ func TestEndBlockerPeriodicMatch(t *testing.T) {
 
 	var startHeight int64 = 10
 	ctx := mapp.BaseApp.NewContext(false, abci.Header{}).WithBlockHeight(startHeight)
-	mapp.supplyKeeper.SetSupply(ctx, supply.NewSupply(mapp.TotalCoinsSupply))
+	mapp.BankKeeper.SetSupply(ctx, banktypes.NewSupply(mapp.TotalCoinsSupply))
 
 	feeParams := types.DefaultTestParams()
 	mapp.orderKeeper.SetParams(ctx, &feeParams)
@@ -116,12 +116,12 @@ func TestEndBlockerPeriodicMatch(t *testing.T) {
 		sdk.NewDecCoinFromDec(common.NativeToken, sdk.MustNewDecFromStr("109.7308")), // 100 + 10 * (1-0.001) - 0.2592
 		sdk.NewDecCoinFromDec(common.TestToken, sdk.MustNewDecFromStr("97")),         // 100 - 0.5 - 2.5
 	}
-	require.EqualValues(t, expectCoins0.String(), acc0.GetCoins().String())
-	require.EqualValues(t, expectCoins1.String(), acc1.GetCoins().String())
+	require.EqualValues(t, expectCoins0.String(), mapp.BankKeeper.GetAllBalances(ctx, acc0.GetAddress()).String())
+	require.EqualValues(t, expectCoins1.String(), mapp.BankKeeper.GetAllBalances(ctx, acc1.GetAddress()).String())
 
 	// check fee pool
-	feeCollector := mapp.supplyKeeper.GetModuleAccount(ctx, auth.FeeCollectorName)
-	collectedFees := feeCollector.GetCoins()
+	feeCollector := mapp.AccountKeeper.GetModuleAccount(ctx, authtypes.FeeCollectorName)
+	collectedFees := mapp.BankKeeper.GetAllBalances(ctx, feeCollector.GetAddress())
 	require.EqualValues(t, "", collectedFees.String())
 }
 
@@ -130,7 +130,7 @@ func TestEndBlockerPeriodicMatchBusyProduct(t *testing.T) {
 	k := mapp.orderKeeper
 	mapp.BeginBlock(abci.RequestBeginBlock{Header: abci.Header{Height: 2}})
 	ctx := mapp.BaseApp.NewContext(false, abci.Header{}).WithBlockHeight(10)
-	mapp.supplyKeeper.SetSupply(ctx, supply.NewSupply(mapp.TotalCoinsSupply))
+	mapp.BankKeeper.SetSupply(ctx, banktypes.NewSupply(mapp.TotalCoinsSupply))
 	feeParams := types.DefaultTestParams()
 	feeParams.MaxDealsPerBlock = 2
 	k.SetParams(ctx, &feeParams)
@@ -211,8 +211,8 @@ func TestEndBlockerPeriodicMatchBusyProduct(t *testing.T) {
 		sdk.NewDecCoinFromDec(common.TestToken, sdk.MustNewDecFromStr("97")),         // 100 - 0.5 - 2.5
 	}
 
-	require.EqualValues(t, expectCoins0.String(), acc0.GetCoins().String())
-	require.EqualValues(t, expectCoins1.String(), acc1.GetCoins().String())
+	require.EqualValues(t, expectCoins0.String(), mapp.BankKeeper.GetAllBalances(ctx, acc0.GetAddress()).String())
+	require.EqualValues(t, expectCoins1.String(), mapp.BankKeeper.GetAllBalances(ctx, acc1.GetAddress()).String())
 
 	// ------- call EndBlock at height 11, continue filling ------- //
 	ctx = mapp.BaseApp.NewContext(false, abci.Header{}).WithBlockHeight(11)
@@ -251,8 +251,8 @@ func TestEndBlockerPeriodicMatchBusyProduct(t *testing.T) {
 		sdk.NewDecCoinFromDec(common.NativeToken, sdk.MustNewDecFromStr("109.7308")), // 100 + 10 * (1 - 0.001) - 0.2592
 		sdk.NewDecCoinFromDec(common.TestToken, sdk.MustNewDecFromStr("97")),         // 100 - 0.5 - 2.5
 	}
-	require.EqualValues(t, expectCoins0.String(), acc0.GetCoins().String())
-	require.EqualValues(t, expectCoins1.String(), acc1.GetCoins().String())
+	require.EqualValues(t, expectCoins0.String(), mapp.BankKeeper.GetAllBalances(ctx, acc0.GetAddress()).String())
+	require.EqualValues(t, expectCoins1.String(), mapp.BankKeeper.GetAllBalances(ctx, acc1.GetAddress()).String())
 }
 
 func TestEndBlockerDropExpireData(t *testing.T) {
@@ -260,7 +260,7 @@ func TestEndBlockerDropExpireData(t *testing.T) {
 	k := mapp.orderKeeper
 	mapp.BeginBlock(abci.RequestBeginBlock{Header: abci.Header{Height: 2}})
 	ctx := mapp.BaseApp.NewContext(false, abci.Header{}).WithBlockHeight(10)
-	mapp.supplyKeeper.SetSupply(ctx, supply.NewSupply(mapp.TotalCoinsSupply))
+	mapp.BankKeeper.SetSupply(ctx, banktypes.NewSupply(mapp.TotalCoinsSupply))
 	feeParams := types.DefaultTestParams()
 	mapp.orderKeeper.SetParams(ctx, &feeParams)
 
@@ -324,7 +324,7 @@ func TestEndBlockerExpireOrdersBusyProduct(t *testing.T) {
 	k := mapp.orderKeeper
 	mapp.BeginBlock(abci.RequestBeginBlock{Header: abci.Header{Height: 2}})
 	ctx := mapp.BaseApp.NewContext(false, abci.Header{}).WithBlockHeight(10)
-	mapp.supplyKeeper.SetSupply(ctx, supply.NewSupply(mapp.TotalCoinsSupply))
+	mapp.BankKeeper.SetSupply(ctx, banktypes.NewSupply(mapp.TotalCoinsSupply))
 	feeParams := types.DefaultTestParams()
 
 	tokenPair := dex.GetBuiltInTokenPair()
@@ -381,7 +381,7 @@ func TestEndBlockerExpireOrders(t *testing.T) {
 
 	var startHeight int64 = 10
 	ctx := mapp.BaseApp.NewContext(false, abci.Header{}).WithBlockHeight(startHeight)
-	mapp.supplyKeeper.SetSupply(ctx, supply.NewSupply(mapp.TotalCoinsSupply))
+	mapp.BankKeeper.SetSupply(ctx, banktypes.NewSupply(mapp.TotalCoinsSupply))
 
 	feeParams := types.DefaultTestParams()
 
@@ -424,8 +424,8 @@ func TestEndBlockerExpireOrders(t *testing.T) {
 		sdk.NewDecCoinFromDec(common.NativeToken, sdk.MustNewDecFromStr("104.7358")),
 		sdk.NewDecCoinFromDec(common.TestToken, sdk.MustNewDecFromStr("99")),
 	}
-	require.EqualValues(t, expectCoins0.String(), acc0.GetCoins().String())
-	require.EqualValues(t, expectCoins1.String(), acc1.GetCoins().String())
+	require.EqualValues(t, expectCoins0.String(), mapp.BankKeeper.GetAllBalances(ctx, acc0.GetAddress()).String())
+	require.EqualValues(t, expectCoins1.String(), mapp.BankKeeper.GetAllBalances(ctx, acc1.GetAddress()).String())
 
 	// check depth book
 	depthBook := k.GetDepthBookCopy(types.TestTokenPair)
@@ -472,12 +472,12 @@ func TestEndBlockerExpireOrders(t *testing.T) {
 		sdk.NewDecCoinFromDec(common.NativeToken, sdk.MustNewDecFromStr("104.7358")),
 		sdk.NewDecCoinFromDec(common.TestToken, sdk.MustNewDecFromStr("99.5")),
 	}
-	require.EqualValues(t, expectCoins0.String(), acc0.GetCoins().String())
-	require.EqualValues(t, expectCoins1.String(), acc1.GetCoins().String())
+	require.EqualValues(t, expectCoins0.String(), mapp.BankKeeper.GetAllBalances(ctx, acc0.GetAddress()).String())
+	require.EqualValues(t, expectCoins1.String(), mapp.BankKeeper.GetAllBalances(ctx, acc1.GetAddress()).String())
 
 	// check fee pool
-	feeCollector := mapp.supplyKeeper.GetModuleAccount(ctx, auth.FeeCollectorName)
-	collectedFees := feeCollector.GetCoins()
+	feeCollector := mapp.AccountKeeper.GetModuleAccount(ctx, authtypes.FeeCollectorName)
+	collectedFees := mapp.BankKeeper.GetAllBalances(ctx, feeCollector.GetAddress())
 	// 0.2592 + 0.2592
 	require.EqualValues(t, "0.51840000"+common.NativeToken, collectedFees.String())
 }
@@ -489,7 +489,7 @@ func TestEndBlockerCleanupOrdersWhoseTokenPairHaveBeenDelisted(t *testing.T) {
 
 	var startHeight int64 = 10
 	ctx := mapp.BaseApp.NewContext(false, abci.Header{}).WithBlockHeight(startHeight)
-	mapp.supplyKeeper.SetSupply(ctx, supply.NewSupply(mapp.TotalCoinsSupply))
+	mapp.BankKeeper.SetSupply(ctx, banktypes.NewSupply(mapp.TotalCoinsSupply))
 
 	feeParams := types.DefaultTestParams()
 	mapp.orderKeeper.SetParams(ctx, &feeParams)
@@ -545,12 +545,12 @@ func TestEndBlockerCleanupOrdersWhoseTokenPairHaveBeenDelisted(t *testing.T) {
 		sdk.NewDecCoinFromDec(common.NativeToken, sdk.MustNewDecFromStr("100")),
 		sdk.NewDecCoinFromDec(common.TestToken, sdk.MustNewDecFromStr("100")),
 	}
-	require.EqualValues(t, expectCoins0.String(), acc0.GetCoins().String())
-	require.EqualValues(t, expectCoins1.String(), acc1.GetCoins().String())
+	require.EqualValues(t, expectCoins0.String(), mapp.BankKeeper.GetAllBalances(ctx, acc0.GetAddress()).String())
+	require.EqualValues(t, expectCoins1.String(), mapp.BankKeeper.GetAllBalances(ctx, acc1.GetAddress()).String())
 
 	// check fee pool
-	feeCollector := mapp.supplyKeeper.GetModuleAccount(ctx, auth.FeeCollectorName)
-	collectedFees := feeCollector.GetCoins()
+	feeCollector := mapp.AccountKeeper.GetModuleAccount(ctx, authtypes.FeeCollectorName)
+	collectedFees := mapp.BankKeeper.GetAllBalances(ctx, feeCollector.GetAddress())
 	require.EqualValues(t, "", collectedFees.String())
 }
 
@@ -563,7 +563,7 @@ func TestFillPrecision(t *testing.T) {
 	ctx := mapp.BaseApp.NewContext(false, abci.Header{}).WithBlockHeight(startHeight)
 	BeginBlocker(ctx, k)
 
-	mapp.supplyKeeper.SetSupply(ctx, supply.NewSupply(mapp.TotalCoinsSupply))
+	mapp.BankKeeper.SetSupply(ctx, banktypes.NewSupply(mapp.TotalCoinsSupply))
 	feeParams := types.DefaultParams()
 	mapp.orderKeeper.SetParams(ctx, &feeParams)
 
@@ -646,7 +646,7 @@ func TestEndBlocker(t *testing.T) {
 
 	var startHeight int64 = 10
 	ctx := mapp.BaseApp.NewContext(false, abci.Header{}).WithBlockHeight(startHeight)
-	mapp.supplyKeeper.SetSupply(ctx, supply.NewSupply(mapp.TotalCoinsSupply))
+	mapp.BankKeeper.SetSupply(ctx, banktypes.NewSupply(mapp.TotalCoinsSupply))
 
 	feeParams := types.DefaultTestParams()
 	mapp.orderKeeper.SetParams(ctx, &feeParams)
@@ -660,7 +660,8 @@ func TestEndBlocker(t *testing.T) {
 	blockHeight := startHeight
 	for i:=0;i<100000;i++ {
 		msg := buildRandomOrderMsg(addrKeysSlice[0].Address)
-		result := handler(ctx, msg)
+		result, err := handler(ctx, &msg)
+		require.Nil(t, err)
 		if (i + 1) % 1000 == 0 {
 			blockHeight = blockHeight + 1
 			ctx = ctx.WithBlockHeight(blockHeight)
@@ -679,7 +680,8 @@ func TestEndBlocker(t *testing.T) {
 			types.NewOrderItem(types.TestTokenPair, types.SellOrder, "100", quantity),
 		}
 		msg := types.NewMsgNewOrders(addrKeysSlice[1].Address, orderItems)
-		handler(ctx, msg)
+		_, err = handler(ctx, &msg)
+		require.Nil(t, err)
 		EndBlocker(ctx, k)
 		fmt.Println(time.Since(startTime))
 		fmt.Println(k.GetOrder(ctx, types.FormatOrderID(blockHeight, 1)))

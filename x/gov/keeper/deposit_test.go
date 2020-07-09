@@ -150,7 +150,7 @@ func TestKeeper_DistributeDeposits(t *testing.T) {
 
 func TestKeeper_RefundDeposits(t *testing.T) {
 	ctx, accKeeper, keeper, _, _ := CreateTestInput(t, false, 1000)
-	amount := accKeeper.GetAccount(ctx, Addrs[0]).GetCoins().AmountOf(sdk.DefaultBondDenom)
+	amount := keeper.BankKeeper().GetAllBalances(ctx, Addrs[0]).AmountOf(sdk.DefaultBondDenom)
 
 	content := types.NewTextProposal("Test", "description")
 	proposal, err := keeper.SubmitProposal(ctx, content)
@@ -165,17 +165,17 @@ func TestKeeper_RefundDeposits(t *testing.T) {
 	err = keeper.AddDeposit(ctx, proposalID, Addrs[1], amount2, "")
 	require.Nil(t, err)
 
-	moduleAccBalance := keeper.SupplyKeeper().GetModuleAccount(ctx, types.ModuleName).GetCoins()
-	require.Equal(t, amount1.Add(amount2), moduleAccBalance)
+	moduleAccBalance := keeper.BankKeeper().GetAllBalances(ctx, accKeeper.GetModuleAccount(ctx, types.ModuleName).GetAddress())
+	require.Equal(t, amount1.Add(amount2...), moduleAccBalance)
 
 	// after RefundDeposits
 	keeper.RefundDeposits(ctx, proposalID)
-	moduleAccBalance = keeper.SupplyKeeper().GetModuleAccount(ctx, types.ModuleName).GetCoins()
+	moduleAccBalance = keeper.BankKeeper().GetAllBalances(ctx, accKeeper.GetModuleAccount(ctx, types.ModuleName).GetAddress())
 	require.Equal(t, sdk.Coins(nil), moduleAccBalance)
 
 	require.Equal(t, amount, sdk.NewDec(1000))
 
-	require.Equal(t, accKeeper.GetAccount(ctx, Addrs[1]).GetCoins(),
+	require.Equal(t, keeper.BankKeeper().GetAllBalances(ctx, Addrs[1]),
 		sdk.DecCoins{sdk.NewInt64DecCoin(sdk.DefaultBondDenom, 1000)})
 
 	// refund panic
@@ -188,7 +188,7 @@ func TestKeeper_RefundDeposits(t *testing.T) {
 	err = keeper.AddDeposit(ctx, proposalID, Addrs[0], amount1, "")
 	require.Nil(t, err)
 
-	err = keeper.SupplyKeeper().SendCoinsFromModuleToModule(ctx, types.ModuleName, keeper.feeCollectorName,
+	err = keeper.BankKeeper().SendCoinsFromModuleToModule(ctx, types.ModuleName, keeper.feeCollectorName,
 		amount1)
 	require.Nil(t, err)
 	require.Panics(t, func() {

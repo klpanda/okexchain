@@ -2,8 +2,9 @@ package staking
 
 import (
 	"fmt"
+	sdkerror "github.com/cosmos/cosmos-sdk/types/errors"
 
-	"github.com/tendermint/tendermint/libs/common"
+	tmstring "github.com/tendermint/tendermint/libs/strings"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/okex/okchain/x/staking/keeper"
@@ -14,31 +15,31 @@ import (
 
 // NewHandler manages all tx treatment
 func NewHandler(k keeper.Keeper) sdk.Handler {
-	return func(ctx sdk.Context, msg sdk.Msg) sdk.Result {
+	return func(ctx sdk.Context, msg sdk.Msg) (*sdk.Result, error) {
 		ctx = ctx.WithEventManager(sdk.NewEventManager())
 
 		switch msg := msg.(type) {
-		case types.MsgCreateValidator:
-			return handleMsgCreateValidator(ctx, msg, k)
-		case types.MsgEditValidator:
-			return handleMsgEditValidator(ctx, msg, k)
-		case types.MsgDeposit:
-			return handleMsgDeposit(ctx, msg, k)
-		case types.MsgWithdraw:
-			return handleMsgWithdraw(ctx, msg, k)
-		case types.MsgAddShares:
-			return handleMsgAddShares(ctx, msg, k)
-		case types.MsgBindProxy:
-			return handleMsgBindProxy(ctx, msg, k)
-		case types.MsgUnbindProxy:
-			return handleMsgUnbindProxy(ctx, msg, k)
-		case types.MsgRegProxy:
-			return handleRegProxy(ctx, msg, k)
-		case types.MsgDestroyValidator:
-			return handleMsgDestroyValidator(ctx, msg, k)
+		case *types.MsgCreateValidator:
+			return handleMsgCreateValidator(ctx, *msg, k)
+		case *types.MsgEditValidator:
+			return handleMsgEditValidator(ctx, *msg, k)
+		case *types.MsgDeposit:
+			return handleMsgDeposit(ctx, *msg, k)
+		case *types.MsgWithdraw:
+			return handleMsgWithdraw(ctx, *msg, k)
+		case *types.MsgAddShares:
+			return handleMsgAddShares(ctx, *msg, k)
+		case *types.MsgBindProxy:
+			return handleMsgBindProxy(ctx, *msg, k)
+		case *types.MsgUnbindProxy:
+			return handleMsgUnbindProxy(ctx, *msg, k)
+		case *types.MsgRegProxy:
+			return handleRegProxy(ctx, *msg, k)
+		case *types.MsgDestroyValidator:
+			return handleMsgDestroyValidator(ctx, *msg, k)
 		default:
 			errMsg := fmt.Sprintf("unrecognized staking message type: %T", msg)
-			return sdk.ErrUnknownRequest(errMsg).Result()
+			return nil, sdkerror.Wrap(sdkerror.ErrUnknownRequest, errMsg)
 		}
 	}
 }
@@ -75,7 +76,7 @@ func EndBlocker(ctx sdk.Context, k keeper.Keeper) []abci.ValidatorUpdate {
 
 			quantity, err := k.CompleteUndelegation(ctx, delAddr)
 			if err != nil {
-				ctx.Logger().Error(fmt.Sprintf("complete withdraw failed: %s", err.Result().Data))
+				ctx.Logger().Error(fmt.Sprintf("complete withdraw failed: %s", err.Error()))
 			} else {
 				ctx.EventManager().EmitEvent(
 					sdk.NewEvent(
@@ -92,34 +93,39 @@ func EndBlocker(ctx sdk.Context, k keeper.Keeper) []abci.ValidatorUpdate {
 }
 
 // These functions assumes everything has been authenticated, now we just perform action and save
-func handleMsgCreateValidator(ctx sdk.Context, msg types.MsgCreateValidator, k keeper.Keeper) sdk.Result {
+func handleMsgCreateValidator(ctx sdk.Context, msg types.MsgCreateValidator, k keeper.Keeper) (*sdk.Result, error) {
 	if _, found := k.GetValidator(ctx, msg.ValidatorAddress); found {
-		return ErrValidatorOwnerExists(k.Codespace()).Result()
+		return nil, ErrValidatorOwnerExists(k.Codespace())
 	}
-	if _, found := k.GetValidatorByConsAddr(ctx, sdk.GetConsAddress(msg.PubKey)); found {
-		return ErrValidatorPubKeyExists(k.Codespace()).Result()
+	pk, err := sdk.GetPubKeyFromBech32(sdk.Bech32PubKeyTypeConsPub, msg.PubKey)
+	if err != nil {
+		return nil, err
+	}
+	if _, found := k.GetValidatorByConsAddr(ctx, sdk.GetConsAddress(pk)); found {
+		return nil, ErrValidatorPubKeyExists(k.Codespace())
 	}
 	if msg.MinSelfDelegation.Denom != k.BondDenom(ctx) {
-		return ErrBadDenom(k.Codespace()).Result()
+		return nil, ErrBadDenom(k.Codespace())
 	}
 
 	if _, err := msg.Description.EnsureLength(); err != nil {
-		return err.Result()
+		return nil, err
 	}
 	if ctx.ConsensusParams() != nil {
-		tmPubKey := tmtypes.TM2PB.PubKey(msg.PubKey)
-		if !common.StringInSlice(tmPubKey.Type, ctx.ConsensusParams().Validator.PubKeyTypes) {
-			return ErrValidatorPubKeyTypeNotSupported(k.Codespace(), tmPubKey.Type,
-				ctx.ConsensusParams().Validator.PubKeyTypes).Result()
+		tmPubKey := tmtypes.TM2PB.PubKey(sdk.MustGetPubKeyFromBech32(sdk.Bech32PubKeyTypeConsPub, msg.PubKey))
+		if !tmstring.StringInSlice(tmPubKey.Type, ctx.ConsensusParams().Validator.PubKeyTypes) {
+			return nil, ErrValidatorPubKeyTypeNotSupported(k.Codespace(), tmPubKey.Type,
+				ctx.ConsensusParams().Validator.PubKeyTypes)
 		}
 	}
 
 	minSelfDelegation := k.ParamsMinSelfDelegation(ctx)
-	validator := NewValidator(msg.ValidatorAddress, msg.PubKey, msg.Description, minSelfDelegation)
+	validator := NewValidator(msg.ValidatorAddress, sdk.MustGetPubKeyFromBech32(sdk.Bech32PubKeyTypeConsPub, msg.PubKey),
+		msg.Description, minSelfDelegation)
 	commission := NewCommission(sdk.NewDec(1), sdk.NewDec(1), sdk.NewDec(0))
-	validator, err := validator.SetInitialCommission(commission)
+	validator, err = validator.SetInitialCommission(commission)
 	if err != nil {
-		return err.Result()
+		return nil, err
 	}
 	k.SetValidator(ctx, validator)
 	k.SetValidatorByConsAddr(ctx, validator)
@@ -127,7 +133,7 @@ func handleMsgCreateValidator(ctx sdk.Context, msg types.MsgCreateValidator, k k
 	// add shares of equal value of msd for validator itself
 	defaultMinSelfDelegationToken := sdk.NewDecCoinFromDec(k.BondDenom(ctx), validator.MinSelfDelegation)
 	if err = k.AddSharesAsMinSelfDelegation(ctx, msg.DelegatorAddress, &validator, defaultMinSelfDelegationToken); err != nil {
-		return err.Result()
+		return nil, err
 	}
 	k.AfterValidatorCreated(ctx, validator.OperatorAddress)
 	ctx.EventManager().EmitEvents(sdk.Events{
@@ -138,20 +144,20 @@ func handleMsgCreateValidator(ctx sdk.Context, msg types.MsgCreateValidator, k k
 			sdk.NewAttribute(sdk.AttributeKeyModule, types.AttributeValueCategory),
 			sdk.NewAttribute(sdk.AttributeKeySender, msg.DelegatorAddress.String())),
 	})
-	return sdk.Result{Events: ctx.EventManager().Events()}
+	return &sdk.Result{Events: ctx.EventManager().Events().ToABCIEvents()}, nil
 }
 
-func handleMsgEditValidator(ctx sdk.Context, msg types.MsgEditValidator, k keeper.Keeper) sdk.Result {
+func handleMsgEditValidator(ctx sdk.Context, msg types.MsgEditValidator, k keeper.Keeper) (*sdk.Result, error) {
 	// validator must already be registered
 	validator, found := k.GetValidator(ctx, msg.ValidatorAddress)
 	if !found {
-		return ErrNoValidatorFound(k.Codespace(), msg.ValidatorAddress.String()).Result()
+		return nil, ErrNoValidatorFound(k.Codespace(), msg.ValidatorAddress.String())
 	}
 
 	// replace all editable fields (clients should autofill existing values)
 	description, err := validator.Description.UpdateDescription(msg.Description)
 	if err != nil {
-		return err.Result()
+		return nil, err
 	}
 
 	validator.Description = description
@@ -168,5 +174,5 @@ func handleMsgEditValidator(ctx sdk.Context, msg types.MsgEditValidator, k keepe
 		),
 	})
 
-	return sdk.Result{Events: ctx.EventManager().Events()}
+	return &sdk.Result{Events: ctx.EventManager().Events().ToABCIEvents()}, nil
 }

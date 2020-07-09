@@ -17,7 +17,7 @@ var (
 
 // UpgradeParams is the struct of upgrade module params
 type UpgradeParams struct {
-	// Maximum period for okb holders to deposit on a AppUpgrade proposal. Initial value: 2 days
+	// Maximum period for okb holders to deposit on a AppUpgrade proposal. Initial 2 days
 	AppUpgradeMaxDepositPeriod time.Duration `json:"app_upgrade_max_deposit_period"`
 	// Minimum deposit for a critical AppUpgrade proposal to enter voting period
 	AppUpgradeMinDeposit sdk.DecCoins `json:"app_upgrade_min_deposit"`
@@ -30,12 +30,16 @@ func ParamKeyTable() params.KeyTable {
 	return params.NewKeyTable().RegisterParamSet(&UpgradeParams{})
 }
 
+func tmpValidate(value interface{}) error {
+	return nil
+}
+
 // ParamSetPairs sets upgrade module params
 func (p *UpgradeParams) ParamSetPairs() params.ParamSetPairs {
 	return params.ParamSetPairs{
-		{Key: keyAppUpgradeMaxDepositPeriod, Value: &p.AppUpgradeMaxDepositPeriod},
-		{Key: keyAppUpgradeMinDeposit, Value: &p.AppUpgradeMinDeposit},
-		{Key: keyAppUpgradeVotingPeriod, Value: &p.AppUpgradeVotingPeriod},
+		{keyAppUpgradeMaxDepositPeriod, &p.AppUpgradeMaxDepositPeriod, tmpValidate},
+		{keyAppUpgradeMinDeposit, &p.AppUpgradeMinDeposit, tmpValidate},
+		{keyAppUpgradeVotingPeriod, &p.AppUpgradeVotingPeriod, tmpValidate},
 	}
 }
 

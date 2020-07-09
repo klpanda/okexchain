@@ -2,15 +2,16 @@ package keeper
 
 import (
 	"fmt"
+	sdkerror "github.com/cosmos/cosmos-sdk/types/errors"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/okex/okchain/x/distribution/types"
 )
 
 // HandleCommunityPoolSpendProposal is a handler for executing a passed community spend proposal
-func HandleCommunityPoolSpendProposal(ctx sdk.Context, k Keeper, p types.CommunityPoolSpendProposal) sdk.Error {
+func HandleCommunityPoolSpendProposal(ctx sdk.Context, k Keeper, p types.CommunityPoolSpendProposal) error {
 	if k.blacklistedAddrs[p.Recipient.String()] {
-		return sdk.ErrUnauthorized(fmt.Sprintf("%s is blacklisted from receiving external funds", p.Recipient))
+		return sdkerror.Wrap(sdkerror.ErrUnauthorized, fmt.Sprintf("%s is blacklisted from receiving external funds", p.Recipient))
 	}
 
 	err := k.distributeFromFeePool(ctx, p.Amount, p.Recipient)
@@ -25,7 +26,7 @@ func HandleCommunityPoolSpendProposal(ctx sdk.Context, k Keeper, p types.Communi
 
 // distributeFromFeePool distributes funds from the distribution module account to
 // a receiver address while updating the community pool
-func (k Keeper) distributeFromFeePool(ctx sdk.Context, amount sdk.Coins, receiveAddr sdk.AccAddress) sdk.Error {
+func (k Keeper) distributeFromFeePool(ctx sdk.Context, amount sdk.Coins, receiveAddr sdk.AccAddress) error {
 	feePool := k.GetFeePool(ctx)
 
 	// NOTE the community pool isn't a module account, however its coins
@@ -37,7 +38,7 @@ func (k Keeper) distributeFromFeePool(ctx sdk.Context, amount sdk.Coins, receive
 	}
 	feePool.CommunityPool = newPool
 
-	err := k.supplyKeeper.SendCoinsFromModuleToAccount(ctx, types.ModuleName, receiveAddr, amount)
+	err := k.bankKeeper.SendCoinsFromModuleToAccount(ctx, types.ModuleName, receiveAddr, amount)
 	if err != nil {
 		return err
 	}

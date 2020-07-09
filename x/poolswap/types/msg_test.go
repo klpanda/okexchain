@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	sdkerror "github.com/cosmos/cosmos-sdk/types/errors"
 	"testing"
 	"time"
 
@@ -37,19 +38,19 @@ func TestMsgCreateExchangeInvalid(t *testing.T) {
 		testCase         string
 		symbol           string
 		addr             sdk.AccAddress
-		exceptResultCode sdk.CodeType
+		exceptResultCode string
 	}{
-		{"success", "xxx", addr, sdk.CodeOK},
-		{"nil addr", "xxx", nil, sdk.CodeInvalidAddress},
-		{"invalid token", "1ab", addr, sdk.CodeUnknownRequest},
+		{"success", "xxx", addr, ""},
+		{"nil addr", "xxx", nil, sdkerror.ErrInvalidAddress.Error()},
+		{"invalid token", "1ab", addr, sdkerror.ErrUnknownRequest.Error()},
 	}
 	for _, testCase := range tests {
 		msg := NewMsgCreateExchange(testCase.symbol, testCase.addr)
 		err := msg.ValidateBasic()
-		if err == nil && testCase.exceptResultCode == sdk.CodeOK {
+		if err == nil {
 			continue
 		}
-		require.Equal(t, testCase.exceptResultCode, err.Code())
+		require.Equal(t, err.Error(), testCase.exceptResultCode)
 	}
 }
 
@@ -97,23 +98,23 @@ func TestMsgAddLiquidityInvalid(t *testing.T) {
 		quoteAmount      sdk.DecCoin
 		deadLine         int64
 		addr             sdk.AccAddress
-		exceptResultCode sdk.CodeType
+		exceptResultCode string
 	}{
-		{"success", minLiquidity, maxBaseAmount, quoteAmount, deadLine, addr, 0},
-		{"tokens must be positive", minLiquidity, maxBaseAmount, notPositiveQuoteAmount, deadLine, addr, sdk.CodeUnknownRequest},
-		{"invalid MaxBaseAmount", minLiquidity, invalidMaxBaseAmount, quoteAmount, deadLine, addr, sdk.CodeUnknownRequest},
-		{"invalid QuoteAmount", minLiquidity, maxBaseAmount, invalidQuoteAmount, deadLine, addr, sdk.CodeUnknownRequest},
-		{"quote token only supports native token", minLiquidity, maxBaseAmount, notNativeQuoteAmount, deadLine, addr, sdk.CodeUnknownRequest},
-		{"empty sender", minLiquidity, maxBaseAmount, quoteAmount, deadLine, nil, sdk.CodeInvalidAddress},
+		{"success", minLiquidity, maxBaseAmount, quoteAmount, deadLine, addr, ""},
+		{"tokens must be positive", minLiquidity, maxBaseAmount, notPositiveQuoteAmount, deadLine, addr, sdkerror.ErrUnknownRequest.Error()},
+		{"invalid MaxBaseAmount", minLiquidity, invalidMaxBaseAmount, quoteAmount, deadLine, addr, sdkerror.ErrUnknownRequest.Error()},
+		{"invalid QuoteAmount", minLiquidity, maxBaseAmount, invalidQuoteAmount, deadLine, addr, sdkerror.ErrUnknownRequest.Error()},
+		{"quote token only supports native token", minLiquidity, maxBaseAmount, notNativeQuoteAmount, deadLine, addr, sdkerror.ErrUnknownRequest.Error()},
+		{"empty sender", minLiquidity, maxBaseAmount, quoteAmount, deadLine, nil, sdkerror.ErrInvalidAddress.Error()},
 	}
 	for _, testCase := range tests {
 		fmt.Println(testCase.testCase)
 		msg := NewMsgAddLiquidity(testCase.minLiquidity, testCase.maxBaseAmount, testCase.quoteAmount, testCase.deadLine, testCase.addr)
 		err := msg.ValidateBasic()
-		if err == nil && testCase.exceptResultCode == sdk.CodeOK {
+		if err == nil {
 			continue
 		}
-		require.Equal(t, testCase.exceptResultCode, err.Code())
+		require.Contains(t, err.Error(), testCase.exceptResultCode)
 	}
 }
 
@@ -164,22 +165,22 @@ func TestMsgRemoveLiquidityInvalid(t *testing.T) {
 		minQuoteAmount   sdk.DecCoin
 		deadLine         int64
 		addr             sdk.AccAddress
-		exceptResultCode sdk.CodeType
+		exceptResultCode string
 	}{
-		{"success", liquidity, minBaseAmount, minQuoteAmount, deadLine, addr, 0},
-		{"empty sender", liquidity, minBaseAmount, minQuoteAmount, deadLine, nil, sdk.CodeInvalidAddress},
-		{"coins must be positive", notPositiveLiquidity, minBaseAmount, minQuoteAmount, deadLine, addr, sdk.CodeUnknownRequest},
-		{"invalid MinBaseAmount", liquidity, invalidMinBaseAmount, minQuoteAmount, deadLine, addr, sdk.CodeUnknownRequest},
-		{"invalid MinQuoteAmount", liquidity, minBaseAmount, invalidMinQuoteAmount, deadLine, addr, sdk.CodeUnknownRequest},
-		{"quote token only supports native token", liquidity, minBaseAmount, notNativeQuoteAmount, deadLine, addr, sdk.CodeUnknownRequest},
+		{"success", liquidity, minBaseAmount, minQuoteAmount, deadLine, addr, ""},
+		{"empty sender", liquidity, minBaseAmount, minQuoteAmount, deadLine, nil, sdkerror.ErrInvalidAddress.Error()},
+		{"coins must be positive", notPositiveLiquidity, minBaseAmount, minQuoteAmount, deadLine, addr, sdkerror.ErrUnknownRequest.Error()},
+		{"invalid MinBaseAmount", liquidity, invalidMinBaseAmount, minQuoteAmount, deadLine, addr, sdkerror.ErrUnknownRequest.Error()},
+		{"invalid MinQuoteAmount", liquidity, minBaseAmount, invalidMinQuoteAmount, deadLine, addr, sdkerror.ErrUnknownRequest.Error()},
+		{"quote token only supports native token", liquidity, minBaseAmount, notNativeQuoteAmount, deadLine, addr, sdkerror.ErrUnknownRequest.Error()},
 	}
 	for _, testCase := range tests {
 		msg := NewMsgRemoveLiquidity(testCase.liquidity, testCase.minBaseAmount, testCase.minQuoteAmount, testCase.deadLine, testCase.addr)
 		err := msg.ValidateBasic()
-		if err == nil && testCase.exceptResultCode == sdk.CodeOK {
+		if err == nil {
 			continue
 		}
-		require.Equal(t, testCase.exceptResultCode, err.Code())
+		require.Contains(t, err.Error(), testCase.exceptResultCode)
 	}
 }
 
@@ -226,21 +227,21 @@ func TestMsgTokenToNativeTokenInvalid(t *testing.T) {
 		deadLine             int64
 		recipient            sdk.AccAddress
 		addr                 sdk.AccAddress
-		exceptResultCode     sdk.CodeType
+		exceptResultCode     string
 	}{
-		{"success", minBoughtTokenAmount, soldTokenAmount, deadLine, addr, addr, sdk.CodeOK},
-		{"empty sender", minBoughtTokenAmount, soldTokenAmount, deadLine, addr, nil, sdk.CodeInvalidAddress},
-		{"empty recipient", minBoughtTokenAmount, soldTokenAmount, deadLine, nil, addr, sdk.CodeInvalidAddress},
-		{"both token to sell and token to buy do not contain native token", minBoughtTokenAmount, notNativeSoldTokenAmount, deadLine, addr, addr, sdk.CodeUnknownRequest},
-		{"invalid SoldTokenAmount", soldTokenAmount, invalidSoldTokenAmount, deadLine, addr, addr, sdk.CodeUnknownRequest},
-		{"invalid MinBoughtTokenAmount", invalidMinBoughtTokenAmount, soldTokenAmount, deadLine, addr, addr, sdk.CodeUnknownRequest},
+		{"success", minBoughtTokenAmount, soldTokenAmount, deadLine, addr, addr, ""},
+		{"empty sender", minBoughtTokenAmount, soldTokenAmount, deadLine, addr, nil, sdkerror.ErrInvalidAddress.Error()},
+		{"empty recipient", minBoughtTokenAmount, soldTokenAmount, deadLine, nil, addr, sdkerror.ErrInvalidAddress.Error()},
+		{"both token to sell and token to buy do not contain native token", minBoughtTokenAmount, notNativeSoldTokenAmount, deadLine, addr, addr, sdkerror.ErrUnknownRequest.Error()},
+		{"invalid SoldTokenAmount", soldTokenAmount, invalidSoldTokenAmount, deadLine, addr, addr, sdkerror.ErrUnknownRequest.Error()},
+		{"invalid MinBoughtTokenAmount", invalidMinBoughtTokenAmount, soldTokenAmount, deadLine, addr, addr, sdkerror.ErrUnknownRequest.Error()},
 	}
 	for _, testCase := range tests {
 		msg := NewMsgTokenToNativeToken(testCase.soldTokenAmount, testCase.minBoughtTokenAmount, testCase.deadLine, testCase.recipient, testCase.addr)
 		err := msg.ValidateBasic()
-		if err == nil && testCase.exceptResultCode == sdk.CodeOK {
+		if err == nil {
 			continue
 		}
-		require.Equal(t, testCase.exceptResultCode, err.Code())
+		require.Contains(t, err.Error(), testCase.exceptResultCode)
 	}
 }

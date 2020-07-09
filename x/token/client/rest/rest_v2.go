@@ -2,11 +2,11 @@ package rest
 
 import (
 	"fmt"
+	"github.com/cosmos/cosmos-sdk/client"
 	"net/http"
 
 	"github.com/okex/okchain/x/token/types"
 
-	"github.com/cosmos/cosmos-sdk/client/context"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/gorilla/mux"
 	"github.com/okex/okchain/x/common"
@@ -14,13 +14,13 @@ import (
 
 // RegisterRoutesV2, a central function to define routes
 // which is called by the rest module in main application
-func RegisterRoutesV2(cliCtx context.CLIContext, r *mux.Router, storeName string) {
+func RegisterRoutesV2(cliCtx client.Context, r *mux.Router, storeName string) {
 	r.HandleFunc(fmt.Sprintf("/tokens/{currency}"), tokenHandlerV2(cliCtx, storeName)).Methods("GET")
 	r.HandleFunc(fmt.Sprintf("/tokens"), tokensHandlerV2(cliCtx, storeName)).Methods("GET")
 	r.HandleFunc(fmt.Sprintf("/accounts/{address}"), accountsHandlerV2(cliCtx, storeName)).Methods("GET")
 }
 
-func tokenHandlerV2(cliCtx context.CLIContext, storeName string) http.HandlerFunc {
+func tokenHandlerV2(cliCtx client.Context, storeName string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		vars := mux.Vars(r)
 		tokenName := vars["currency"]
@@ -30,14 +30,14 @@ func tokenHandlerV2(cliCtx context.CLIContext, storeName string) http.HandlerFun
 	}
 }
 
-func tokensHandlerV2(cliCtx context.CLIContext, storeName string) http.HandlerFunc {
+func tokensHandlerV2(cliCtx client.Context, storeName string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		res, _, err := cliCtx.QueryWithData(fmt.Sprintf("custom/%s/%s", storeName, types.QueryTokensV2), nil)
 		common.HandleResponseV2(w, res, err)
 	}
 }
 
-func accountsHandlerV2(cliCtx context.CLIContext, storeName string) http.HandlerFunc {
+func accountsHandlerV2(cliCtx client.Context, storeName string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		vars := mux.Vars(r)
 		address := vars["address"]

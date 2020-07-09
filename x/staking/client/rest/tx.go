@@ -3,18 +3,18 @@ package rest
 import (
 	"bytes"
 	"fmt"
+	"github.com/cosmos/cosmos-sdk/client"
+	authclient "github.com/cosmos/cosmos-sdk/x/auth/client"
 	"net/http"
 
 	"github.com/gorilla/mux"
 
-	"github.com/cosmos/cosmos-sdk/client/context"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/rest"
-	"github.com/cosmos/cosmos-sdk/x/auth/client/utils"
 	"github.com/okex/okchain/x/staking/types"
 )
 
-func registerTxRoutes(cliCtx context.CLIContext, r *mux.Router) {
+func registerTxRoutes(cliCtx client.Context, r *mux.Router) {
 	r.HandleFunc(
 		"/staking/delegators/{delegatorAddr}/delegations",
 		postDelegationsHandlerFn(cliCtx),
@@ -43,7 +43,7 @@ type (
 	}
 )
 
-func postDelegationsHandlerFn(cliCtx context.CLIContext) http.HandlerFunc {
+func postDelegationsHandlerFn(cliCtx client.Context) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req DelegateRequest
 
@@ -73,11 +73,11 @@ func postDelegationsHandlerFn(cliCtx context.CLIContext) http.HandlerFunc {
 			return
 		}
 
-		utils.WriteGenerateStdTxResponse(w, cliCtx, req.BaseReq, []sdk.Msg{msg})
+		authclient.WriteGenerateStdTxResponse(w, cliCtx, req.BaseReq, []sdk.Msg{&msg})
 	}
 }
 
-func postUnbondingDelegationsHandlerFn(cliCtx context.CLIContext) http.HandlerFunc {
+func postUnbondingDelegationsHandlerFn(cliCtx client.Context) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req WithdrawRequest
 
@@ -107,6 +107,6 @@ func postUnbondingDelegationsHandlerFn(cliCtx context.CLIContext) http.HandlerFu
 			return
 		}
 
-		utils.WriteGenerateStdTxResponse(w, cliCtx, req.BaseReq, []sdk.Msg{msg})
+		authclient.WriteGenerateStdTxResponse(w, cliCtx, req.BaseReq, []sdk.Msg{&msg})
 	}
 }

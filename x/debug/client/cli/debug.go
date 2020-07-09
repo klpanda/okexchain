@@ -2,17 +2,18 @@ package cli
 
 import (
 	"fmt"
+	"github.com/cosmos/cosmos-sdk/client"
+	"github.com/cosmos/cosmos-sdk/client/flags"
+	"github.com/okex/okchain/app/protocol"
 	"strings"
 
-	"github.com/cosmos/cosmos-sdk/client"
-	"github.com/cosmos/cosmos-sdk/client/context"
 	"github.com/cosmos/cosmos-sdk/codec"
 	"github.com/okex/okchain/x/debug/types"
 	"github.com/spf13/cobra"
 )
 
 // GetDebugCmd returns the cli query commands for this module
-func GetDebugCmd(cdc *codec.Codec) *cobra.Command {
+func GetDebugCmd(config protocol.EncodingConfig) *cobra.Command {
 
 	queryRoute := types.ModuleName
 
@@ -21,10 +22,10 @@ func GetDebugCmd(cdc *codec.Codec) *cobra.Command {
 		Short: "Debugging subcommands",
 	}
 
-	queryCmd.AddCommand(client.GetCommands(
-		CmdSetLogLevel(queryRoute, cdc),
-		CmdDumpStore(queryRoute, cdc),
-		CmdSanityCheck(queryRoute, cdc),
+	queryCmd.AddCommand(flags.GetCommands(
+		CmdSetLogLevel(queryRoute, config.Amino),
+		CmdDumpStore(queryRoute, config.Amino),
+		CmdSanityCheck(queryRoute, config.Amino),
 	)...)
 
 	return queryCmd
@@ -42,7 +43,7 @@ func CmdDumpStore(queryRoute string, cdc *codec.Codec) *cobra.Command {
 			if len(args) == 1 {
 				module = args[0]
 			}
-			cliCtx := context.NewCLIContext().WithCodec(cdc)
+			cliCtx := client.NewContext().WithCodec(cdc)
 			bz, err := cdc.MarshalJSON(types.DumpInfoParams{Module: module})
 			if err != nil {
 				return err
@@ -71,7 +72,7 @@ $ okchaincli debug set-loglevel "main:info,state:info"
 $ okchaincli debug set-loglevel "upgrade:error"
 `),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cliCtx := context.NewCLIContext().WithCodec(cdc)
+			cliCtx := client.NewContext().WithCodec(cdc)
 			if len(args) > 1 {
 				return fmt.Errorf("wrong number of arguments for set-loglevel")
 			}
@@ -93,7 +94,7 @@ func CmdSanityCheck(queryRoute string, cdc *codec.Codec) *cobra.Command {
 		Use:   "sanity-check-shares",
 		Short: "check the total share of validator",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cliCtx := context.NewCLIContext().WithCodec(cdc)
+			cliCtx := client.NewContext().WithCodec(cdc)
 			res, _, err := cliCtx.QueryWithData(
 				fmt.Sprintf("custom/%s/%s", queryRoute, types.SanityCheckShares), nil)
 			if err != nil {

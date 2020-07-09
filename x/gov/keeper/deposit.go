@@ -9,18 +9,11 @@ import (
 	"github.com/okex/okchain/x/gov/types"
 )
 
-// SetDeposit sets the deposit of a specific depositor on a specific proposal
-func (keeper Keeper) SetDeposit(ctx sdk.Context, deposit types.Deposit) {
-	store := ctx.KVStore(keeper.StoreKey())
-	bz := keeper.Cdc().MustMarshalBinaryLengthPrefixed(deposit)
-	store.Set(types.DepositKey(deposit.ProposalID, deposit.Depositor), bz)
-}
-
 func tryEnterVotingPeriod(
 	ctx sdk.Context, keeper Keeper, proposal *types.Proposal, depositAmount sdk.DecCoins, eventType string,
 ) {
 	// Update proposal
-	proposal.TotalDeposit = proposal.TotalDeposit.Add(depositAmount)
+	proposal.TotalDeposit = proposal.TotalDeposit.Add(depositAmount...)
 	// Check if deposit has provided sufficient total funds to transition the proposal into the voting period
 	activatedVotingPeriod := false
 	var minDeposit sdk.DecCoins
@@ -28,7 +21,7 @@ func tryEnterVotingPeriod(
 		minDeposit = keeper.GetDepositParams(ctx).MinDeposit
 	} else {
 		phr := keeper.proposalHandlerRouter.GetRoute(proposal.ProposalRoute())
-		minDeposit = phr.GetMinDeposit(ctx, proposal.Content)
+		minDeposit = phr.GetMinDeposit(ctx, proposal.GetContent())
 	}
 
 	if proposal.Status == types.StatusDepositPeriod && proposal.TotalDeposit.IsAllGTE(minDeposit) {
@@ -40,10 +33,10 @@ func tryEnterVotingPeriod(
 
 	if activatedVotingPeriod {
 		// execute the logic when the deposit period is passed
-		if !keeper.ProposalHandlerRouter().HasRoute(proposal.Content.ProposalRoute()) {
+		if !keeper.ProposalHandlerRouter().HasRoute(proposal.GetContent().ProposalRoute()) {
 			keeper.AfterDepositPeriodPassed(ctx, *proposal)
 		} else {
-			proposalHandler := keeper.ProposalHandlerRouter().GetRoute(proposal.Content.ProposalRoute())
+			proposalHandler := keeper.ProposalHandlerRouter().GetRoute(proposal.GetContent().ProposalRoute())
 			proposalHandler.AfterDepositPeriodPassed(ctx, *proposal)
 		}
 
@@ -61,7 +54,7 @@ func updateDeposit(
 ) {
 	deposit, found := keeper.GetDeposit(ctx, proposalID, depositorAddr)
 	if found {
-		deposit.Amount = deposit.Amount.Add(depositAmount)
+		deposit.Amount = deposit.Amount.Add(depositAmount...)
 	} else {
 		deposit = types.Deposit{
 			ProposalID: proposalID,
@@ -77,22 +70,22 @@ func updateDeposit(
 func (keeper Keeper) AddDeposit(
 	ctx sdk.Context, proposalID uint64, depositorAddr sdk.AccAddress,
 	depositAmount sdk.DecCoins, eventType string,
-) sdk.Error {
+) error {
 	// Checks to see if proposal exists
 	proposal, ok := keeper.GetProposal(ctx, proposalID)
 	if !ok {
-		return types.ErrUnknownProposal(keeper.Codespace(), proposalID)
+		return types.ErrUnknownProposal(types.ModuleName, proposalID)
 	}
 
 	// Check if proposal is still depositable
 	if proposal.Status != types.StatusDepositPeriod {
-		return types.ErrInvalidateProposalStatus(keeper.Codespace(),
+		return types.ErrInvalidateProposalStatus(types.ModuleName,
 			fmt.Sprintf("The status of proposal %d is in %s can not be deposited.",
 				proposal.ProposalID, proposal.Status))
 	}
 	depositCoinsAmount := depositAmount
 	// update the governance module's account coins pool
-	err := keeper.SupplyKeeper().SendCoinsFromAccountToModule(ctx, depositorAddr, types.ModuleName, depositCoinsAmount)
+	err := keeper.BankKeeper().SendCoinsFromAccountToModule(ctx, depositorAddr, types.ModuleName, depositCoinsAmount)
 	if err != nil {
 		return err
 	}
@@ -119,7 +112,7 @@ func (keeper Keeper) RefundDeposits(ctx sdk.Context, proposalID uint64) {
 	deposits := keeper.GetDeposits(ctx, proposalID)
 	for i := 0; i < len(deposits); i++ {
 		deposit := deposits[i]
-		err := keeper.SupplyKeeper().SendCoinsFromModuleToAccount(ctx, types.ModuleName, deposit.Depositor,
+		err := keeper.BankKeeper().SendCoinsFromModuleToAccount(ctx, types.ModuleName, deposit.Depositor,
 			deposit.Amount)
 		if err != nil {
 			panic(err)
@@ -133,7 +126,7 @@ func (keeper Keeper) DistributeDeposits(ctx sdk.Context, proposalID uint64) {
 	deposits := keeper.GetDeposits(ctx, proposalID)
 	for i := 0; i < len(deposits); i++ {
 		deposit := deposits[i]
-		err := keeper.SupplyKeeper().SendCoinsFromModuleToModule(ctx, types.ModuleName, keeper.feeCollectorName,
+		err := keeper.BankKeeper().SendCoinsFromModuleToModule(ctx, types.ModuleName, keeper.feeCollectorName,
 			deposit.Amount)
 		if err != nil {
 			panic(err)

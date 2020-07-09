@@ -2,12 +2,12 @@ package cli
 
 import (
 	"fmt"
+	"github.com/cosmos/cosmos-sdk/client/flags"
 	"strings"
 
 	"github.com/okex/okchain/x/params/types"
 
 	"github.com/cosmos/cosmos-sdk/client"
-	"github.com/cosmos/cosmos-sdk/client/context"
 	"github.com/cosmos/cosmos-sdk/codec"
 	"github.com/spf13/cobra"
 )
@@ -19,7 +19,7 @@ func GetQueryCmd(queryRoute string, cdc *codec.Codec) *cobra.Command {
 		Short: "Querying commands for the params module",
 	}
 
-	queryCmd.AddCommand(client.GetCommands(
+	queryCmd.AddCommand(flags.GetCommands(
 		GetCmdQueryParams(queryRoute, cdc),
 	)...)
 
@@ -37,7 +37,7 @@ $ okchaincli query params params
 `),
 		Args: cobra.NoArgs,
 		RunE: func(_ *cobra.Command, _ []string) error {
-			cliCtx := context.NewCLIContext().WithCodec(cdc)
+			cliCtx := client.NewContext().WithCodec(cdc)
 
 			route := fmt.Sprintf("custom/%s/%s", queryRoute, types.QueryParams)
 			bz, _, err := cliCtx.QueryWithData(route, nil)

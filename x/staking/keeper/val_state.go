@@ -2,7 +2,6 @@ package keeper
 
 import (
 	"fmt"
-
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/okex/okchain/x/staking/types"
 	abci "github.com/tendermint/tendermint/abci/types"
@@ -88,7 +87,7 @@ func (k Keeper) KickOutAndReturnValidatorSetUpdates(ctx sdk.Context) (updates []
 				panic("Never occur")
 			}
 			var oldPower int64
-			k.cdc.MustUnmarshalBinaryLengthPrefixed(oldPowerBytes, &oldPower)
+			k.cdc.MustUnmarshalJSON(oldPowerBytes, &oldPower)
 			totalPower = totalPower.Sub(sdk.NewInt(oldPower))
 		default:
 			panic("unexpected validator status")
@@ -127,7 +126,7 @@ func (k Keeper) AppendAbandonedValidatorAddrs(ctx sdk.Context, ConsAddr sdk.Cons
 	abandonedValAddr := k.getAbandonedValidatorAddrs(ctx)
 	// if there are several validators to destroy in one block
 	abandonedValAddr = append(abandonedValAddr, validator.OperatorAddress)
-	bytes := k.cdc.MustMarshalBinaryLengthPrefixed(abandonedValAddr)
+	bytes := k.cdc.MustMarshalBinaryBare(&sdk.ValAddresses{Addresses: abandonedValAddr})
 	ctx.KVStore(k.storeKey).Set(types.ValidatorAbandonedKey, bytes)
 }
 
@@ -138,8 +137,9 @@ func (k Keeper) getAbandonedValidatorAddrs(ctx sdk.Context) (abandonedValAddr []
 		return
 	}
 
-	k.cdc.MustUnmarshalBinaryLengthPrefixed(bytes, &abandonedValAddr)
-	return
+	var vals sdk.ValAddresses
+	k.cdc.MustUnmarshalBinaryBare(bytes, &vals)
+	return vals.Addresses
 }
 
 // DeleteAbandonedValidatorAddrs deletes the abandoned validator addresses

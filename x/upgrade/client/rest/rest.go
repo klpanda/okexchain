@@ -1,10 +1,10 @@
 package rest
 
 import (
-	"github.com/cosmos/cosmos-sdk/client/context"
+	"github.com/cosmos/cosmos-sdk/client"
 	govRest "github.com/okex/okchain/x/gov/client/rest"
 )
 
-func ProposalRESTHandler(context.CLIContext) govRest.ProposalRESTHandler {
+func ProposalRESTHandler(client.Context) govRest.ProposalRESTHandler {
 	return govRest.ProposalRESTHandler{}
 }

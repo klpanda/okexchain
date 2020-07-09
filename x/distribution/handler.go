@@ -2,6 +2,7 @@ package distribution
 
 import (
 	"fmt"
+	sdkerror "github.com/cosmos/cosmos-sdk/types/errors"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/okex/okchain/x/distribution/keeper"
@@ -11,28 +12,28 @@ import (
 
 // NewHandler manages all distribution tx
 func NewHandler(k keeper.Keeper) sdk.Handler {
-	return func(ctx sdk.Context, msg sdk.Msg) sdk.Result {
+	return func(ctx sdk.Context, msg sdk.Msg) (*sdk.Result, error) {
 		ctx = ctx.WithEventManager(sdk.NewEventManager())
 
 		switch msg := msg.(type) {
-		case types.MsgSetWithdrawAddress:
-			return handleMsgModifyWithdrawAddress(ctx, msg, k)
+		case *types.MsgSetWithdrawAddress:
+			return handleMsgModifyWithdrawAddress(ctx, *msg, k)
 
-		case types.MsgWithdrawValidatorCommission:
-			return handleMsgWithdrawValidatorCommission(ctx, msg, k)
+		case *types.MsgWithdrawValidatorCommission:
+			return handleMsgWithdrawValidatorCommission(ctx, *msg, k)
 
 		default:
 			errMsg := fmt.Sprintf("unrecognized distribution message type: %T", msg)
-			return sdk.ErrUnknownRequest(errMsg).Result()
+			return nil, sdkerror.Wrap(sdkerror.ErrUnknownRequest, errMsg)
 		}
 	}
 }
 
 // These functions assume everything has been authenticated (ValidateBasic passed, and signatures checked)
-func handleMsgModifyWithdrawAddress(ctx sdk.Context, msg types.MsgSetWithdrawAddress, k keeper.Keeper) sdk.Result {
+func handleMsgModifyWithdrawAddress(ctx sdk.Context, msg types.MsgSetWithdrawAddress, k keeper.Keeper) (*sdk.Result, error) {
 	err := k.SetWithdrawAddr(ctx, msg.DelegatorAddress, msg.WithdrawAddress)
 	if err != nil {
-		return err.Result()
+		return nil, err
 	}
 
 	ctx.EventManager().EmitEvent(
@@ -43,15 +44,15 @@ func handleMsgModifyWithdrawAddress(ctx sdk.Context, msg types.MsgSetWithdrawAdd
 		),
 	)
 
-	return sdk.Result{Events: ctx.EventManager().Events()}
+	return &sdk.Result{Events: ctx.EventManager().Events().ToABCIEvents()}, nil
 }
 
 func handleMsgWithdrawValidatorCommission(ctx sdk.Context,
-	msg types.MsgWithdrawValidatorCommission, k keeper.Keeper) sdk.Result {
+	msg types.MsgWithdrawValidatorCommission, k keeper.Keeper) (*sdk.Result, error) {
 
 	_, err := k.WithdrawValidatorCommission(ctx, msg.ValidatorAddress)
 	if err != nil {
-		return err.Result()
+		return nil, err
 	}
 
 	ctx.EventManager().EmitEvent(
@@ -62,18 +63,18 @@ func handleMsgWithdrawValidatorCommission(ctx sdk.Context,
 		),
 	)
 
-	return sdk.Result{Events: ctx.EventManager().Events()}
+	return &sdk.Result{Events: ctx.EventManager().Events().ToABCIEvents()}, nil
 }
 
 func NewCommunityPoolSpendProposalHandler(k Keeper) govtypes.Handler {
-	return func(ctx sdk.Context, content *govtypes.Proposal) sdk.Error {
-		switch c := content.Content.(type) {
+	return func(ctx sdk.Context, proposal *govtypes.Proposal) error {
+		switch c := proposal.GetContent().(type) {
 		case types.CommunityPoolSpendProposal:
 			return keeper.HandleCommunityPoolSpendProposal(ctx, k, c)
 
 		default:
 			errMsg := fmt.Sprintf("unrecognized distr proposal content type: %T", c)
-			return sdk.ErrUnknownRequest(errMsg)
+			return sdkerror.Wrap(sdkerror.ErrUnknownRequest, errMsg)
 		}
 	}
 }

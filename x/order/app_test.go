@@ -2,17 +2,17 @@ package order
 
 import (
 	"fmt"
+	authkeeper "github.com/cosmos/cosmos-sdk/x/auth/keeper"
+	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
+	bankkeeper "github.com/cosmos/cosmos-sdk/x/bank/keeper"
+	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	"testing"
 
 	"github.com/okex/okchain/x/common/monitor"
 
 	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/cosmos/cosmos-sdk/x/auth"
-	"github.com/cosmos/cosmos-sdk/x/bank"
 	"github.com/cosmos/cosmos-sdk/x/mock"
-	"github.com/cosmos/cosmos-sdk/x/supply"
-	"github.com/cosmos/cosmos-sdk/x/supply/exported"
 	"github.com/okex/okchain/x/staking/types"
 	"github.com/stretchr/testify/require"
 	abci "github.com/tendermint/tendermint/abci/types"
@@ -32,19 +32,18 @@ type MockApp struct {
 	keyDex       *sdk.KVStoreKey
 	keyTokenPair *sdk.KVStoreKey
 
-	keySupply *sdk.KVStoreKey
+	keyBank *sdk.KVStoreKey
+	keyAcc  *sdk.KVStoreKey
 
-	bankKeeper   bank.Keeper
 	orderKeeper  Keeper
 	tokenKeeper  token.Keeper
-	supplyKeeper supply.Keeper
 	dexKeeper    dex.Keeper
 }
 
 func registerCodec(cdc *codec.Codec) {
 	RegisterCodec(cdc)
 	token.RegisterCodec(cdc)
-	supply.RegisterCodec(cdc)
+	authtypes.RegisterCodec(cdc)
 }
 
 func getMockApp(t *testing.T, numGenAccs int) (mockApp *MockApp, addrKeysSlice mock.AddrKeysSlice) {
@@ -66,71 +65,71 @@ func getMockAppWithBalance(t *testing.T, numGenAccs int, balance int64) (mockApp
 		keyDex:       sdk.NewKVStoreKey(dex.StoreKey),
 		keyTokenPair: sdk.NewKVStoreKey(dex.TokenPairStoreKey),
 
-		keySupply: sdk.NewKVStoreKey(supply.StoreKey),
+		keyBank: sdk.NewKVStoreKey(banktypes.StoreKey),
+		keyAcc:  sdk.NewKVStoreKey(authtypes.StoreKey),
 	}
 
-	feeCollector := supply.NewEmptyModuleAccount(auth.FeeCollectorName)
+	feeCollector := authtypes.NewEmptyModuleAccount(authtypes.FeeCollectorName)
 	blacklistedAddrs := make(map[string]bool)
 	blacklistedAddrs[feeCollector.String()] = true
 
-	mockApp.bankKeeper = bank.NewBaseKeeper(mockApp.AccountKeeper,
-		mockApp.ParamsKeeper.Subspace(bank.DefaultParamspace),
-		bank.DefaultCodespace, blacklistedAddrs)
+	mockApp.BankKeeper = bankkeeper.NewBaseKeeper(mockApp.AppCodec, mockApp.keyBank, mockApp.AccountKeeper,
+		mockApp.ParamsKeeper.Subspace(banktypes.ModuleName), blacklistedAddrs)
 
 	maccPerms := map[string][]string{
-		auth.FeeCollectorName: nil,
-		token.ModuleName:      {supply.Minter, supply.Burner},
+		authtypes.FeeCollectorName: nil,
+		token.ModuleName:      {authtypes.Minter, authtypes.Burner},
 	}
-	mockApp.supplyKeeper = supply.NewKeeper(mockApp.Cdc, mockApp.keySupply, mockApp.AccountKeeper,
-		mockApp.bankKeeper, maccPerms)
+	mockApp.AccountKeeper = authkeeper.NewAccountKeeper(mockApp.AppCodec, mockApp.keyAcc,
+		mockApp.ParamsKeeper.Subspace(authtypes.ModuleName), authtypes.ProtoBaseAccount, maccPerms)
 
 	mockApp.tokenKeeper = token.NewKeeper(
-		mockApp.bankKeeper,
+		mockApp.BankKeeper,
 		mockApp.ParamsKeeper.Subspace(token.DefaultParamspace),
-		auth.FeeCollectorName,
-		mockApp.supplyKeeper,
+		authtypes.FeeCollectorName,
+		mockApp.AccountKeeper,
 		mockApp.keyToken,
 		mockApp.keyLock,
 		mockApp.Cdc,
 		true)
 
 	mockApp.dexKeeper = dex.NewKeeper(
-		auth.FeeCollectorName,
-		mockApp.supplyKeeper,
+		authtypes.FeeCollectorName,
+		mockApp.AccountKeeper,
 		mockApp.ParamsKeeper.Subspace(dex.DefaultParamspace),
 		mockApp.tokenKeeper,
 		nil,
-		mockApp.bankKeeper,
+		mockApp.BankKeeper,
 		mockApp.keyDex,
 		mockApp.keyTokenPair,
 		mockApp.Cdc)
 
 	mockApp.orderKeeper = NewKeeper(
 		mockApp.tokenKeeper,
-		mockApp.supplyKeeper,
+		mockApp.AccountKeeper,
+		mockApp.BankKeeper,
 		mockApp.dexKeeper,
 		mockApp.ParamsKeeper.Subspace(DefaultParamspace),
-		auth.FeeCollectorName,
+		authtypes.FeeCollectorName,
 		mockApp.keyOrder,
 		mockApp.Cdc,
 		true,
 		monitor.NopOrderMetrics())
 
-	mockApp.Router().AddRoute(RouterKey, NewOrderHandler(mockApp.orderKeeper))
+	mockApp.Router().AddRoute(sdk.NewRoute(RouterKey, NewOrderHandler(mockApp.orderKeeper)))
 	mockApp.QueryRouter().AddRoute(QuerierRoute, NewQuerier(mockApp.orderKeeper))
-
-	mockApp.SetBeginBlocker(getBeginBlocker(mockApp.orderKeeper))
-	mockApp.SetEndBlocker(getEndBlocker(mockApp.orderKeeper))
-	mockApp.SetInitChainer(getInitChainer(mockApp.App, mockApp.supplyKeeper,
-		[]exported.ModuleAccountI{feeCollector}))
 
 	decCoins, err := sdk.ParseDecCoins(fmt.Sprintf("%d%s,%d%s",
 		balance, common.NativeToken, balance, common.TestToken))
 	require.Nil(t, err)
 	coins := decCoins
-
-	keysSlice, genAccs := CreateGenAccounts(numGenAccs, coins)
+	keysSlice, genAccs, genBals := CreateGenAccounts(numGenAccs, coins)
 	addrKeysSlice = keysSlice
+
+	mockApp.SetBeginBlocker(getBeginBlocker(mockApp.orderKeeper))
+	mockApp.SetEndBlocker(getEndBlocker(mockApp.orderKeeper))
+	mockApp.SetInitChainer(getInitChainer(mockApp.App, mockApp.AccountKeeper,
+		[]authtypes.ModuleAccountI{feeCollector}))
 
 	// todo: checkTx in mock app
 	mockApp.SetAnteHandler(nil)
@@ -142,13 +141,14 @@ func getMockAppWithBalance(t *testing.T, numGenAccs int, balance int64) (mockApp
 		app.keyDex,
 		app.keyTokenPair,
 		app.keyLock,
-		app.keySupply,
+		app.keyBank,
+		app.keyAcc,
 	))
-	mock.SetGenesis(mockApp.App, genAccs)
+	mock.SetGenesis(mockApp.App, genAccs, genBals)
 
 	for i := 0; i < numGenAccs; i++ {
 		mock.CheckBalance(t, app.App, keysSlice[i].Address, coins)
-		mockApp.TotalCoinsSupply = mockApp.TotalCoinsSupply.Add(coins)
+		mockApp.TotalCoinsSupply = mockApp.TotalCoinsSupply.Add(coins...)
 	}
 
 	return mockApp, addrKeysSlice
@@ -168,13 +168,13 @@ func getEndBlocker(keeper Keeper) sdk.EndBlocker {
 	}
 }
 
-func getInitChainer(mapp *mock.App, supplyKeeper types.SupplyKeeper,
-	blacklistedAddrs []exported.ModuleAccountI) sdk.InitChainer {
+func getInitChainer(mapp *mock.App, accKeeper types.AccountKeeper,
+	blacklistedAddrs []authtypes.ModuleAccountI) sdk.InitChainer {
 	return func(ctx sdk.Context, req abci.RequestInitChain) abci.ResponseInitChain {
 		mapp.InitChainer(ctx, req)
 		// set module accounts
 		for _, macc := range blacklistedAddrs {
-			supplyKeeper.SetModuleAccount(ctx, macc)
+			accKeeper.SetModuleAccount(ctx, macc)
 		}
 		return abci.ResponseInitChain{}
 	}
@@ -219,18 +219,22 @@ func getInitChainer(mapp *mock.App, supplyKeeper types.SupplyKeeper,
 //}
 
 func CreateGenAccounts(numAccs int, genCoins sdk.Coins) (addrKeysSlice mock.AddrKeysSlice,
-	genAccs []auth.Account) {
+	genAccs []authtypes.BaseAccount, genBals []banktypes.Balance) {
 	for i := 0; i < numAccs; i++ {
 		privKey := secp256k1.GenPrivKey()
 		pubKey := privKey.PubKey()
 		addr := sdk.AccAddress(pubKey.Address())
 
 		addrKeys := mock.NewAddrKeys(addr, pubKey, privKey)
-		account := &auth.BaseAccount{
+		account := authtypes.BaseAccount{
 			Address: addr,
-			Coins:   genCoins,
 		}
 		genAccs = append(genAccs, account)
+		bal := banktypes.Balance{
+			Address: addr,
+			Coins: genCoins,
+		}
+		genBals = append(genBals, bal)
 		addrKeysSlice = append(addrKeysSlice, addrKeys)
 	}
 	return

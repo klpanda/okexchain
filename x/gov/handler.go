@@ -2,6 +2,7 @@ package gov
 
 import (
 	"fmt"
+	sdkerror "github.com/cosmos/cosmos-sdk/types/errors"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 
@@ -12,52 +13,52 @@ import (
 
 // NewHandler handle all "gov" type messages.
 func NewHandler(keeper Keeper) sdk.Handler {
-	return func(ctx sdk.Context, msg sdk.Msg) sdk.Result {
+	return func(ctx sdk.Context, msg sdk.Msg) (*sdk.Result, error) {
 		ctx = ctx.WithEventManager(sdk.NewEventManager())
 
 		switch msg := msg.(type) {
-		case MsgDeposit:
-			return handleMsgDeposit(ctx, keeper, msg)
+		case *MsgDeposit:
+			return handleMsgDeposit(ctx, keeper, *msg)
 
-		case MsgSubmitProposal:
-			return handleMsgSubmitProposal(ctx, keeper, msg)
+		case *MsgSubmitProposal:
+			return handleMsgSubmitProposal(ctx, keeper, *msg)
 
-		case MsgVote:
-			return handleMsgVote(ctx, keeper, msg)
+		case *MsgVote:
+			return handleMsgVote(ctx, keeper, *msg)
 
 		default:
 			errMsg := fmt.Sprintf("unrecognized gov message type: %T", msg)
-			return sdk.ErrUnknownRequest(errMsg).Result()
+			return nil, sdkerror.Wrap(sdkerror.ErrUnknownRequest, errMsg)
 		}
 	}
 }
 
-func handleMsgSubmitProposal(ctx sdk.Context, keeper keeper.Keeper, msg MsgSubmitProposal) sdk.Result {
+func handleMsgSubmitProposal(ctx sdk.Context, keeper keeper.Keeper, msg MsgSubmitProposal) (*sdk.Result, error) {
 	err := hasOnlyDefaultBondDenom(msg.InitialDeposit)
 	if err != nil {
-		return err.Result()
+		return nil, err
 	}
 
 	// use ctx directly
-	if !keeper.ProposalHandlerRouter().HasRoute(msg.Content.ProposalRoute()) {
+	if !keeper.ProposalHandlerRouter().HasRoute(msg.GetContent().ProposalRoute()) {
 		err = keeper.CheckMsgSubmitProposal(ctx, msg)
 	} else {
-		proposalHandler := keeper.ProposalHandlerRouter().GetRoute(msg.Content.ProposalRoute())
+		proposalHandler := keeper.ProposalHandlerRouter().GetRoute(msg.GetContent().ProposalRoute())
 		err = proposalHandler.CheckMsgSubmitProposal(ctx, msg)
 	}
 	if err != nil {
-		return err.Result()
+		return nil, err
 	}
 
-	proposal, err := keeper.SubmitProposal(ctx, msg.Content)
+	proposal, err := keeper.SubmitProposal(ctx, msg.GetContent())
 	if err != nil {
-		return err.Result()
+		return nil, err
 	}
 
 	err = keeper.AddDeposit(ctx, proposal.ProposalID, msg.Proposer,
 		msg.InitialDeposit, types.EventTypeSubmitProposal)
 	if err != nil {
-		return err.Result()
+		return nil, err
 	}
 
 	ctx.EventManager().EmitEvent(
@@ -68,27 +69,27 @@ func handleMsgSubmitProposal(ctx sdk.Context, keeper keeper.Keeper, msg MsgSubmi
 		),
 	)
 
-	return sdk.Result{
-		Data:   keeper.Cdc().MustMarshalBinaryLengthPrefixed(proposal.ProposalID),
-		Events: ctx.EventManager().Events(),
-	}
+	return &sdk.Result{
+		Data:   types.GetProposalIDBytes(proposal.ProposalID),
+		Events: ctx.EventManager().Events().ToABCIEvents(),
+	}, nil
 }
 
-func handleMsgDeposit(ctx sdk.Context, keeper keeper.Keeper, msg MsgDeposit) sdk.Result {
+func handleMsgDeposit(ctx sdk.Context, keeper keeper.Keeper, msg MsgDeposit) (*sdk.Result, error) {
 	if err := hasOnlyDefaultBondDenom(msg.Amount); err != nil {
-		return err.Result()
+		return nil, err
 	}
 	// check depositor has sufficient coins
-	err := common.HasSufficientCoins(msg.Depositor, keeper.BankKeeper().GetCoins(ctx, msg.Depositor),
+	err := common.HasSufficientCoins(msg.Depositor, keeper.BankKeeper().GetAllBalances(ctx, msg.Depositor),
 		msg.Amount)
 	if err != nil {
-		sdk.NewError(DefaultCodespace, sdk.CodeInsufficientCoins, err.Error()).Result()
+		return nil, sdkerror.Wrapf(sdkerror.ErrInsufficientFunds, err.Error())
 	}
 
-	sdkErr := keeper.AddDeposit(ctx, msg.ProposalID, msg.Depositor,
+	err = keeper.AddDeposit(ctx, msg.ProposalID, msg.Depositor,
 		msg.Amount, types.EventTypeProposalDeposit)
-	if sdkErr != nil {
-		return sdkErr.Result()
+	if err != nil {
+		return nil, err
 	}
 
 	ctx.EventManager().EmitEvent(
@@ -99,18 +100,18 @@ func handleMsgDeposit(ctx sdk.Context, keeper keeper.Keeper, msg MsgDeposit) sdk
 		),
 	)
 
-	return sdk.Result{Events: ctx.EventManager().Events()}
+	return &sdk.Result{Events: ctx.EventManager().Events().ToABCIEvents()}, nil
 }
 
-func handleMsgVote(ctx sdk.Context, k keeper.Keeper, msg MsgVote) sdk.Result {
+func handleMsgVote(ctx sdk.Context, k keeper.Keeper, msg MsgVote) (*sdk.Result, error) {
 	proposal, ok := k.GetProposal(ctx, msg.ProposalID)
 	if !ok {
-		return types.ErrUnknownProposal(types.DefaultCodespace, msg.ProposalID).Result()
+		return nil, types.ErrUnknownProposal(types.DefaultCodespace, msg.ProposalID)
 	}
 
 	err, _ := k.AddVote(ctx, msg.ProposalID, msg.Voter, msg.Option)
 	if err != nil {
-		return err.Result()
+		return nil, err
 	}
 
 	status, distribute, tallyResults := keeper.Tally(ctx, k, proposal, false)
@@ -135,7 +136,7 @@ func handleMsgVote(ctx sdk.Context, k keeper.Keeper, msg MsgVote) sdk.Result {
 		),
 	)
 
-	return sdk.Result{Events: ctx.EventManager().Events()}
+	return &sdk.Result{Events: ctx.EventManager().Events().ToABCIEvents()}, nil
 }
 
 func handleProposalAfterTally(
@@ -164,10 +165,10 @@ func handleProposalAfterTally(
 
 		proposal.Status = StatusFailed
 		return types.AttributeValueProposalFailed, fmt.Sprintf("passed, but failed on execution: %s",
-			err.ABCILog())
+			err.Error())
 	} else if status == StatusRejected {
 		if k.ProposalHandlerRouter().HasRoute(proposal.ProposalRoute()) {
-			k.ProposalHandlerRouter().GetRoute(proposal.ProposalRoute()).RejectedHandler(ctx, proposal.Content)
+			k.ProposalHandlerRouter().GetRoute(proposal.ProposalRoute()).RejectedHandler(ctx, proposal.GetContent())
 		}
 		proposal.Status = StatusRejected
 		return types.AttributeValueProposalRejected, "rejected"
@@ -175,9 +176,9 @@ func handleProposalAfterTally(
 	return "", ""
 }
 
-func hasOnlyDefaultBondDenom(decCoins sdk.DecCoins) sdk.Error {
+func hasOnlyDefaultBondDenom(decCoins sdk.DecCoins) error {
 	if len(decCoins) != 1 || decCoins[0].Denom != sdk.DefaultBondDenom || !decCoins.IsValid() {
-		return sdk.ErrInvalidCoins(fmt.Sprintf("must deposit %s but got %s", sdk.DefaultBondDenom, decCoins.String()))
+		return sdkerror.Wrap(sdkerror.ErrInvalidCoins, fmt.Sprintf("must deposit %s but got %s", sdk.DefaultBondDenom, decCoins.String()))
 	}
 	return nil
 }

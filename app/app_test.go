@@ -2,13 +2,13 @@ package app
 
 import (
 	"encoding/json"
+	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	"os"
 	"strconv"
 	"testing"
 
 	"github.com/cosmos/cosmos-sdk/baseapp"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/cosmos/cosmos-sdk/x/auth"
 	"github.com/cosmos/cosmos-sdk/x/mock"
 	"github.com/okex/okchain/app/protocol"
 	"github.com/okex/okchain/x/common/version"
@@ -17,7 +17,7 @@ import (
 	"github.com/okex/okchain/x/upgrade"
 	abci "github.com/tendermint/tendermint/abci/types"
 	"github.com/tendermint/tendermint/libs/cli/flags"
-	cmn "github.com/tendermint/tendermint/libs/common"
+	cmn "github.com/tendermint/tendermint/libs/kv"
 	tmsm "github.com/tendermint/tendermint/state"
 	tm "github.com/tendermint/tendermint/types"
 
@@ -87,7 +87,7 @@ func TestExportAppStateAndValidators_abci_postEndBlocker(t *testing.T) {
 
 	// export the state of the latest height
 	// situation 1: without jail white list
-	appStateBytes, vals, err := app.ExportAppStateAndValidators(false, []string{})
+	appStateBytes, vals, _, err := app.ExportAppStateAndValidators(false, []string{})
 	require.NoError(t, err)
 
 	var appState map[string]json.RawMessage
@@ -97,7 +97,7 @@ func TestExportAppStateAndValidators_abci_postEndBlocker(t *testing.T) {
 
 	// situation 2: with jail white list
 	jailWhiteList := []string{"okchainvaloper10q0rk5qnyag7wfvvt7rtphlw589m7frs863s3m"}
-	_, _, err = app.ExportAppStateAndValidators(true, jailWhiteList)
+	_, _, _, err = app.ExportAppStateAndValidators(true, jailWhiteList)
 	require.NoError(t, err)
 
 	require.Equal(t, totalModuleNum, len(appState))
@@ -106,13 +106,13 @@ func TestExportAppStateAndValidators_abci_postEndBlocker(t *testing.T) {
 	jailWhiteList = []string{"10q0rk5qnyag7wfvvt7rtphlw589m7frs863s3m"}
 
 	require.Panics(t, func() {
-		_, _, _ = app.ExportAppStateAndValidators(true, jailWhiteList)
+		_, _, _, _ = app.ExportAppStateAndValidators(true, jailWhiteList)
 	})
 
 	// situation 4 : validator in the jail white list doesn't exist in the stakingKeeper
 	jailWhiteList = []string{"okchainvaloper1qryc3z7jxlk7ma56qcaz75ksely65havrmtufv"}
 	require.Panics(t, func() {
-		_, _, _ = app.ExportAppStateAndValidators(true, jailWhiteList)
+		_, _, _, _ = app.ExportAppStateAndValidators(true, jailWhiteList)
 	})
 
 	///////////////////// test postEndBloker /////////////////////
@@ -121,13 +121,13 @@ func TestExportAppStateAndValidators_abci_postEndBlocker(t *testing.T) {
 	testInput := &abci.ResponseEndBlock{}
 	event1 := abci.Event{
 		Type: "test",
-		Attributes: []cmn.KVPair{
+		Attributes: []cmn.Pair{
 			{Key: []byte("key1"), Value: []byte("value1")},
 		},
 	}
 	event2 := abci.Event{
 		Type: upgrade.EventTypeUpgradeAppVersion,
-		Attributes: []cmn.KVPair{
+		Attributes: []cmn.Pair{
 			{Key: []byte(upgrade.AttributeKeyAppVersion), Value: []byte(strconv.FormatUint(1024, 10))},
 		},
 	}
@@ -146,7 +146,7 @@ func TestExportAppStateAndValidators_abci_postEndBlocker(t *testing.T) {
 	testInput.Events = []abci.Event{
 		{
 			Type: upgrade.EventTypeUpgradeAppVersion,
-			Attributes: []cmn.KVPair{
+			Attributes: []cmn.Pair{
 				{Key: []byte(upgrade.AttributeKeyAppVersion), Value: []byte("parse error")},
 			},
 		},
@@ -159,7 +159,7 @@ func TestExportAppStateAndValidators_abci_postEndBlocker(t *testing.T) {
 	testInput.Events = []abci.Event{
 		{
 			Type: upgrade.EventTypeUpgradeAppVersion,
-			Attributes: []cmn.KVPair{
+			Attributes: []cmn.Pair{
 				{Key: []byte(upgrade.AttributeKeyAppVersion), Value: []byte(strconv.FormatUint(0, 10))},
 			},
 		},
@@ -177,7 +177,7 @@ func TestExportAppStateAndValidators_abci_postEndBlocker(t *testing.T) {
 	testInput.Events = []abci.Event{
 		{
 			Type: upgrade.EventTypeUpgradeAppVersion,
-			Attributes: []cmn.KVPair{
+			Attributes: []cmn.Pair{
 				{Key: []byte(upgrade.AttributeKeyAppVersion), Value: []byte(strconv.FormatUint(1, 10))},
 			},
 		},
@@ -206,7 +206,7 @@ func TestOKChainApp_MountKVStores(t *testing.T) {
 }
 
 // make a tx 2 check the abci deliver of OKChainApp
-func makeTestTx(t *testing.T) auth.StdTx {
+func makeTestTx(t *testing.T) authtypes.StdTx {
 	privKey := getPrivateKey(privateKey)
 	addr := sdk.AccAddress(privKey.PubKey().Address())
 	orderMsg := order.NewMsgNewOrder(addr, types.TestTokenPair, types.BuyOrder, "1", "0.1")

@@ -7,7 +7,7 @@ import (
 
 	okchaincfg "github.com/cosmos/cosmos-sdk/server/config"
 
-	"github.com/tendermint/tendermint/libs/common"
+	tmos "github.com/tendermint/tendermint/libs/os"
 )
 
 // nolint
@@ -29,7 +29,7 @@ func loadMaintainConf(confDir string, fileName string) (*Config, error) {
 		return nil, err
 	}
 
-	bytes := common.MustReadFile(fPath)
+	bytes := tmos.MustReadFile(fPath)
 
 	m := Config{}
 	err := json.Unmarshal(bytes, &m)
@@ -49,7 +49,7 @@ func dumpMaintainConf(maintainConf *Config, confDir string, fileName string) (er
 	if err != nil {
 		return err
 	}
-	common.MustWriteFile(fPath, bs, os.ModePerm)
+	tmos.MustWriteFile(fPath, bs, os.ModePerm)
 
 	return nil
 }

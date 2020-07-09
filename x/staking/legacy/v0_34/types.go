@@ -7,8 +7,8 @@ import (
 
 	"github.com/tendermint/tendermint/crypto"
 
-	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	"github.com/okex/okchain/x/staking/types"
 )
 
 const (
@@ -23,7 +23,7 @@ type (
 
 	Params struct {
 		UnbondingTime time.Duration `json:"unbonding_time"`
-		MaxValidators uint16        `json:"max_validators"`
+		MaxValidators uint32        `json:"max_validators"`
 		MaxEntries    uint16        `json:"max_entries"`
 		BondDenom     string        `json:"bond_denom"`
 	}
@@ -137,12 +137,12 @@ type (
 
 // MarshalJSON marshals the validator to JSON by Bech32
 func (v Validator) MarshalJSON() ([]byte, error) {
-	bechConsPubKey, err := sdk.Bech32ifyConsPub(v.ConsPubKey)
+	bechConsPubKey, err := sdk.Bech32ifyPubKey(sdk.Bech32PubKeyTypeConsPub, v.ConsPubKey)
 	if err != nil {
 		return nil, err
 	}
 
-	return codec.Cdc.MarshalJSON(bechValidator{
+	return types.ModuleCdc.MarshalJSON(bechValidator{
 		OperatorAddress:         v.OperatorAddress,
 		ConsPubKey:              bechConsPubKey,
 		Jailed:                  v.Jailed,
@@ -160,10 +160,10 @@ func (v Validator) MarshalJSON() ([]byte, error) {
 // UnmarshalJSON unmarshals the validator from JSON by Bech32
 func (v *Validator) UnmarshalJSON(data []byte) error {
 	bv := &bechValidator{}
-	if err := codec.Cdc.UnmarshalJSON(data, bv); err != nil {
+	if err := types.ModuleCdc.UnmarshalJSON(data, bv); err != nil {
 		return err
 	}
-	consPubKey, err := sdk.GetConsPubKeyBech32(bv.ConsPubKey)
+	consPubKey, err := sdk.GetPubKeyFromBech32(sdk.Bech32PubKeyTypeConsPub, bv.ConsPubKey)
 	if err != nil {
 		return err
 	}

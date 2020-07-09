@@ -3,7 +3,6 @@ package types
 import (
 	"testing"
 
-	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 
 	"github.com/stretchr/testify/assert"
@@ -97,7 +96,7 @@ func TestABCIValidatorUpdate(t *testing.T) {
 	validator := NewValidator(valAddr1, pk1, Description{}, DefaultMinSelfDelegation)
 
 	abciVal := validator.ABCIValidatorUpdate()
-	require.Equal(t, tmtypes.TM2PB.PubKey(validator.ConsPubKey), abciVal.PubKey)
+	require.Equal(t, tmtypes.TM2PB.PubKey(sdk.MustGetPubKeyFromBech32(sdk.Bech32PubKeyTypeConsPub, validator.ConsPubKey)), abciVal.PubKey)
 	require.Equal(t, validator.BondedTokens().Int64(), abciVal.Power)
 }
 
@@ -105,14 +104,14 @@ func TestABCIValidatorUpdateZero(t *testing.T) {
 	validator := NewValidator(valAddr1, pk1, Description{}, DefaultMinSelfDelegation)
 
 	abciVal := validator.ABCIValidatorUpdateZero()
-	require.Equal(t, tmtypes.TM2PB.PubKey(validator.ConsPubKey), abciVal.PubKey)
+	require.Equal(t, tmtypes.TM2PB.PubKey(sdk.MustGetPubKeyFromBech32(sdk.Bech32PubKeyTypeConsPub, validator.ConsPubKey)), abciVal.PubKey)
 	require.Equal(t, int64(0), abciVal.Power)
 }
 
 func TestShareTokens(t *testing.T) {
 	validator := Validator{
 		OperatorAddress: valAddr1,
-		ConsPubKey:      pk1,
+		ConsPubKey:      sdk.MustBech32ifyPubKey(sdk.Bech32PubKeyTypeConsPub, pk1),
 		Status:          sdk.Bonded,
 		Tokens:          sdk.NewInt(100),
 		DelegatorShares: sdk.NewDec(100),
@@ -126,12 +125,12 @@ func TestShareTokens(t *testing.T) {
 
 func TestValidatorMarshalUnmarshalJSON(t *testing.T) {
 	validator := NewValidator(valAddr1, pk1, Description{}, DefaultMinSelfDelegation)
-	js, err := codec.Cdc.MarshalJSON(validator)
+	js, err := ModuleCdc.MarshalJSON(validator)
 	require.NoError(t, err)
 	require.NotEmpty(t, js)
 	require.Contains(t, string(js), "\"consensus_pubkey\":\"okchainvalconspub")
 	got := &Validator{}
-	err = codec.Cdc.UnmarshalJSON(js, got)
+	err = ModuleCdc.UnmarshalJSON(js, got)
 	assert.NoError(t, err)
 	assert.Equal(t, validator, *got)
 }

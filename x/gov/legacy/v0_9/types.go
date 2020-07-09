@@ -12,7 +12,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	sdkGovTypes "github.com/cosmos/cosmos-sdk/x/gov/types"
-	sdkparams "github.com/cosmos/cosmos-sdk/x/params"
+	sdkparams "github.com/cosmos/cosmos-sdk/x/params/types/proposal"
 )
 
 const (

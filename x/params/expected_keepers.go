@@ -6,7 +6,7 @@ import (
 
 // BankKeeper shows the expected action of bank keeper
 type BankKeeper interface {
-	GetCoins(ctx sdk.Context, addr sdk.AccAddress) sdk.Coins
+	GetAllBalances(ctx sdk.Context, addr sdk.AccAddress) sdk.Coins
 }
 
 // StakingKeeper shows the expected action of staking keeper

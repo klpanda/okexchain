@@ -1,20 +1,11 @@
 package keeper
 
 import (
+	"github.com/cosmos/cosmos-sdk/x/staking/exported"
 	stakingexported "github.com/okex/okchain/x/staking/exported"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 )
-
-// BankKeeper defines expected bank keeper
-type BankKeeper interface {
-	GetCoins(ctx sdk.Context, addr sdk.AccAddress) sdk.Coins
-
-	// TODO remove once governance doesn't require use of accounts
-	SendCoins(ctx sdk.Context, fromAddr sdk.AccAddress, toAddr sdk.AccAddress, amt sdk.Coins) sdk.Error
-	SetSendEnabled(ctx sdk.Context, enabled bool)
-	SubtractCoins(ctx sdk.Context, addr sdk.AccAddress, amt sdk.Coins) (sdk.Coins, sdk.Error)
-}
 
 // StakingKeeper defines expected staking keeper (Validator and Delegator sets)
 type StakingKeeper interface {
@@ -25,4 +16,7 @@ type StakingKeeper interface {
 
 	// gov use it for getting votes of delegator which has been voted to validator
 	Delegator(ctx sdk.Context, delAddr sdk.AccAddress) stakingexported.DelegatorI
+
+	TotalBondedTokens(context sdk.Context) sdk.Dec
+	IterateDelegations(ctx sdk.Context, delegator sdk.AccAddress, fn func(index int64, delegation exported.DelegationI) (stop bool))
 }

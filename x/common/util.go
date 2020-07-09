@@ -3,14 +3,14 @@ package common
 import (
 	"encoding/binary"
 	"fmt"
+	sdkerror "github.com/cosmos/cosmos-sdk/types/errors"
 	"net/http"
 	"os"
 	"runtime"
 	"strings"
 	"testing"
 
-	"github.com/cosmos/cosmos-sdk/client/context"
-
+	"github.com/cosmos/cosmos-sdk/client"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/rest"
 )
@@ -35,7 +35,7 @@ func GetPage(page, perPage int) (offset, limit int) {
 }
 
 // HandleErrorMsg handles the error msg
-func HandleErrorMsg(w http.ResponseWriter, cliCtx context.CLIContext, msg string) {
+func HandleErrorMsg(w http.ResponseWriter, cliCtx client.Context, msg string) {
 	response := GetErrorResponseJSON(-1, msg, "")
 	rest.PostProcessResponse(w, cliCtx, response)
 }
@@ -44,15 +44,15 @@ func HandleErrorMsg(w http.ResponseWriter, cliCtx context.CLIContext, msg string
 func HasSufficientCoins(addr sdk.AccAddress, availableCoins, amt sdk.Coins) (err error) {
 	//availableCoins := availCoins[:]
 	if !amt.IsValid() {
-		return sdk.ErrInvalidCoins(amt.String())
+		return sdkerror.Wrapf(sdkerror.ErrInvalidCoins, amt.String())
 	}
 	if !availableCoins.IsValid() {
-		return sdk.ErrInvalidCoins(availableCoins.String())
+		return sdkerror.Wrapf(sdkerror.ErrInvalidCoins, availableCoins.String())
 	}
 
 	_, hasNeg := availableCoins.SafeSub(amt)
 	if hasNeg {
-		return sdk.ErrInsufficientCoins(
+		return sdkerror.Wrapf(sdkerror.ErrInsufficientFunds,
 			fmt.Sprintf("insufficient account funds;address: %s, availableCoin: %s, needCoin: %s",
 				addr.String(), availableCoins, amt),
 		)

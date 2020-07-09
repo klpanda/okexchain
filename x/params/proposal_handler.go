@@ -2,6 +2,9 @@ package params
 
 import (
 	"fmt"
+	sdkerror "github.com/cosmos/cosmos-sdk/types/errors"
+	sdkparamstypes "github.com/cosmos/cosmos-sdk/x/params/types"
+	"github.com/cosmos/cosmos-sdk/x/params/types/proposal"
 	"math"
 	"time"
 
@@ -10,27 +13,26 @@ import (
 	"github.com/okex/okchain/x/params/types"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	sdkparams "github.com/cosmos/cosmos-sdk/x/params"
 )
 
 // NewParamChangeProposalHandler returns the rollback function of the param proposal handler
 func NewParamChangeProposalHandler(k *Keeper) govtypes.Handler {
-	return func(ctx sdk.Context, proposal *govtypes.Proposal) sdk.Error {
-		switch c := proposal.Content.(type) {
+	return func(ctx sdk.Context, proposal *govtypes.Proposal) error {
+		switch c := proposal.GetContent().(type) {
 		case types.ParameterChangeProposal:
 			return handleParameterChangeProposal(ctx, k, proposal)
 
 		default:
 			errMsg := fmt.Sprintf("unrecognized param proposal content type: %T", c)
-			return sdk.ErrUnknownRequest(errMsg)
+			return sdkerror.Wrapf(sdkerror.ErrUnknownRequest, errMsg)
 		}
 	}
 }
 
-func handleParameterChangeProposal(ctx sdk.Context, k *Keeper, proposal *govtypes.Proposal) sdk.Error {
+func handleParameterChangeProposal(ctx sdk.Context, k *Keeper, proposal *govtypes.Proposal) error {
 	logger := ctx.Logger().With("module", ModuleName)
 	logger.Info("Execute ParameterProposal begin")
-	paramProposal := proposal.Content.(types.ParameterChangeProposal)
+	paramProposal := proposal.GetContent().(types.ParameterChangeProposal)
 	curHeight := uint64(ctx.BlockHeight())
 	if paramProposal.Height > curHeight {
 		k.gk.InsertWaitingProposalQueue(ctx, paramProposal.Height, proposal.ProposalID)
@@ -41,29 +43,20 @@ func handleParameterChangeProposal(ctx sdk.Context, k *Keeper, proposal *govtype
 	return changeParams(ctx, k, paramProposal)
 }
 
-func changeParams(ctx sdk.Context, k *Keeper, paramProposal types.ParameterChangeProposal) sdk.Error {
+func changeParams(ctx sdk.Context, k *Keeper, paramProposal types.ParameterChangeProposal) error {
 	for _, c := range paramProposal.Changes {
 		ss, ok := k.GetSubspace(c.Subspace)
 		if !ok {
-			return sdkparams.ErrUnknownSubspace(k.Codespace(), c.Subspace)
+			return sdkerror.Wrapf(proposal.ErrUnknownSubspace, c.Subspace)
 		}
 
-		var err error
-		if len(c.Subkey) == 0 {
-			k.Logger(ctx).Info(
-				fmt.Sprintf("setting new parameter; key: %s, value: %s", c.Key, c.Value),
-			)
-
-			err = ss.Update(ctx, []byte(c.Key), []byte(c.Value))
-		} else {
-			k.Logger(ctx).Info(
-				fmt.Sprintf("setting new parameter; key: %s, subkey: %s, value: %s", c.Key, c.Subspace, c.Value),
-			)
-			err = ss.UpdateWithSubkey(ctx, []byte(c.Key), []byte(c.Subkey), []byte(c.Value))
-		}
+		k.Logger(ctx).Info(
+			fmt.Sprintf("setting new parameter; key: %s, subkey: %s, value: %s", c.Key, c.Subspace, c.Value),
+		)
+		err := ss.Update(ctx, []byte(c.Key), []byte(c.Value))
 
 		if err != nil {
-			return sdkparams.ErrSettingParameter(k.Codespace(), c.Key, c.Subkey, c.Value, err.Error())
+			return sdkerror.Wrapf(proposal.ErrSettingParameter, "key: %s, value: %s, err: %s", c.Key, c.Value, err.Error())
 		}
 	}
 	return nil
@@ -100,21 +93,21 @@ func (keeper Keeper) GetVotingPeriod(ctx sdk.Context, content govtypes.Content) 
 }
 
 // CheckMsgSubmitProposal implements ProposalHandler interface
-func (keeper Keeper) CheckMsgSubmitProposal(ctx sdk.Context, msg govtypes.MsgSubmitProposal) sdk.Error {
-	paramsChangeProposal := msg.Content.(types.ParameterChangeProposal)
+func (keeper Keeper) CheckMsgSubmitProposal(ctx sdk.Context, msg govtypes.MsgSubmitProposal) error {
+	paramsChangeProposal := msg.GetContent().(types.ParameterChangeProposal)
 	// check message sender is current validator
 	if !keeper.sk.IsValidator(ctx, msg.Proposer) {
-		return govtypes.ErrInvalidProposer(sdkparams.DefaultCodespace,
+		return govtypes.ErrInvalidProposer(sdkparamstypes.ModuleName,
 			fmt.Sprintf("proposer of ParamChange proposal must be validator"))
 	}
 	// check initial deposit more than or equal to ratio of MinDeposit
 	initDeposit := keeper.GetParams(ctx).MinDeposit.MulDec(sdk.NewDecWithPrec(1, 1))
 	if err := common.HasSufficientCoins(msg.Proposer, msg.InitialDeposit, initDeposit); err != nil {
-		return sdk.ErrInvalidCoins(fmt.Sprintf("InitialDeposit must not be less than %s", initDeposit.String()))
+		return sdkerror.Wrapf(sdkerror.ErrInvalidCoins,"InitialDeposit must not be less than %s", initDeposit.String())
 	}
 	// check proposer has sufficient coins
-	if err := common.HasSufficientCoins(msg.Proposer, keeper.ck.GetCoins(ctx, msg.Proposer), msg.InitialDeposit); err != nil {
-		return sdk.ErrInvalidCoins(err.Error())
+	if err := common.HasSufficientCoins(msg.Proposer, keeper.ck.GetAllBalances(ctx, msg.Proposer), msg.InitialDeposit); err != nil {
+		return sdkerror.Wrap(sdkerror.ErrInvalidCoins, err.Error())
 	}
 
 	curHeight := uint64(ctx.BlockHeight())
@@ -123,7 +116,7 @@ func (keeper Keeper) CheckMsgSubmitProposal(ctx sdk.Context, msg govtypes.MsgSub
 		maxHeight = math.MaxInt64 - paramsChangeProposal.Height
 	}
 	if paramsChangeProposal.Height < curHeight || paramsChangeProposal.Height > curHeight+maxHeight {
-		return govtypes.ErrInvalidHeight(DefaultCodespace, paramsChangeProposal.Height, curHeight, maxHeight)
+		return govtypes.ErrInvalidHeight(sdkparamstypes.ModuleName, paramsChangeProposal.Height, curHeight, maxHeight)
 	}
 
 	// run simulation with cache context
@@ -133,7 +126,7 @@ func (keeper Keeper) CheckMsgSubmitProposal(ctx sdk.Context, msg govtypes.MsgSub
 
 // nolint
 func (keeper Keeper) AfterSubmitProposalHandler(ctx sdk.Context, proposal govtypes.Proposal) {}
-func (keeper Keeper) VoteHandler(ctx sdk.Context, proposal govtypes.Proposal, vote govtypes.Vote) (string, sdk.Error) {
+func (keeper Keeper) VoteHandler(ctx sdk.Context, proposal govtypes.Proposal, vote govtypes.Vote) (string, error) {
 	return "", nil
 }
 func (keeper Keeper) AfterDepositPeriodPassed(ctx sdk.Context, proposal govtypes.Proposal) {}

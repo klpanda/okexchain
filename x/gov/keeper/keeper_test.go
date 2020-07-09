@@ -362,7 +362,8 @@ func TestKeeper_CheckMsgSubmitProposal(t *testing.T) {
 	// not satisfy initial deposit
 	amount, err := sdk.ParseDecCoins(fmt.Sprintf("1%s", sdk.DefaultBondDenom))
 	require.Nil(t, err)
-	msg := types.NewMsgSubmitProposal(content, amount, Addrs[0])
-	err = keeper.CheckMsgSubmitProposal(ctx, msg)
+	msg, err := types.NewMsgSubmitProposal(content, amount, Addrs[0])
+	require.Nil(t, err)
+	err = keeper.CheckMsgSubmitProposal(ctx, *msg)
 	require.NotNil(t, err)
 }

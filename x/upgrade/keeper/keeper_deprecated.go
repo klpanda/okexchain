@@ -2,6 +2,7 @@ package keeper
 
 import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	sdkerror "github.com/cosmos/cosmos-sdk/types/errors"
 	"github.com/okex/okchain/x/common/proto"
 	"github.com/okex/okchain/x/upgrade/types"
 )
@@ -11,9 +12,9 @@ import (
 // SetAppUpgradeConfig sets app upgrade config for test
 // deprecated
 func (k Keeper) SetAppUpgradeConfig(ctx sdk.Context, proposalID, version, upgradeHeight uint64, software string,
-) sdk.Error {
+) error {
 	if _, found := k.GetAppUpgradeConfig(ctx); found {
-		return sdk.ErrInternal("failed. an app upgrade config has existed, only one entry is permitted")
+		return sdkerror.Wrap(sdkerror.ErrInternal, "failed. an app upgrade config has existed, only one entry is permitted")
 	}
 
 	appUpgradeConfig := proto.NewAppUpgradeConfig(

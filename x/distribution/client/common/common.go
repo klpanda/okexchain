@@ -2,14 +2,14 @@ package common
 
 import (
 	"fmt"
+	"github.com/cosmos/cosmos-sdk/client"
 
-	"github.com/cosmos/cosmos-sdk/client/context"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/okex/okchain/x/distribution/types"
 )
 
 // QueryParams actually queries distribution params
-func QueryParams(cliCtx context.CLIContext, queryRoute string) (params types.Params, err error) {
+func QueryParams(cliCtx client.Context, queryRoute string) (params types.Params, err error) {
 	route := fmt.Sprintf("custom/%s/params/%s", queryRoute, types.ParamCommunityTax)
 	var communityTax sdk.Dec
 	var withdrawAddrEnabled bool
@@ -30,7 +30,7 @@ func QueryParams(cliCtx context.CLIContext, queryRoute string) (params types.Par
 }
 
 // QueryValidatorCommission returns a validator's commission.
-func QueryValidatorCommission(cliCtx context.CLIContext, queryRoute string, validatorAddr sdk.ValAddress) (
+func QueryValidatorCommission(cliCtx client.Context, queryRoute string, validatorAddr sdk.ValAddress) (
 	[]byte, error) {
 	res, _, err := cliCtx.QueryWithData(
 		fmt.Sprintf("custom/%s/%s", queryRoute, types.QueryValidatorCommission),
@@ -47,5 +47,5 @@ func WithdrawValidatorRewardsAndCommission(validatorAddr sdk.ValAddress) ([]sdk.
 		return nil, err
 	}
 
-	return []sdk.Msg{commissionMsg}, nil
+	return []sdk.Msg{&commissionMsg}, nil
 }

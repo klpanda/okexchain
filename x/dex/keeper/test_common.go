@@ -2,6 +2,11 @@ package keeper
 
 import (
 	"fmt"
+	"github.com/cosmos/cosmos-sdk/std"
+	authkeeper "github.com/cosmos/cosmos-sdk/x/auth/keeper"
+	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
+	bankkeeper "github.com/cosmos/cosmos-sdk/x/bank/keeper"
+	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	"os"
 	"testing"
 	"time"
@@ -9,11 +14,10 @@ import (
 	"github.com/okex/okchain/x/staking"
 
 	"github.com/cosmos/cosmos-sdk/codec"
+	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
+	cryptocodec "github.com/cosmos/cosmos-sdk/crypto/codec"
 	"github.com/cosmos/cosmos-sdk/store"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/cosmos/cosmos-sdk/x/auth"
-	"github.com/cosmos/cosmos-sdk/x/bank"
-	"github.com/cosmos/cosmos-sdk/x/supply"
 	"github.com/okex/okchain/x/params"
 	"github.com/stretchr/testify/require"
 	abci "github.com/tendermint/tendermint/abci/types"
@@ -38,11 +42,10 @@ type testInput struct {
 // create a codec used only for testing
 func makeTestCodec() *codec.Codec {
 	var cdc = codec.New()
-	bank.RegisterCodec(cdc)
-	auth.RegisterCodec(cdc)
-	supply.RegisterCodec(cdc)
+	banktypes.RegisterCodec(cdc)
+	authtypes.RegisterCodec(cdc)
 	sdk.RegisterCodec(cdc)
-	codec.RegisterCrypto(cdc)
+	cryptocodec.RegisterCrypto(cdc)
 
 	types.RegisterCodec(cdc) // dex
 	return cdc
@@ -51,8 +54,8 @@ func makeTestCodec() *codec.Codec {
 func createTestInputWithBalance(t *testing.T, numAddrs, initQuantity int64) testInput {
 	db := dbm.NewMemDB()
 
-	keyAcc := sdk.NewKVStoreKey(auth.StoreKey)
-	keySupply := sdk.NewKVStoreKey(supply.StoreKey)
+	keyAcc := sdk.NewKVStoreKey(authtypes.StoreKey)
+	keyBank := sdk.NewKVStoreKey(banktypes.StoreKey)
 	keyParams := sdk.NewKVStoreKey(params.StoreKey)
 	tkeyParams := sdk.NewTransientStoreKey(params.TStoreKey)
 
@@ -69,7 +72,7 @@ func createTestInputWithBalance(t *testing.T, numAddrs, initQuantity int64) test
 
 	ms := store.NewCommitMultiStore(db)
 	ms.MountStoreWithDB(keyAcc, sdk.StoreTypeIAVL, db)
-	ms.MountStoreWithDB(keySupply, sdk.StoreTypeIAVL, db)
+	ms.MountStoreWithDB(keyBank, sdk.StoreTypeIAVL, db)
 	ms.MountStoreWithDB(keyParams, sdk.StoreTypeIAVL, db)
 	ms.MountStoreWithDB(tkeyParams, sdk.StoreTypeTransient, db)
 
@@ -85,41 +88,43 @@ func createTestInputWithBalance(t *testing.T, numAddrs, initQuantity int64) test
 
 	ctx := sdk.NewContext(ms, abci.Header{Time: time.Unix(0, 0)}, false, log.NewTMLogger(os.Stdout))
 	cdc := makeTestCodec()
+	interfaceRegistry := codectypes.NewInterfaceRegistry()
+	appCodec := codec.NewHybridCodec(cdc, interfaceRegistry)
+	std.RegisterInterfaces(interfaceRegistry)
 
-	feeCollectorAcc := supply.NewEmptyModuleAccount(auth.FeeCollectorName)
+	feeCollectorAcc := authtypes.NewEmptyModuleAccount(authtypes.FeeCollectorName)
 
 	blacklistedAddrs := make(map[string]bool)
 	blacklistedAddrs[feeCollectorAcc.String()] = true
 
-	paramsKeeper := params.NewKeeper(cdc, keyParams, tkeyParams, params.DefaultCodespace)
-	accountKeeper := auth.NewAccountKeeper(cdc, keyAcc,
-		paramsKeeper.Subspace(auth.DefaultParamspace), auth.ProtoBaseAccount)
-	bankKeeper := bank.NewBaseKeeper(accountKeeper, paramsKeeper.Subspace(bank.DefaultParamspace),
-		bank.DefaultCodespace, blacklistedAddrs)
+	paramsKeeper := params.NewKeeper(appCodec, keyParams, tkeyParams)
 	maccPerms := map[string][]string{
-		auth.FeeCollectorName: nil,
-		token.ModuleName:      {supply.Minter, supply.Burner},
-		types.ModuleName:      nil,
-		gov.ModuleName:        nil,
+		authtypes.FeeCollectorName: nil,
+		token.ModuleName:           {authtypes.Minter, authtypes.Burner},
+		types.ModuleName:           nil,
+		gov.ModuleName:             nil,
 	}
-	supplyKeeper := supply.NewKeeper(cdc, keySupply, accountKeeper, bankKeeper, maccPerms)
-	supplyKeeper.SetSupply(ctx, supply.NewSupply(sdk.Coins{}))
+	accountKeeper := authkeeper.NewAccountKeeper(appCodec, keyAcc,
+		paramsKeeper.Subspace(authtypes.ModuleName), authtypes.ProtoBaseAccount, maccPerms)
+	bankKeeper := bankkeeper.NewBaseKeeper(appCodec, keyBank, accountKeeper, paramsKeeper.Subspace(banktypes.ModuleName), blacklistedAddrs)
+
+	bankKeeper.SetSupply(ctx, banktypes.NewSupply(sdk.Coins{}))
 
 	// set module accounts
-	supplyKeeper.SetModuleAccount(ctx, feeCollectorAcc)
+	accountKeeper.SetModuleAccount(ctx, feeCollectorAcc)
 
 	// token keeper
 	tokenKeepr := token.NewKeeper(bankKeeper,
-		paramsKeeper.Subspace(token.DefaultParamspace), auth.FeeCollectorName, supplyKeeper,
+		paramsKeeper.Subspace(token.DefaultParamspace), authtypes.FeeCollectorName, accountKeeper,
 		keyToken, keyLock, cdc, true)
 
 	paramsSubspace := paramsKeeper.Subspace(types.DefaultParamspace)
 
 	mockStakingKeeper := &mockStakingKeeper{true}
-	mockBankKeeper := mockBankKeeper{}
+	//mockBankKeeper := mockBankKeeper{}
 
 	// dex keeper
-	dexKeeper := NewKeeper(auth.FeeCollectorName, supplyKeeper, paramsSubspace, tokenKeepr, mockStakingKeeper, mockBankKeeper, storeKey, keyTokenPair, cdc)
+	dexKeeper := NewKeeper(authtypes.FeeCollectorName, accountKeeper, paramsSubspace, tokenKeepr, mockStakingKeeper, bankKeeper, storeKey, keyTokenPair, cdc)
 
 	// init account tokens
 	decCoins, err := sdk.ParseDecCoins(fmt.Sprintf("%d%s,%d%s",
@@ -133,9 +138,9 @@ func createTestInputWithBalance(t *testing.T, numAddrs, initQuantity int64) test
 		pk := ed25519.GenPrivKey().PubKey()
 		addr := sdk.AccAddress(pk.Address())
 		testAddrs = append(testAddrs, addr)
-		err := dexKeeper.supplyKeeper.MintCoins(ctx, token.ModuleName, decCoins)
+		err := dexKeeper.bankKeeper.MintCoins(ctx, token.ModuleName, decCoins)
 		require.Nil(t, err)
-		err = dexKeeper.supplyKeeper.SendCoinsFromModuleToAccount(ctx, token.ModuleName, addr, decCoins)
+		err = dexKeeper.bankKeeper.SendCoinsFromModuleToAccount(ctx, token.ModuleName, addr, decCoins)
 		require.Nil(t, err)
 	}
 

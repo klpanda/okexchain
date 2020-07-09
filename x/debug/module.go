@@ -2,8 +2,9 @@ package debug
 
 import (
 	"encoding/json"
+	"github.com/cosmos/cosmos-sdk/client"
+	"github.com/gogo/protobuf/grpc"
 
-	"github.com/cosmos/cosmos-sdk/client/context"
 	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/module"
@@ -33,21 +34,21 @@ func (AppModuleBasic) RegisterCodec(cdc *codec.Codec) {
 }
 
 // default genesis state
-func (AppModuleBasic) DefaultGenesis() json.RawMessage { return nil }
+func (AppModuleBasic) DefaultGenesis(cdc codec.JSONMarshaler) json.RawMessage { return nil }
 
 // module validate genesis
-func (AppModuleBasic) ValidateGenesis(json.RawMessage) error { return nil }
+func (AppModuleBasic) ValidateGenesis(cdc codec.JSONMarshaler, _ json.RawMessage) error { return nil }
 
 // register rest routes
-func (AppModuleBasic) RegisterRESTRoutes(context.CLIContext, *mux.Router) {}
+func (AppModuleBasic) RegisterRESTRoutes(ctx client.Context, _ *mux.Router) {}
 
 // get the root tx command of this module
-func (AppModuleBasic) GetTxCmd(cdc *codec.Codec) *cobra.Command {
+func (AppModuleBasic) GetTxCmd(ctx client.Context) *cobra.Command {
 	return nil
 }
 
 // get the root query command of this module
-func (AppModuleBasic) GetQueryCmd(cdc *codec.Codec) *cobra.Command {
+func (AppModuleBasic) GetQueryCmd(ctx client.Context) *cobra.Command {
 	return nil
 }
 
@@ -65,18 +66,20 @@ func NewAppModule(keeper Keeper) AppModule {
 	}
 }
 
+func (am AppModule) RegisterQueryService(grpc.Server) {}
+
 // module init-genesis
-func (AppModule) InitGenesis(sdk.Context, json.RawMessage) []abci.ValidatorUpdate { return nil }
+func (AppModule) InitGenesis(sdk.Context, codec.JSONMarshaler, json.RawMessage) []abci.ValidatorUpdate { return nil }
 
 // module export genesis
-func (AppModule) ExportGenesis(sdk.Context) json.RawMessage { return nil }
+func (AppModule) ExportGenesis(sdk.Context, codec.JSONMarshaler) json.RawMessage { return nil }
 
 // register invariants
 func (AppModule) RegisterInvariants(sdk.InvariantRegistry) {}
 
 // module message route name
-func (AppModule) Route() string {
-	return RouterKey
+func (AppModule) Route() sdk.Route {
+	return sdk.NewRoute(RouterKey, nil)
 }
 
 // module handler

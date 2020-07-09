@@ -1,15 +1,15 @@
 package cli
 
 import (
+	"bufio"
 	"fmt"
+	authclient "github.com/cosmos/cosmos-sdk/x/auth/client"
+	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	"strings"
 
-	"github.com/cosmos/cosmos-sdk/client/context"
-	"github.com/cosmos/cosmos-sdk/codec"
+	"github.com/cosmos/cosmos-sdk/client"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/version"
-	"github.com/cosmos/cosmos-sdk/x/auth"
-	"github.com/cosmos/cosmos-sdk/x/auth/client/utils"
 	"github.com/spf13/cobra"
 
 	govTypes "github.com/okex/okchain/x/gov/types"
@@ -18,7 +18,7 @@ import (
 )
 
 // GetCmdSubmitProposal implements a command handler for submitting a parameter change proposal transaction
-func GetCmdSubmitProposal(cdc *codec.Codec) *cobra.Command {
+func GetCmdSubmitProposal(cliCtx client.Context) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "param-change [proposal-file]",
 		Args:  cobra.ExactArgs(1),
@@ -64,10 +64,11 @@ Where proposal.json contains:
 			),
 		),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			txBldr := auth.NewTxBuilderFromCLI().WithTxEncoder(utils.GetTxEncoder(cdc))
-			cliCtx := context.NewCLIContext().WithCodec(cdc)
+			inBuf := bufio.NewReader(cmd.InOrStdin())
+			txBldr := authtypes.NewTxBuilderFromCLI(inBuf).WithTxEncoder(authclient.GetTxEncoder(cliCtx.Codec))
+			cliCtx := client.NewContext().WithCodec(cliCtx.Codec)
 
-			proposal, err := paramscutils.ParseParamChangeProposalJSON(cdc, args[0])
+			proposal, err := paramscutils.ParseParamChangeProposalJSON(cliCtx.Codec, args[0])
 			if err != nil {
 				return err
 			}
@@ -80,12 +81,15 @@ Where proposal.json contains:
 				proposal.Height,
 			)
 
-			msg := govTypes.NewMsgSubmitProposal(content, proposal.Deposit, from)
+			msg, err := govTypes.NewMsgSubmitProposal(content, proposal.Deposit, from)
+			if err != nil {
+				return err
+			}
 			if err := msg.ValidateBasic(); err != nil {
 				return err
 			}
 
-			return utils.GenerateOrBroadcastMsgs(cliCtx, txBldr, []sdk.Msg{msg})
+			return authclient.GenerateOrBroadcastMsgs(cliCtx, txBldr, []sdk.Msg{msg})
 		},
 	}
 

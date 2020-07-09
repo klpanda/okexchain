@@ -1,37 +1,33 @@
 package protocol
 
 import (
-	"github.com/cosmos/cosmos-sdk/baseapp"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/cosmos/cosmos-sdk/x/auth"
-	"github.com/cosmos/cosmos-sdk/x/mint"
-	"github.com/cosmos/cosmos-sdk/x/slashing"
-	"github.com/cosmos/cosmos-sdk/x/supply"
+	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
+	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
+	minttypes "github.com/cosmos/cosmos-sdk/x/mint/types"
+	slashingtypes "github.com/cosmos/cosmos-sdk/x/slashing/types"
+	upgradetypes "github.com/okex/okchain/x/upgrade/types"
+
 	"github.com/okex/okchain/x/debug"
 	"github.com/okex/okchain/x/dex"
-	"github.com/okex/okchain/x/staking"
-
-	//distr "github.com/okex/okchain/x/distribution"
 	distr "github.com/okex/okchain/x/distribution"
 	"github.com/okex/okchain/x/gov"
 	"github.com/okex/okchain/x/order"
 	"github.com/okex/okchain/x/params"
-
-	//"github.com/okex/okchain/x/staking"
+	"github.com/okex/okchain/x/poolswap"
+	"github.com/okex/okchain/x/staking"
 	"github.com/okex/okchain/x/token"
 	"github.com/okex/okchain/x/upgrade"
-	"github.com/okex/okchain/x/poolswap"
 )
 
 // store keys used in all modules
 var (
 	kvStoreKeysMap = sdk.NewKVStoreKeys(
-		baseapp.MainStoreKey,
-		auth.StoreKey,
+		authtypes.StoreKey,
 		staking.StoreKey,
-		supply.StoreKey,
-		mint.StoreKey,
-		slashing.StoreKey,
+		banktypes.StoreKey,
+		minttypes.StoreKey,
+		slashingtypes.StoreKey,
 		distr.StoreKey,
 		gov.StoreKey,
 		params.StoreKey,
@@ -46,11 +42,6 @@ var (
 	transientStoreKeysMap = sdk.NewTransientStoreKeys(staking.TStoreKey, params.TStoreKey)
 )
 
-// GetMainStoreKey gets the main store key
-func GetMainStoreKey() *sdk.KVStoreKey {
-	return kvStoreKeysMap[baseapp.MainStoreKey]
-}
-
 // GetKVStoreKeysMap gets the map of all kv store keys
 func GetKVStoreKeysMap() map[string]*sdk.KVStoreKey {
 	return kvStoreKeysMap
@@ -59,4 +50,8 @@ func GetKVStoreKeysMap() map[string]*sdk.KVStoreKey {
 // GetTransientStoreKeysMap gets the map of all transient store keys
 func GetTransientStoreKeysMap() map[string]*sdk.TransientStoreKey {
 	return transientStoreKeysMap
+}
+
+func GetMainStoreKey() *sdk.KVStoreKey {
+	return kvStoreKeysMap[upgradetypes.StoreKey]
 }

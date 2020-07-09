@@ -3,12 +3,12 @@ package order
 import (
 	"encoding/json"
 	"fmt"
+	sdkerror "github.com/cosmos/cosmos-sdk/types/errors"
+	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
+	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	"testing"
 
-	"github.com/cosmos/cosmos-sdk/x/supply"
-
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/cosmos/cosmos-sdk/x/auth"
 	"github.com/stretchr/testify/require"
 	abci "github.com/tendermint/tendermint/abci/types"
 
@@ -42,7 +42,8 @@ func TestEventNewOrders(t *testing.T) {
 
 	mapp.orderKeeper.SetParams(ctx, &feeParams)
 	msg := types.NewMsgNewOrders(addrKeysSlice[0].Address, orderItems)
-	result := handler(ctx, msg)
+	result, err := handler(ctx, &msg)
+	require.Nil(t, err)
 
 	require.EqualValues(t, 2, len(result.Events[4].Attributes))
 
@@ -72,11 +73,12 @@ func TestFeesNewOrders(t *testing.T) {
 		sdk.NewDecCoinFromDec(common.NativeToken, sdk.MustNewDecFromStr("100")), // 100
 		sdk.NewDecCoinFromDec(common.TestToken, sdk.MustNewDecFromStr("100")),
 	}
-	require.EqualValues(t, expectCoins.String(), acc.GetCoins().String())
+	require.EqualValues(t, expectCoins.String(), mapp.BankKeeper.GetAllBalances(ctx, acc.GetAddress()).String())
 
 	mapp.orderKeeper.SetParams(ctx, &feeParams)
 	msg := types.NewMsgNewOrders(addrKeysSlice[0].Address, orderItems)
-	result := handler(ctx, msg)
+	_, err = handler(ctx, &msg)
+	require.Nil(t, err)
 
 	// check account balance
 	// multi fee 7958528000
@@ -85,9 +87,7 @@ func TestFeesNewOrders(t *testing.T) {
 		sdk.NewDecCoinFromDec(common.NativeToken, sdk.MustNewDecFromStr("89.79264")), // 100 - 10  - 0.20736
 		sdk.NewDecCoinFromDec(common.TestToken, sdk.MustNewDecFromStr("100")),
 	}
-	require.EqualValues(t, expectCoins.String(), acc.GetCoins().String())
-	require.EqualValues(t, true, result.Code.IsOK())
-
+	require.EqualValues(t, expectCoins.String(), mapp.BankKeeper.GetAllBalances(ctx, acc.GetAddress()).String())
 }
 
 func TestHandleMsgNewOrderInvalid(t *testing.T) {
@@ -106,8 +106,9 @@ func TestHandleMsgNewOrderInvalid(t *testing.T) {
 
 	// not-exist product
 	msg := types.NewMsgNewOrder(addrKeysSlice[0].Address, "nobb_"+common.NativeToken, types.BuyOrder, "10.0", "1.0")
-	result := handler(ctx, msg)
-	orderRes := parseOrderResult(result)
+	result, err := handler(ctx, &msg)
+	require.Nil(t, err)
+	orderRes := parseOrderResult(*result)
 	require.Nil(t, orderRes)
 
 	// invalid price precision
@@ -127,8 +128,9 @@ func TestHandleMsgNewOrderInvalid(t *testing.T) {
 
 	// insufficient coins
 	msg = types.NewMsgNewOrder(addrKeysSlice[0].Address, types.TestTokenPair, types.BuyOrder, "10.0", "10.1")
-	result = handler(ctx, msg)
-	orderRes = parseOrderResult(result)
+	result, err = handler(ctx, &msg)
+	require.Nil(t, err)
+	orderRes = parseOrderResult(*result)
 	require.Nil(t, orderRes)
 
 	// check depth book
@@ -151,13 +153,13 @@ func TestValidateMsgNewOrder(t *testing.T) {
 
 	// normal
 	msg := types.NewMsgNewOrder(addrKeysSlice[0].Address, types.TestTokenPair, types.BuyOrder, "10.0", "1.0")
-	result := ValidateMsgNewOrders(ctx, keeper, msg)
-	require.EqualValues(t, sdk.CodeOK, result.Code)
+	err = ValidateMsgNewOrders(ctx, keeper, &msg)
+	require.Nil(t, err)
 
 	// not-exist product
 	msg = types.NewMsgNewOrder(addrKeysSlice[0].Address, "nobb_"+common.NativeToken, types.BuyOrder, "10.0", "1.0")
-	result = ValidateMsgNewOrders(ctx, keeper, msg)
-	require.EqualValues(t, sdk.CodeUnknownRequest, result.Code)
+	err = ValidateMsgNewOrders(ctx, keeper, &msg)
+	require.Nil(t, err)
 
 	// invalid price precision
 	//msg = types.NewMsgNewOrder(addrKeysSlice[0].Address, types.TestTokenPair, types.BuyOrder, "10.01", "1.0")
@@ -176,20 +178,20 @@ func TestValidateMsgNewOrder(t *testing.T) {
 
 	// insufficient coins
 	msg = types.NewMsgNewOrder(addrKeysSlice[0].Address, types.TestTokenPair, types.BuyOrder, "10.0", "10.1")
-	result = ValidateMsgNewOrders(ctx, keeper, msg)
-	require.EqualValues(t, sdk.CodeInsufficientCoins, result.Code)
+	err = ValidateMsgNewOrders(ctx, keeper, &msg)
+	require.Nil(t, err)
 
 	// busy product
 	keeper.SetProductLock(ctx, types.TestTokenPair, &types.ProductLock{})
 	msg = types.NewMsgNewOrder(addrKeysSlice[0].Address, types.TestTokenPair, types.BuyOrder, "10.0", "1.0")
-	result = ValidateMsgNewOrders(ctx, keeper, msg)
-	require.EqualValues(t, sdk.CodeInternal, result.Code)
+	err = ValidateMsgNewOrders(ctx, keeper, &msg)
+	require.Nil(t, err)
 
 	// price * quantity over accuracy
 	keeper.SetProductLock(ctx, types.TestTokenPair, &types.ProductLock{})
 	msg = types.NewMsgNewOrder(addrKeysSlice[0].Address, types.TestTokenPair, types.BuyOrder, "10.000001", "1.0001")
-	result = ValidateMsgNewOrders(ctx, keeper, msg)
-	require.EqualValues(t, sdk.CodeInternal, result.Code)
+	err = ValidateMsgNewOrders(ctx, keeper, &msg)
+	require.Nil(t, err)
 }
 
 // test order cancel without enough okb as fee
@@ -204,7 +206,7 @@ func TestHandleMsgCancelOrder2(t *testing.T) {
 	//feeParams.CancelNative = sdk.MustNewDecFromStr("0.1")
 	mapp.orderKeeper.SetParams(ctx, &feeParams)
 	tokenPair := dex.GetBuiltInTokenPair()
-	mapp.supplyKeeper.SetSupply(ctx, supply.NewSupply(mapp.TotalCoinsSupply))
+	mapp.BankKeeper.SetSupply(ctx, banktypes.NewSupply(mapp.TotalCoinsSupply))
 	err := mapp.dexKeeper.SaveTokenPair(ctx, tokenPair)
 	require.Nil(t, err)
 
@@ -228,7 +230,7 @@ func TestHandleMsgCancelOrder2(t *testing.T) {
 	expectCoins0 := sdk.DecCoins{
 		sdk.NewDecCoinFromDec(common.TestToken, sdk.MustNewDecFromStr("98")),
 	}
-	require.EqualValues(t, expectCoins0.String(), acc0.GetCoins().String())
+	require.EqualValues(t, expectCoins0.String(), mapp.BankKeeper.GetAllBalances(ctx, acc0.GetAddress()).String())
 
 	// Start Testing...
 	handler := NewOrderHandler(keeper)
@@ -236,10 +238,10 @@ func TestHandleMsgCancelOrder2(t *testing.T) {
 
 	// Test fully cancel
 	msg := types.NewMsgCancelOrder(addrKeysSlice[0].Address, orders[0].OrderID)
-	result := handler(ctx, msg)
+	result, err := handler(ctx, &msg)
 	// check result
-	require.EqualValues(t, sdk.CodeOK, result.Code)
-	orderRes := parseOrderResult(result)
+	require.Nil(t, err)
+	orderRes := parseOrderResult(*result)
 	require.NotNil(t, orderRes)
 	require.EqualValues(t, "0.00000100"+common.NativeToken, orderRes[0].Message)
 	// check account balance
@@ -248,10 +250,10 @@ func TestHandleMsgCancelOrder2(t *testing.T) {
 		sdk.NewDecCoinFromDec(common.NativeToken, sdk.MustNewDecFromStr("0.25919900")), // no change
 		sdk.NewDecCoinFromDec(common.TestToken, sdk.MustNewDecFromStr("100")),          // 100 - 0.000001
 	}
-	require.EqualValues(t, expectCoins0.String(), acc0.GetCoins().String())
+	require.EqualValues(t, expectCoins0.String(), mapp.BankKeeper.GetAllBalances(ctx, acc0.GetAddress()).String())
 	// check fee pool
-	feeCollector := mapp.supplyKeeper.GetModuleAccount(ctx, auth.FeeCollectorName)
-	collectedFees := feeCollector.GetCoins()
+	feeCollector := mapp.AccountKeeper.GetModuleAccount(ctx, authtypes.FeeCollectorName)
+	collectedFees := mapp.BankKeeper.GetAllBalances(ctx, feeCollector.GetAddress())
 	require.EqualValues(t, "0.00000100"+common.NativeToken, collectedFees.String())
 }
 
@@ -266,7 +268,7 @@ func TestHandleMsgCancelOrderInvalid(t *testing.T) {
 	tokenPair := dex.GetBuiltInTokenPair()
 	err := mapp.dexKeeper.SaveTokenPair(ctx, tokenPair)
 	require.Nil(t, err)
-	mapp.supplyKeeper.SetSupply(ctx, supply.NewSupply(mapp.TotalCoinsSupply))
+	mapp.BankKeeper.SetSupply(ctx, banktypes.NewSupply(mapp.TotalCoinsSupply))
 
 	// mock orders
 	order := types.MockOrder(types.FormatOrderID(startHeight, 1), types.TestTokenPair, types.SellOrder, "10.0", "1.0")
@@ -280,31 +282,34 @@ func TestHandleMsgCancelOrderInvalid(t *testing.T) {
 
 	// invalid owner
 	msg := types.NewMsgCancelOrder(addrKeysSlice[1].Address, order.OrderID)
-	result := handler(ctx, msg)
-	orderRes := parseOrderResult(result)
+	result, err := handler(ctx, &msg)
+	require.Nil(t, err)
+	orderRes := parseOrderResult(*result)
 	require.Nil(t, orderRes)
 
 	// invalid orderID
 	msg = types.NewMsgCancelOrder(addrKeysSlice[1].Address, "InvalidID-0001")
-	result = handler(ctx, msg)
-	orderRes = parseOrderResult(result)
+	result, err = handler(ctx, &msg)
+	require.Nil(t, err)
+	orderRes = parseOrderResult(*result)
 	require.Nil(t, orderRes)
 
 	// busy product
 	keeper.SetProductLock(ctx, order.Product, &types.ProductLock{})
 	msg = types.NewMsgCancelOrder(addrKeysSlice[0].Address, order.OrderID)
-	result = handler(ctx, msg)
-	orderRes = parseOrderResult(result)
+	result, err = handler(ctx, &msg)
+	require.Nil(t, err)
+	orderRes = parseOrderResult(*result)
 	require.Nil(t, orderRes)
 	keeper.UnlockProduct(ctx, order.Product)
 
 	// normal
 	msg = types.NewMsgCancelOrder(addrKeysSlice[0].Address, order.OrderID)
-	result = handler(ctx, msg)
+	result, err = handler(ctx, &msg)
+	require.Nil(t, err)
 
 	// check result
-	require.EqualValues(t, sdk.CodeOK, result.Code)
-	orderRes = parseOrderResult(result)
+	orderRes = parseOrderResult(*result)
 	require.NotNil(t, orderRes)
 	require.EqualValues(t, "0.00000000"+common.NativeToken, orderRes[0].Message)
 	// check order status
@@ -316,12 +321,13 @@ func TestHandleMsgCancelOrderInvalid(t *testing.T) {
 		sdk.NewDecCoinFromDec(common.NativeToken, sdk.MustNewDecFromStr("100")),
 		sdk.NewDecCoinFromDec(common.TestToken, sdk.MustNewDecFromStr("100")),
 	}
-	require.EqualValues(t, expectCoins0.String(), acc0.GetCoins().String())
+	require.EqualValues(t, expectCoins0.String(), mapp.BankKeeper.GetAllBalances(ctx, acc0.GetAddress()).String())
 
 	// invalid order status
 	msg = types.NewMsgCancelOrder(addrKeysSlice[0].Address, order.OrderID)
-	result = handler(ctx, msg)
-	orderRes = parseOrderResult(result)
+	result, err = handler(ctx, &msg)
+	require.Nil(t, err)
+	orderRes = parseOrderResult(*result)
 	require.Nil(t, orderRes)
 }
 
@@ -336,7 +342,7 @@ func TestHandleInvalidMsg(t *testing.T) {
 	handler := NewOrderHandler(keeper)
 	var msg token.MsgSend
 	require.Panics(t, func() {
-		handler(ctx, msg)
+		handler(ctx, &msg)
 	})
 }
 
@@ -426,17 +432,19 @@ func TestHandleMsgMultiNewOrder(t *testing.T) {
 		types.NewOrderItem(types.TestTokenPair, types.BuyOrder, "10.0", "1.0"),
 	}
 	msg := types.NewMsgNewOrders(addrKeysSlice[0].Address, orderItems)
-	result := handler(ctx, msg)
+	result, err := handler(ctx, &msg)
+	require.Nil(t, err)
 	require.Equal(t, "", result.Log)
 	// Test order when locked
 	keeper.SetProductLock(ctx, types.TestTokenPair, &types.ProductLock{})
-	result1 := handler(ctx, msg)
-	res1 := parseOrderResult(result1)
+	result1, err := handler(ctx, &msg)
+	require.Nil(t, err)
+	res1 := parseOrderResult(*result1)
 	require.Nil(t, res1)
 	keeper.UnlockProduct(ctx, types.TestTokenPair)
 
 	//check result & order
-	orderID := getOrderID(result)
+	orderID := getOrderID(*result)
 	require.EqualValues(t, types.FormatOrderID(10, 2), orderID)
 	order := keeper.GetOrder(ctx, orderID)
 	require.NotNil(t, order)
@@ -447,7 +455,7 @@ func TestHandleMsgMultiNewOrder(t *testing.T) {
 		sdk.NewDecCoinFromDec(common.NativeToken, sdk.MustNewDecFromStr("79.58528")), // 100 - 10 - 10 - 0.2592 * 2 * 0.8
 		sdk.NewDecCoinFromDec(common.TestToken, sdk.MustNewDecFromStr("100")),
 	}
-	require.EqualValues(t, expectCoins.String(), acc.GetCoins().String())
+	require.EqualValues(t, expectCoins.String(), mapp.BankKeeper.GetAllBalances(ctx, acc.GetAddress()).String())
 	// check depth book
 	depthBook := keeper.GetDepthBookCopy(order.Product)
 	require.Equal(t, 1, len(depthBook.Items))
@@ -466,10 +474,11 @@ func TestHandleMsgMultiNewOrder(t *testing.T) {
 		types.NewOrderItem(types.TestTokenPair, types.SellOrder, "10.0", "1.0"),
 	}
 	msg = types.NewMsgNewOrders(addrKeysSlice[0].Address, orderItems)
-	result = handler(ctx, msg)
+	result, err = handler(ctx, &msg)
+	require.Nil(t, err)
 
 	// check result & order
-	orderID = getOrderID(result)
+	orderID = getOrderID(*result)
 	require.EqualValues(t, types.FormatOrderID(10, 3), orderID)
 	order = keeper.GetOrder(ctx, orderID)
 	require.NotNil(t, order)
@@ -480,7 +489,7 @@ func TestHandleMsgMultiNewOrder(t *testing.T) {
 		sdk.NewDecCoinFromDec(common.NativeToken, sdk.MustNewDecFromStr("79.32608")), // 100 - 10 - 10 - 0.2592 * 2 * 0.8 - 0.2592
 		sdk.NewDecCoinFromDec(common.TestToken, sdk.MustNewDecFromStr("99")),
 	}
-	require.EqualValues(t, expectCoins.String(), acc.GetCoins().String())
+	require.EqualValues(t, expectCoins.String(), mapp.BankKeeper.GetAllBalances(ctx, acc.GetAddress()).String())
 
 	// test new order with fee
 	feeParams.FeePerBlock = sdk.NewDecCoinFromDec(types.DefaultFeeDenomPerBlock, sdk.MustNewDecFromStr("0.000002"))
@@ -489,9 +498,10 @@ func TestHandleMsgMultiNewOrder(t *testing.T) {
 		types.NewOrderItem(types.TestTokenPair, types.SellOrder, "10.0", "1.0"),
 	}
 	msg = types.NewMsgNewOrders(addrKeysSlice[0].Address, orderItems)
-	result = handler(ctx, msg)
+	result, err = handler(ctx, &msg)
+	require.Nil(t, err)
 
-	orderID = getOrderID(result)
+	orderID = getOrderID(*result)
 	require.EqualValues(t, types.FormatOrderID(10, 4), orderID)
 	// check account balance
 	acc = mapp.AccountKeeper.GetAccount(ctx, addrKeysSlice[0].Address)
@@ -499,7 +509,7 @@ func TestHandleMsgMultiNewOrder(t *testing.T) {
 		sdk.NewDecCoinFromDec(common.NativeToken, sdk.MustNewDecFromStr("78.80768")), // 79.32608 - 0.2592 * 2
 		sdk.NewDecCoinFromDec(common.TestToken, sdk.MustNewDecFromStr("98")),         // 99 - 1
 	}
-	require.EqualValues(t, expectCoins.String(), acc.GetCoins().String())
+	require.EqualValues(t, expectCoins.String(), mapp.BankKeeper.GetAllBalances(ctx, acc.GetAddress()).String())
 
 	feeParams = types.DefaultTestParams()
 	mapp.orderKeeper.SetParams(ctx, &feeParams)
@@ -511,7 +521,7 @@ func TestHandleMsgMultiNewOrder(t *testing.T) {
 		sdk.NewDecCoinFromDec(common.NativeToken, sdk.MustNewDecFromStr("78.80768")), // 78.80768
 		sdk.NewDecCoinFromDec(common.TestToken, sdk.MustNewDecFromStr("98")),
 	}
-	require.EqualValues(t, expectCoins.String(), acc.GetCoins().String())
+	require.EqualValues(t, expectCoins.String(), mapp.BankKeeper.GetAllBalances(ctx, acc.GetAddress()).String())
 }
 
 func TestHandleMsgMultiCancelOrder(t *testing.T) {
@@ -526,7 +536,7 @@ func TestHandleMsgMultiCancelOrder(t *testing.T) {
 
 	err := mapp.dexKeeper.SaveTokenPair(ctx, tokenPair)
 	require.Nil(t, err)
-	mapp.supplyKeeper.SetSupply(ctx, supply.NewSupply(mapp.TotalCoinsSupply))
+	mapp.BankKeeper.SetSupply(ctx, banktypes.NewSupply(mapp.TotalCoinsSupply))
 
 	handler := NewOrderHandler(keeper)
 
@@ -537,19 +547,21 @@ func TestHandleMsgMultiCancelOrder(t *testing.T) {
 		types.NewOrderItem(types.TestTokenPair, types.BuyOrder, "10.0", "1.0"),
 	}
 	msg := types.NewMsgNewOrders(addrKeysSlice[0].Address, orderItems)
-	result := handler(ctx, msg)
+	result, err := handler(ctx, &msg)
+	require.Nil(t, err)
 	require.Equal(t, "", result.Log)
 	// Test order when locked
 	keeper.SetProductLock(ctx, types.TestTokenPair, &types.ProductLock{})
 
-	result1 := handler(ctx, msg)
+	result1, err := handler(ctx, &msg)
+	require.Nil(t, err)
 
 	require.Equal(t, "", result1.Log)
 	keeper.UnlockProduct(ctx, types.TestTokenPair)
 
 	// check result & order
 
-	orderID := getOrderID(result)
+	orderID := getOrderID(*result)
 	require.EqualValues(t, types.FormatOrderID(10, 3), orderID)
 	order := keeper.GetOrder(ctx, orderID)
 	require.NotNil(t, order)
@@ -560,7 +572,7 @@ func TestHandleMsgMultiCancelOrder(t *testing.T) {
 		sdk.NewDecCoinFromDec(common.NativeToken, sdk.MustNewDecFromStr("69.37792")), // 100 - 10*6 - 0.2592 * 6 * 0.8
 		sdk.NewDecCoinFromDec(common.TestToken, sdk.MustNewDecFromStr("100")),
 	}
-	require.EqualValues(t, expectCoins.String(), acc.GetCoins().String())
+	require.EqualValues(t, expectCoins.String(), mapp.BankKeeper.GetAllBalances(ctx, acc.GetAddress()).String())
 	// check depth book
 	depthBook := keeper.GetDepthBookCopy(order.Product)
 	require.Equal(t, 1, len(depthBook.Items))
@@ -575,12 +587,11 @@ func TestHandleMsgMultiCancelOrder(t *testing.T) {
 	require.Equal(t, 1, len(keeper.GetDiskCache().GetUpdatedOrderIDKeys()))
 
 	// Test cancel order
-	orderIDItems := getOrderIDList(result)
+	orderIDItems := getOrderIDList(*result)
 	multiCancelMsg := types.NewMsgCancelOrders(addrKeysSlice[0].Address, orderIDItems[:len(orderItems)-1])
-	result = handler(ctx, multiCancelMsg)
+	result, err = handler(ctx, &multiCancelMsg)
 
-	require.Equal(t, true, result.Code.IsOK())
-	// check result & order
+	require.Nil(t, err)
 
 	require.EqualValues(t, 3, keeper.GetBlockOrderNum(ctx, 10))
 	// check account balance
@@ -589,16 +600,16 @@ func TestHandleMsgMultiCancelOrder(t *testing.T) {
 		sdk.NewDecCoinFromDec(common.NativeToken, sdk.MustNewDecFromStr("89.79264")), // 100 - 10 - 10 - 0.2592 * 2 * 0.8 - 0.2592
 		sdk.NewDecCoinFromDec(common.TestToken, sdk.MustNewDecFromStr("100")),
 	}
-	require.EqualValues(t, expectCoins.String(), acc.GetCoins().String())
+	require.EqualValues(t, expectCoins.String(), mapp.BankKeeper.GetAllBalances(ctx, acc.GetAddress()).String())
 
 	// Test cancel order
 	orderIDItems = orderIDItems[2:]
 	orderIDItems = append(orderIDItems, "")
 
 	multiCancelMsg = types.NewMsgCancelOrders(addrKeysSlice[0].Address, orderIDItems)
-	result = handler(ctx, multiCancelMsg)
+	result, err = handler(ctx, &multiCancelMsg)
 
-	require.Equal(t, true, result.Code.IsOK())
+	require.Nil(t, err)
 	require.Equal(t, "", result.Log)
 	// check result & order
 
@@ -609,7 +620,7 @@ func TestHandleMsgMultiCancelOrder(t *testing.T) {
 		sdk.NewDecCoinFromDec(common.NativeToken, sdk.MustNewDecFromStr("100")), // 100 - 10 - 10 - 0.2592 * 2 * 0.8 - 0.2592
 		sdk.NewDecCoinFromDec(common.TestToken, sdk.MustNewDecFromStr("100")),
 	}
-	require.EqualValues(t, expectCoins.String(), acc.GetCoins().String())
+	require.EqualValues(t, expectCoins.String(), mapp.BankKeeper.GetAllBalances(ctx, acc.GetAddress()).String())
 
 }
 
@@ -634,14 +645,15 @@ func TestValidateMsgMultiNewOrder(t *testing.T) {
 	// normal
 	orderItem := types.NewOrderItem(types.TestTokenPair, types.BuyOrder, "10.0", "1.0")
 	msg := types.NewMsgNewOrders(addrKeysSlice[0].Address, append(orderItems, orderItem))
-	result := ValidateMsgNewOrders(ctx, keeper, msg)
-	require.EqualValues(t, sdk.CodeOK, result.Code)
+	err = ValidateMsgNewOrders(ctx, keeper, &msg)
+	require.Nil(t, err)
 
 	// not-exist product
 	orderItem = types.NewOrderItem("nobb_"+common.NativeToken, types.BuyOrder, "10.0", "1.0")
 	msg = types.NewMsgNewOrders(addrKeysSlice[0].Address, append(orderItems, orderItem))
-	result = ValidateMsgNewOrders(ctx, keeper, msg)
-	require.EqualValues(t, sdk.CodeUnknownRequest, result.Code)
+	err = ValidateMsgNewOrders(ctx, keeper, &msg)
+	require.NotNil(t, err)
+	require.Contains(t, err.Error(), sdkerror.ErrUnknownRequest.Error())
 
 	// invalid price precision
 	//orderItem = types.NewMultiNewOrderItem(types.TestTokenPair, types.BuyOrder, "10.01", "1.0")
@@ -677,8 +689,9 @@ func TestValidateMsgMultiCancelOrder(t *testing.T) {
 
 	orderIDItems := []string{""}
 	multiCancelMsg := types.NewMsgCancelOrders(addrKeysSlice[0].Address, orderIDItems)
-	result := ValidateMsgCancelOrders(ctx, keeper, multiCancelMsg)
-	require.EqualValues(t, sdk.CodeUnknownRequest, result.Code)
+	err = ValidateMsgCancelOrders(ctx, keeper, &multiCancelMsg)
+	require.NotNil(t, err)
+	require.Contains(t, err.Error(), sdkerror.ErrUnknownRequest.Error())
 
 	err = mapp.dexKeeper.SaveTokenPair(ctx, tokenPair)
 	require.Nil(t, err)
@@ -686,21 +699,21 @@ func TestValidateMsgMultiCancelOrder(t *testing.T) {
 
 	// new order
 	msg := types.NewMsgNewOrder(addrKeysSlice[0].Address, types.TestTokenPair, types.BuyOrder, "10.0", "1.0")
-	result = handler(ctx, msg)
+	result, err := handler(ctx, &msg)
+	require.Nil(t, err)
 
 	// validate true
-	orderID := getOrderID(result)
+	orderID := getOrderID(*result)
 	orderIDItems = []string{orderID}
 	multiCancelMsg = types.NewMsgCancelOrders(addrKeysSlice[0].Address, orderIDItems)
-	result = ValidateMsgCancelOrders(ctx, keeper, multiCancelMsg)
-	require.EqualValues(t, sdk.CodeOK, result.Code)
+	err = ValidateMsgCancelOrders(ctx, keeper, &multiCancelMsg)
+	require.Nil(t, err)
 
 	// validate empty orderIDItems
 	orderIDItems = []string{}
 	multiCancelMsg = types.NewMsgCancelOrders(addrKeysSlice[0].Address, orderIDItems)
-	result = ValidateMsgCancelOrders(ctx, keeper, multiCancelMsg)
-	require.EqualValues(t, sdk.CodeOK, result.Code)
-
+	err = ValidateMsgCancelOrders(ctx, keeper, &multiCancelMsg)
+	require.Nil(t, err)
 }
 
 func TestHandleMsgCancelOrder(t *testing.T) {
@@ -710,7 +723,7 @@ func TestHandleMsgCancelOrder(t *testing.T) {
 
 	var startHeight int64 = 10
 	ctx := mapp.BaseApp.NewContext(false, abci.Header{}).WithBlockHeight(startHeight)
-	mapp.supplyKeeper.SetSupply(ctx, supply.NewSupply(mapp.TotalCoinsSupply))
+	mapp.BankKeeper.SetSupply(ctx, banktypes.NewSupply(mapp.TotalCoinsSupply))
 
 	feeParams := types.DefaultTestParams()
 	mapp.orderKeeper.SetParams(ctx, &feeParams)
@@ -752,8 +765,8 @@ func TestHandleMsgCancelOrder(t *testing.T) {
 		sdk.NewDecCoinFromDec(common.NativeToken, sdk.MustNewDecFromStr("104.7358")),
 		sdk.NewDecCoinFromDec(common.TestToken, sdk.MustNewDecFromStr("99")),
 	}
-	require.EqualValues(t, expectCoins0.String(), acc0.GetCoins().String())
-	require.EqualValues(t, expectCoins1.String(), acc1.GetCoins().String())
+	require.EqualValues(t, expectCoins0.String(), mapp.BankKeeper.GetAllBalances(ctx, acc0.GetAddress()).String())
+	require.EqualValues(t, expectCoins1.String(), mapp.BankKeeper.GetAllBalances(ctx, acc1.GetAddress()).String())
 
 	// check depth book
 	depthBook := keeper.GetDepthBookCopy(types.TestTokenPair)
@@ -772,7 +785,8 @@ func TestHandleMsgCancelOrder(t *testing.T) {
 
 	// Test fully cancel
 	msg := types.NewMsgCancelOrder(addrKeysSlice[0].Address, orders[0].OrderID)
-	result := handler(ctx, msg)
+	result, err := handler(ctx, &msg)
+	require.Nil(t, err)
 	for i := 0; i < len(result.Events); i++ {
 		fmt.Println(i)
 		for j := 0; j < len(result.Events[i].Attributes); j++ {
@@ -781,9 +795,8 @@ func TestHandleMsgCancelOrder(t *testing.T) {
 		}
 	}
 
-	orderRes := parseOrderResult(result)
+	orderRes := parseOrderResult(*result)
 	// check result
-	require.EqualValues(t, sdk.CodeOK, result.Code)
 	require.EqualValues(t, "0.00000100"+common.NativeToken, orderRes[0].Message)
 	// check order status
 	orders[0] = keeper.GetOrder(ctx, orders[0].OrderID)
@@ -795,10 +808,10 @@ func TestHandleMsgCancelOrder(t *testing.T) {
 		sdk.NewDecCoinFromDec(common.NativeToken, sdk.MustNewDecFromStr("99.999999")), // 100 - 9.8 + 9.8 - 0.000001
 		sdk.NewDecCoinFromDec(common.TestToken, sdk.MustNewDecFromStr("100")),
 	}
-	require.EqualValues(t, expectCoins0.String(), acc0.GetCoins().String())
+	require.EqualValues(t, expectCoins0.String(), mapp.BankKeeper.GetAllBalances(ctx, acc0.GetAddress()).String())
 	// check fee pool
-	feeCollector := mapp.supplyKeeper.GetModuleAccount(ctx, auth.FeeCollectorName)
-	collectedFees := feeCollector.GetCoins()
+	feeCollector := mapp.AccountKeeper.GetModuleAccount(ctx, authtypes.FeeCollectorName)
+	collectedFees := mapp.BankKeeper.GetAllBalances(ctx, feeCollector.GetAddress())
 	require.EqualValues(t, "0.00000100"+common.NativeToken, collectedFees.String()) // 0.002+0.002
 	// check depth book
 	depthBook = keeper.GetDepthBookCopy(types.TestTokenPair)
@@ -819,9 +832,9 @@ func TestHandleMsgCancelOrder(t *testing.T) {
 
 	// Test partially cancel
 	msg = types.NewMsgCancelOrder(addrKeysSlice[1].Address, orders[1].OrderID)
-	result = handler(ctx, msg)
+	result, err = handler(ctx, &msg)
 	// check result
-	require.EqualValues(t, sdk.CodeOK, result.Code)
+	require.Nil(t, err)
 	// check order status
 	orders[1] = keeper.GetOrder(ctx, orders[1].OrderID)
 	require.EqualValues(t, types.OrderStatusPartialFilledCancelled, orders[1].Status)
@@ -831,10 +844,10 @@ func TestHandleMsgCancelOrder(t *testing.T) {
 		sdk.NewDecCoinFromDec(common.NativeToken, sdk.MustNewDecFromStr("104.994999")), // 99.999999 + 5 * (1 - 0.001)
 		sdk.NewDecCoinFromDec(common.TestToken, sdk.MustNewDecFromStr("99.5")),
 	}
-	require.EqualValues(t, expectCoins1.String(), acc1.GetCoins().String())
+	require.EqualValues(t, expectCoins1.String(), mapp.BankKeeper.GetAllBalances(ctx, acc1.GetAddress()).String())
 	// check fee pool, partially cancel, no fees
-	feeCollector = mapp.supplyKeeper.GetModuleAccount(ctx, auth.FeeCollectorName)
-	collectedFees = feeCollector.GetCoins()
+	feeCollector = mapp.AccountKeeper.GetModuleAccount(ctx, authtypes.FeeCollectorName)
+	collectedFees = mapp.BankKeeper.GetAllBalances(ctx, feeCollector.GetAddress())
 	require.EqualValues(t, "0.00000200"+common.NativeToken, collectedFees.String())
 	// check order ids
 	key = types.FormatOrderIDsKey(types.TestTokenPair, sdk.MustNewDecFromStr("10"), types.SellOrder)
@@ -927,7 +940,7 @@ func handleOrders(t *testing.T, baseasset string, quoteasset string, orders []*t
 
 	var startHeight int64 = 10
 	ctx := mapp.BaseApp.NewContext(false, abci.Header{}).WithBlockHeight(startHeight)
-	mapp.supplyKeeper.SetSupply(ctx, supply.NewSupply(mapp.TotalCoinsSupply))
+	mapp.BankKeeper.SetSupply(ctx, banktypes.NewSupply(mapp.TotalCoinsSupply))
 
 	feeParams := types.DefaultTestParams()
 	mapp.orderKeeper.SetParams(ctx, &feeParams)
@@ -935,9 +948,9 @@ func handleOrders(t *testing.T, baseasset string, quoteasset string, orders []*t
 	//init balance account0 & account1
 	decCoins, err := sdk.ParseDecCoins(fmt.Sprintf("%d%s,%d%s", 100, baseasset, 100, quoteasset))
 	require.Nil(t, err)
-	_, err = mapp.bankKeeper.AddCoins(ctx, addrKeysSlice[0].Address, decCoins)
+	_, err = mapp.BankKeeper.AddCoins(ctx, addrKeysSlice[0].Address, decCoins)
 	require.Nil(t, err)
-	_, err = mapp.bankKeeper.AddCoins(ctx, addrKeysSlice[1].Address, decCoins)
+	_, err = mapp.BankKeeper.AddCoins(ctx, addrKeysSlice[1].Address, decCoins)
 	require.Nil(t, err)
 	//init token pair
 	tokenPair := dex.TokenPair{
@@ -976,5 +989,5 @@ func handleOrders(t *testing.T, baseasset string, quoteasset string, orders []*t
 	acc0 := mapp.AccountKeeper.GetAccount(ctx, addrKeysSlice[0].Address)
 	acc1 := mapp.AccountKeeper.GetAccount(ctx, addrKeysSlice[1].Address)
 	require.NotNil(t, acc1)
-	return acc0.GetCoins()
+	return mapp.BankKeeper.GetAllBalances(ctx, acc0.GetAddress())
 }

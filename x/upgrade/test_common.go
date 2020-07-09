@@ -2,6 +2,12 @@ package upgrade
 
 import (
 	"encoding/hex"
+	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
+	cryptocodec "github.com/cosmos/cosmos-sdk/crypto/codec"
+	authkeeper "github.com/cosmos/cosmos-sdk/x/auth/keeper"
+	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
+	bankkeeper "github.com/cosmos/cosmos-sdk/x/bank/keeper"
+	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	"os"
 	"testing"
 
@@ -11,28 +17,16 @@ import (
 
 	"github.com/okex/okchain/x/common/proto"
 
-	"github.com/cosmos/cosmos-sdk/x/supply"
-
 	"github.com/cosmos/cosmos-sdk/codec"
-	"github.com/cosmos/cosmos-sdk/x/bank"
-	"github.com/tendermint/tendermint/crypto"
-
-	"github.com/tendermint/tendermint/libs/log"
-
-	"github.com/stretchr/testify/require"
-
 	"github.com/cosmos/cosmos-sdk/store"
-
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/cosmos/cosmos-sdk/x/auth"
 	"github.com/okex/okchain/x/params"
-
-	//"github.com/okex/okchain/x/staking"
 	"github.com/okex/okchain/x/staking"
-
-	//"github.com/okex/okchain/x/staking/types"
 	"github.com/okex/okchain/x/staking/types"
+	"github.com/stretchr/testify/require"
 	abci "github.com/tendermint/tendermint/abci/types"
+	"github.com/tendermint/tendermint/crypto"
+	"github.com/tendermint/tendermint/libs/log"
 	dbm "github.com/tendermint/tm-db"
 )
 
@@ -52,16 +46,16 @@ var (
 	}
 
 	maccPerms = map[string][]string{
-		staking.BondedPoolName:    {supply.Staking},
-		staking.NotBondedPoolName: {supply.Staking},
+		staking.BondedPoolName:    {authtypes.Staking},
+		staking.NotBondedPoolName: {authtypes.Staking},
 	}
 )
 
 func testPrepare(t *testing.T) (ctx sdk.Context, keeper Keeper, stakingKeeper staking.Keeper, paramsKeeper params.Keeper) {
 	skMap := sdk.NewKVStoreKeys(
 		"main",
-		auth.StoreKey,
-		supply.StoreKey,
+		authtypes.StoreKey,
+		banktypes.StoreKey,
 
 		// for staking/distr rollback to cosmos-sdk
 		//staking.StoreKey, staking.DelegatorPoolKey, staking.RedelegationKeyM, staking.RedelegationActonKey, staking.UnbondingKey,
@@ -87,18 +81,21 @@ func testPrepare(t *testing.T) (ctx sdk.Context, keeper Keeper, stakingKeeper st
 
 	ctx = sdk.NewContext(ms, abci.Header{}, false, log.NewTMLogger(os.Stdout))
 	cdc := getTestCodec()
-	paramsKeeper = params.NewKeeper(cdc, skMap[params.StoreKey], tskMap[params.TStoreKey], params.DefaultCodespace)
-	accountKeeper := auth.NewAccountKeeper(cdc, skMap[auth.StoreKey], paramsKeeper.Subspace(auth.DefaultParamspace), auth.ProtoBaseAccount)
-	bankKeeper := bank.NewBaseKeeper(accountKeeper, paramsKeeper.Subspace(bank.DefaultParamspace), bank.DefaultCodespace, nil)
-	supplyKeeper := supply.NewKeeper(cdc, skMap[supply.StoreKey], accountKeeper, bankKeeper, maccPerms)
+	interfaceRegistry := codectypes.NewInterfaceRegistry()
+	appCodec := codec.NewHybridCodec(cdc, interfaceRegistry)
+
+	paramsKeeper = params.NewKeeper(appCodec, skMap[params.StoreKey], tskMap[params.TStoreKey])
+	accountKeeper := authkeeper.NewAccountKeeper(appCodec, skMap[authtypes.StoreKey],
+		paramsKeeper.Subspace(authtypes.ModuleName), authtypes.ProtoBaseAccount, maccPerms)
+	bankKeeper := bankkeeper.NewBaseKeeper(appCodec, skMap[banktypes.StoreKey], accountKeeper, paramsKeeper.Subspace(banktypes.ModuleName), nil)
 
 	// for staking/distr rollback to cosmos-sdk
 	//stakingKeeper = staking.NewKeeper(
 	//	cdc, skMap[staking.StoreKey], skMap[staking.DelegatorPoolKey], skMap[staking.RedelegationKeyM], skMap[staking.RedelegationActonKey], skMap[staking.UnbondingKey], tskMap[staking.TStoreKey],
 	//	supplyKeeper, paramsKeeper.Subspace(staking.DefaultParamspace), staking.DefaultCodespace)
 	stakingKeeper = staking.NewKeeper(
-		cdc, skMap[staking.StoreKey], tskMap[staking.TStoreKey],
-		supplyKeeper, paramsKeeper.Subspace(staking.DefaultParamspace), staking.DefaultCodespace)
+		appCodec, skMap[staking.StoreKey], tskMap[staking.TStoreKey],
+		accountKeeper, bankKeeper, paramsKeeper.Subspace(staking.DefaultParamspace), staking.DefaultCodespace)
 
 	stakingKeeper.SetParams(ctx, types.DefaultParams())
 	protocolKeeper := proto.NewProtocolKeeper(skMap["main"])
@@ -109,10 +106,10 @@ func testPrepare(t *testing.T) (ctx sdk.Context, keeper Keeper, stakingKeeper st
 func getTestCodec() *codec.Codec {
 	cdc := codec.New()
 	sdk.RegisterCodec(cdc)
-	auth.RegisterCodec(cdc)
-	bank.RegisterCodec(cdc)
+	authtypes.RegisterCodec(cdc)
+	banktypes.RegisterCodec(cdc)
 	staking.RegisterCodec(cdc)
-	codec.RegisterCrypto(cdc)
+	cryptocodec.RegisterCrypto(cdc)
 	cdc.Seal()
 	return cdc
 }

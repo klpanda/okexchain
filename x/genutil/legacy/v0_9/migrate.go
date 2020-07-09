@@ -2,6 +2,7 @@ package v0_9
 
 import (
 	"fmt"
+	cryptocodec "github.com/cosmos/cosmos-sdk/crypto/codec"
 
 	v09dex "github.com/okex/okchain/x/dex/legacy/v0_9"
 	v034distr "github.com/okex/okchain/x/distribution/legacy/v0_34"
@@ -22,14 +23,12 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	v034auth "github.com/cosmos/cosmos-sdk/x/auth/legacy/v0_34"
 	v036auth "github.com/cosmos/cosmos-sdk/x/auth/legacy/v0_36"
-	v036crisis "github.com/cosmos/cosmos-sdk/x/crisis"
+	v036crisis "github.com/cosmos/cosmos-sdk/x/crisis/types"
 	v034genAccounts "github.com/cosmos/cosmos-sdk/x/genaccounts/legacy/v0_34"
 	v036genAccounts "github.com/cosmos/cosmos-sdk/x/genaccounts/legacy/v0_36"
-	"github.com/cosmos/cosmos-sdk/x/genutil"
 	v034gov "github.com/cosmos/cosmos-sdk/x/gov/legacy/v0_34"
-	v036mint "github.com/cosmos/cosmos-sdk/x/mint"
-	v036supply "github.com/cosmos/cosmos-sdk/x/supply/legacy/v0_36"
 	"github.com/tendermint/tendermint/crypto"
+	genutiltypes "github.com/cosmos/cosmos-sdk/x/genutil/types"
 )
 
 const (
@@ -45,12 +44,12 @@ const (
 )
 
 // Migrate migrates exported state from v0.34 to a v0.36 genesis state
-func Migrate(appState genutil.AppMap) genutil.AppMap {
+func Migrate(appState genutiltypes.AppMap) genutiltypes.AppMap {
 	v08Codec := codec.New()
-	codec.RegisterCrypto(v08Codec)
+	cryptocodec.RegisterCrypto(v08Codec)
 
 	v09Codec := codec.New()
-	codec.RegisterCrypto(v09Codec)
+	cryptocodec.RegisterCrypto(v09Codec)
 	v08gov.RegisterCodec(v08Codec)
 	v09gov.RegisterCodec(v09Codec)
 
@@ -88,7 +87,7 @@ func Migrate(appState genutil.AppMap) genutil.AppMap {
 		}
 		lockCoins := sdk.DecCoins{}
 		for _, lock := range tokenGenState.LockCoins {
-			lockCoins = lockCoins.Add(lock.Coins)
+			lockCoins = lockCoins.Add(lock.Coins...)
 		}
 
 		appState[v036genAccounts.ModuleName] = v09Codec.MustMarshalJSON(
@@ -168,11 +167,11 @@ func Migrate(appState genutil.AppMap) genutil.AppMap {
 	}
 
 	// migrate supply state
-	appState[v036supply.ModuleName] = v09Codec.MustMarshalJSON(v036supply.EmptyGenesisState())
+	//appState[v036supply.ModuleName] = v09Codec.MustMarshalJSON(v036supply.EmptyGenesisState())
 	// migrate crisis state
 	appState[v036crisis.ModuleName] = v09Codec.MustMarshalJSON(v036crisis.DefaultGenesisState())
 
-	appState[v036mint.ModuleName] = v09Codec.MustMarshalJSON(v036mint.DefaultGenesisState())
+	//appState[v036mint.ModuleName] = v09Codec.MustMarshalJSON(v036mint.DefaultGenesisState())
 
 	return appState
 }
@@ -233,7 +232,7 @@ func genAccountMigrate(
 
 	var expDeposits sdk.Coins
 	for _, deposit := range deposits {
-		expDeposits = expDeposits.Add(deposit.Deposit.Amount)
+		expDeposits = expDeposits.Add(deposit.Deposit.Amount...)
 	}
 
 	if !expDeposits.IsEqual(govCoins) {
@@ -265,16 +264,16 @@ func genAccountMigrate(
 		}
 	}
 	//bondedCoins := sdk.NewCoins(sdk.NewCoin(bondDenom, bondedAmt))
-	bondedCoins := sdk.NewDecCoins(sdk.NewDecCoinsFromDec(bondDenom, sdk.NewDecFromBigIntWithPrec(bondedAmt.BigInt(), 3)))
+	bondedCoins := sdk.NewDecCoins(sdk.NewDecCoinsFromDec(bondDenom, sdk.NewDecFromBigIntWithPrec(bondedAmt.BigInt(), 3))...)
 	notBondedCoins := sdk.NewCoins(sdk.NewCoin(bondDenom, notBondedAmt))
 
 	// get distr module account coins
 	var distrDecCoins sdk.DecCoins
 	for _, reward := range valOutRewards {
-		distrDecCoins = distrDecCoins.Add(reward.OutstandingRewards)
+		distrDecCoins = distrDecCoins.Add(reward.OutstandingRewards...)
 	}
 
-	distrCoins, _ := distrDecCoins.Add(communityPool).TruncateDecimal()
+	distrCoins, _ := distrDecCoins.Add(communityPool...).TruncateDecimal()
 
 	// get module account addresses
 	feeCollectorAddr := sdk.AccAddress(crypto.AddressHash([]byte(feeCollectorName)))
@@ -317,7 +316,7 @@ func genAccountMigrate(
 		0, 0, mintModuleName, []string{minter},
 	)
 	tokenModuleAcc := v036genAccounts.NewGenesisAccount(
-		tokenAddr, dexListDeposited.Add(lockCoins), 0,
+		tokenAddr, dexListDeposited.Add(lockCoins...), 0,
 		sdk.Coins{}, sdk.Coins{}, sdk.Coins{},
 		0, 0, tokenModuleName, []string{minter, burner},
 	)

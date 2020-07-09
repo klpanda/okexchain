@@ -2,12 +2,12 @@ package cli
 
 import (
 	"fmt"
+	"github.com/cosmos/cosmos-sdk/client/flags"
+	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	"strings"
 
 	"github.com/cosmos/cosmos-sdk/client"
-	"github.com/cosmos/cosmos-sdk/client/context"
 	"github.com/cosmos/cosmos-sdk/codec"
-	"github.com/cosmos/cosmos-sdk/x/auth"
 	"github.com/okex/okchain/x/token/types"
 	"github.com/spf13/cobra"
 )
@@ -22,7 +22,7 @@ func GetQueryCmd(queryRoute string, cdc *codec.Codec) *cobra.Command {
 		RunE:                       client.ValidateCmd,
 	}
 
-	queryCmd.AddCommand(client.GetCommands(
+	queryCmd.AddCommand(flags.GetCommands(
 		getCmdQueryParams(queryRoute, cdc),
 		getCmdTokenInfo(queryRoute, cdc),
 		//getAccountCmd(queryRoute, cdc),
@@ -39,7 +39,7 @@ func getCmdTokenInfo(queryRoute string, cdc *codec.Codec) *cobra.Command {
 		Short: "query token info by symbol",
 		//Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cliCtx := context.NewCLIContext().WithCodec(cdc)
+			cliCtx := client.NewContext().WithCodec(cdc)
 
 			switch {
 			case len(args) == 1:
@@ -89,7 +89,7 @@ $ okchaincli query token params
 `),
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cliCtx := context.NewCLIContext().WithCodec(cdc)
+			cliCtx := client.NewContext().WithCodec(cdc)
 
 			route := fmt.Sprintf("custom/%s/%s", queryRoute, types.QueryParameters)
 			bz, _, err := cliCtx.QueryWithData(route, nil)
@@ -111,19 +111,19 @@ func (strs Strings) String() string {
 	return strings.Join(strs, "\n")
 }
 
-func getAccount(ctx *context.CLIContext, address []byte) (auth.Account, error) {
-	bz, err := ctx.Codec.MarshalJSON(auth.NewQueryAccountParams(address))
+func getAccount(ctx *client.Context, address []byte) (authtypes.AccountI, error) {
+	bz, err := ctx.Codec.MarshalJSON(authtypes.NewQueryAccountParams(address))
 	if err != nil {
 		return nil, err
 	}
 
-	route := fmt.Sprintf("custom/%s/%s", auth.StoreKey, auth.QueryAccount)
+	route := fmt.Sprintf("custom/%s/%s", authtypes.StoreKey, authtypes.QueryAccount)
 	res, _, err := ctx.QueryWithData(route, bz)
 	if err != nil {
 		return nil, err
 	}
 
-	var account auth.Account
+	var account authtypes.AccountI
 	if err := ctx.Codec.UnmarshalJSON(res, &account); err != nil {
 		return nil, err
 	}

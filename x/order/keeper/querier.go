@@ -2,6 +2,7 @@ package keeper
 
 import (
 	"fmt"
+	sdkerror "github.com/cosmos/cosmos-sdk/types/errors"
 
 	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -18,7 +19,7 @@ const (
 
 // NewQuerier is the module level router for state queries
 func NewQuerier(keeper Keeper) sdk.Querier {
-	return func(ctx sdk.Context, path []string, req abci.RequestQuery) (res []byte, err sdk.Error) {
+	return func(ctx sdk.Context, path []string, req abci.RequestQuery) (res []byte, err error) {
 		switch path[0] {
 		case types.QueryOrderDetail:
 			return queryOrder(ctx, path[1:], req, keeper)
@@ -32,17 +33,17 @@ func NewQuerier(keeper Keeper) sdk.Querier {
 		case types.QueryDepthBookV2:
 			return queryDepthBookV2(ctx, path[1:], req, keeper)
 		default:
-			return nil, sdk.ErrUnknownRequest("unknown order query endpoint")
+			return nil, sdkerror.Wrap(sdkerror.ErrUnknownRequest, "unknown order query endpoint")
 		}
 	}
 }
 
 // nolint: unparam
 func queryOrder(ctx sdk.Context, path []string, req abci.RequestQuery, keeper Keeper) (res []byte,
-	err sdk.Error) {
+	err error) {
 	order := keeper.GetOrder(ctx, path[0])
 	if order == nil {
-		return nil, sdk.ErrUnknownRequest(fmt.Sprintf("order(%v) does not exist", path[0]))
+		return nil, sdkerror.Wrap(sdkerror.ErrUnknownRequest, fmt.Sprintf("order(%v) does not exist", path[0]))
 	}
 	bz := keeper.cdc.MustMarshalJSON(order)
 	return bz, nil
@@ -79,16 +80,15 @@ type BookRes struct {
 
 // nolint: unparam
 func queryDepthBook(ctx sdk.Context, path []string, req abci.RequestQuery, keeper Keeper) ([]byte,
-	sdk.Error) {
+	error) {
 	var params QueryDepthBookParams
 	err := keeper.cdc.UnmarshalJSON(req.Data, &params)
 	if err != nil {
-		return nil, sdk.ErrUnknownRequest(
-			sdk.AppendMsgToErr("incorrectly formatted request Data", err.Error()))
+		return nil, sdkerror.Wrap(sdkerror.ErrUnknownRequest, "incorrectly formatted request Data" + err.Error())
 	}
 	tokenPair := keeper.GetDexKeeper().GetTokenPair(ctx, params.Product)
 	if tokenPair == nil {
-		return nil, sdk.ErrUnknownRequest(fmt.Sprintf("Non-exist product: %s", params.Product))
+		return nil, sdkerror.Wrap(sdkerror.ErrUnknownRequest, fmt.Sprintf("Non-exist product: %s", params.Product))
 	}
 	depthBook := keeper.GetDepthBookFromDB(ctx, params.Product)
 
@@ -164,27 +164,26 @@ func getStoreStatistic(ctx sdk.Context, keeper Keeper) *StoreStatistic {
 }
 
 func queryStore(ctx sdk.Context, path []string, req abci.RequestQuery, keeper Keeper) ([]byte,
-	sdk.Error) {
+	error) {
 	ss := getStoreStatistic(ctx, keeper)
 	bz := keeper.cdc.MustMarshalJSON(ss)
 	return bz, nil
 }
 
-func queryParameters(ctx sdk.Context, keeper Keeper) (res []byte, err sdk.Error) {
+func queryParameters(ctx sdk.Context, keeper Keeper) (res []byte, err error) {
 	params := keeper.GetParams(ctx)
 	res, errRes := codec.MarshalJSONIndent(keeper.cdc, params)
 	if errRes != nil {
-		return nil, sdk.ErrInternal(
-			sdk.AppendMsgToErr("could not marshal result to JSON", errRes.Error()))
+		return nil, sdkerror.Wrap(sdkerror.ErrInternal, "could not marshal result to JSON" + errRes.Error())
 	}
 	return res, nil
 }
 
-func queryDepthBookV2(ctx sdk.Context, path []string, req abci.RequestQuery, keeper Keeper) ([]byte, sdk.Error) {
+func queryDepthBookV2(ctx sdk.Context, path []string, req abci.RequestQuery, keeper Keeper) ([]byte, error) {
 	var params QueryDepthBookParams
 	err := keeper.cdc.UnmarshalJSON(req.Data, &params)
 	if err != nil {
-		return nil, sdk.ErrUnknownRequest(err.Error())
+		return nil, sdkerror.Wrap(sdkerror.ErrUnknownRequest, err.Error())
 	}
 
 	depthBook := keeper.GetDepthBookFromDB(ctx, params.Product)
@@ -213,7 +212,7 @@ func queryDepthBookV2(ctx sdk.Context, path []string, req abci.RequestQuery, kee
 
 	res, err := common.JSONMarshalV2(bookRes)
 	if err != nil {
-		return nil, sdk.ErrInternal(err.Error())
+		return nil, sdkerror.Wrap(sdkerror.ErrInternal, err.Error())
 	}
 	return res, nil
 }

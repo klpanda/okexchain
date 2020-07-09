@@ -8,7 +8,7 @@ import (
 )
 
 // InitGenesis sets distribution information for genesis
-func InitGenesis(ctx sdk.Context, keeper Keeper, supplyKeeper types.SupplyKeeper, data types.GenesisState) {
+func InitGenesis(ctx sdk.Context, keeper Keeper, bankKeeper types.BankKeeper, data types.GenesisState) {
 
 	keeper.SetFeePool(ctx, data.FeePool)
 	keeper.SetCommunityTax(ctx, data.CommunityTax)
@@ -20,20 +20,19 @@ func InitGenesis(ctx sdk.Context, keeper Keeper, supplyKeeper types.SupplyKeeper
 	moduleHoldings := sdk.DecCoins{}
 	for _, acc := range data.ValidatorAccumulatedCommissions {
 		keeper.SetValidatorAccumulatedCommission(ctx, acc.ValidatorAddress, acc.Accumulated)
-		moduleHoldings = moduleHoldings.Add(acc.Accumulated)
+		moduleHoldings = moduleHoldings.Add(acc.Accumulated...)
 	}
 
-	moduleHoldings = moduleHoldings.Add(data.FeePool.CommunityPool)
+	moduleHoldings = moduleHoldings.Add(data.FeePool.CommunityPool...)
 	// check if the module account exists
 	moduleAcc := keeper.GetDistributionAccount(ctx)
 	if moduleAcc == nil {
 		panic(fmt.Sprintf("%s module account has not been set", types.ModuleName))
 	}
-	if moduleAcc.GetCoins().IsZero() {
-		if err := moduleAcc.SetCoins(moduleHoldings); err != nil {
+	if bankKeeper.GetAllBalances(ctx, moduleAcc.GetAddress()).IsZero() {
+		if err := bankKeeper.SetBalances(ctx, moduleAcc.GetAddress(), moduleHoldings); err != nil {
 			panic(err)
 		}
-		supplyKeeper.SetModuleAccount(ctx, moduleAcc)
 	}
 }
 

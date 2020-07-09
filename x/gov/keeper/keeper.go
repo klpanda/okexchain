@@ -2,30 +2,29 @@ package keeper
 
 import (
 	"fmt"
+	sdkerror "github.com/cosmos/cosmos-sdk/types/errors"
 	"time"
+
+	"github.com/cosmos/cosmos-sdk/codec"
+	sdk "github.com/cosmos/cosmos-sdk/types"
+	sdkGovkeeper "github.com/cosmos/cosmos-sdk/x/gov/keeper"
+	sdkGovtypes "github.com/cosmos/cosmos-sdk/x/gov/types"
+	"github.com/okex/okchain/x/params"
 
 	"github.com/okex/okchain/x/common"
 	"github.com/okex/okchain/x/gov/types"
 	"github.com/okex/okchain/x/staking/exported"
-
-	"github.com/cosmos/cosmos-sdk/codec"
-	sdk "github.com/cosmos/cosmos-sdk/types"
-	sdkGov "github.com/cosmos/cosmos-sdk/x/gov"
-	"github.com/okex/okchain/x/params"
 )
 
 // Keeper defines governance keeper
 type Keeper struct {
-	sdkGov.Keeper
+	sdkGovkeeper.Keeper
 
 	// The reference to the DelegationSet and ValidatorSet to get information about validators and delegators
 	sk StakingKeeper
 
 	// name of the FeeCollector ModuleAccount
 	feeCollectorName string
-
-	// The reference to the CoinKeeper to modify balances
-	bankKeeper BankKeeper
 
 	// Proposal module parameter router
 	proposalHandlerRouter ProposalHandlerRouter
@@ -37,25 +36,18 @@ type Keeper struct {
 // - users voting on proposals, with weight proportional to stake in the system
 // - and tallying the result of the vote.
 func NewKeeper(
-	cdc *codec.Codec, key sdk.StoreKey, paramsKeeper params.Keeper, paramSpace params.Subspace,
-	supplyKeeper sdkGov.SupplyKeeper, sk StakingKeeper, codespace sdk.CodespaceType, rtr sdkGov.Router,
-	ck BankKeeper, phr ProposalHandlerRouter, feeCollectorName string,
+	cdc codec.Marshaler, key sdk.StoreKey, paramSpace params.Subspace,
+	accKeeper sdkGovtypes.AccountKeeper, bankKeeper types.BankKeeper, sk StakingKeeper, rtr sdkGovtypes.Router,
+	phr ProposalHandlerRouter, feeCollectorName string,
 ) Keeper {
 	keeper := Keeper{
-		Keeper: sdkGov.NewKeeper(cdc, key, paramsKeeper.Keeper, paramSpace, supplyKeeper, nil,
-			codespace, rtr),
+		Keeper: sdkGovkeeper.NewKeeper(cdc, key, paramSpace, accKeeper, bankKeeper, sk, rtr),
 		sk:                    sk,
 		feeCollectorName:      feeCollectorName,
-		bankKeeper:            ck,
 		proposalHandlerRouter: phr,
 	}
 	keeper.proposalHandlerRouter = keeper.proposalHandlerRouter.AddRoute(types.RouterKey, keeper)
 	return keeper
-}
-
-// BankKeeper returns bank keeper in gov keeper
-func (keeper Keeper) BankKeeper() BankKeeper {
-	return keeper.bankKeeper
 }
 
 // ProposalHandlerRouter returns proposal handler router  in gov keeper
@@ -113,7 +105,7 @@ func (keeper Keeper) WaitingProposalQueueIterator(ctx sdk.Context, blockHeight u
 // InsertWaitingProposalQueue inserts a ProposalID into the waiting proposal queue at endTime
 func (keeper Keeper) InsertWaitingProposalQueue(ctx sdk.Context, blockHeight, proposalID uint64) {
 	store := ctx.KVStore(keeper.StoreKey())
-	bz := keeper.Cdc().MustMarshalBinaryLengthPrefixed(proposalID)
+	bz := sdkGovtypes.GetProposalIDBytes(proposalID)
 	store.Set(types.WaitingProposalQueueKey(proposalID, blockHeight), bz)
 }
 
@@ -145,12 +137,12 @@ func (keeper Keeper) IterateProposals(ctx sdk.Context, cb func(proposal types.Pr
 // and performs a callback function
 func (keeper Keeper) IterateActiveProposalsQueue(
 	ctx sdk.Context, endTime time.Time, cb func(proposal types.Proposal,
-	) (stop bool)) {
+) (stop bool)) {
 	iterator := keeper.ActiveProposalQueueIterator(ctx, endTime)
 
 	defer iterator.Close()
 	for ; iterator.Valid(); iterator.Next() {
-		proposalID, _ := sdkGov.SplitActiveProposalQueueKey(iterator.Key())
+		proposalID, _ := sdkGovtypes.SplitActiveProposalQueueKey(iterator.Key())
 		proposal, found := keeper.GetProposal(ctx, proposalID)
 		if !found {
 			panic(fmt.Sprintf("proposal %d does not exist", proposalID))
@@ -166,12 +158,12 @@ func (keeper Keeper) IterateActiveProposalsQueue(
 // and performs a callback function
 func (keeper Keeper) IterateInactiveProposalsQueue(
 	ctx sdk.Context, endTime time.Time, cb func(proposal types.Proposal,
-	) (stop bool)) {
+) (stop bool)) {
 	iterator := keeper.InactiveProposalQueueIterator(ctx, endTime)
 
 	defer iterator.Close()
 	for ; iterator.Valid(); iterator.Next() {
-		proposalID, _ := sdkGov.SplitInactiveProposalQueueKey(iterator.Key())
+		proposalID, _ := sdkGovtypes.SplitInactiveProposalQueueKey(iterator.Key())
 		proposal, found := keeper.GetProposal(ctx, proposalID)
 		if !found {
 			panic(fmt.Sprintf("proposal %d does not exist", proposalID))
@@ -187,7 +179,7 @@ func (keeper Keeper) IterateInactiveProposalsQueue(
 // and performs a callback function
 func (keeper Keeper) IterateWaitingProposalsQueue(
 	ctx sdk.Context, height uint64, cb func(proposal types.Proposal,
-	) (stop bool)) {
+) (stop bool)) {
 	iterator := keeper.WaitingProposalQueueIterator(ctx, height)
 
 	defer iterator.Close()
@@ -245,7 +237,7 @@ func (keeper Keeper) IterateAllDeposits(ctx sdk.Context, cb func(deposit types.D
 // IterateDeposits iterates over the all the proposals deposits and performs a callback function
 func (keeper Keeper) IterateDeposits(
 	ctx sdk.Context, proposalID uint64, cb func(deposit types.Deposit,
-	) (stop bool)) {
+) (stop bool)) {
 	deposits := keeper.GetDeposits(ctx, proposalID)
 
 	for i := 0; i < len(deposits); i++ {
@@ -271,22 +263,22 @@ func (keeper Keeper) IterateVotes(ctx sdk.Context, proposalID uint64, cb func(vo
 
 // GetMinDeposit implement ProposalHandler
 // nolint
-func (keeper Keeper) GetMinDeposit(ctx sdk.Context, content sdkGov.Content) sdk.DecCoins {
+func (keeper Keeper) GetMinDeposit(ctx sdk.Context, content sdkGovtypes.Content) sdk.DecCoins {
 	return keeper.GetDepositParams(ctx).MinDeposit
 }
 
 // nolint
-func (keeper Keeper) GetMaxDepositPeriod(ctx sdk.Context, content sdkGov.Content) time.Duration {
+func (keeper Keeper) GetMaxDepositPeriod(ctx sdk.Context, content sdkGovtypes.Content) time.Duration {
 	return keeper.GetDepositParams(ctx).MaxDepositPeriod
 }
 
 // nolint
-func (keeper Keeper) GetVotingPeriod(ctx sdk.Context, content sdkGov.Content) time.Duration {
+func (keeper Keeper) GetVotingPeriod(ctx sdk.Context, content sdkGovtypes.Content) time.Duration {
 	return keeper.GetVotingParams(ctx).VotingPeriod
 }
 
 // nolint
-func (keeper Keeper) CheckMsgSubmitProposal(ctx sdk.Context, msg types.MsgSubmitProposal) sdk.Error {
+func (keeper Keeper) CheckMsgSubmitProposal(ctx sdk.Context, msg types.MsgSubmitProposal) error {
 	// check initial deposit more than or equal to ratio of MinDeposit
 	initDeposit := keeper.GetDepositParams(ctx).MinDeposit.MulDec(sdk.NewDecWithPrec(1, 1))
 	err := common.HasSufficientCoins(msg.Proposer, msg.InitialDeposit,
@@ -295,10 +287,10 @@ func (keeper Keeper) CheckMsgSubmitProposal(ctx sdk.Context, msg types.MsgSubmit
 		return types.ErrInitialDepositNotEnough(types.DefaultCodespace, initDeposit.String())
 	}
 	// check proposer has sufficient coins
-	err = common.HasSufficientCoins(msg.Proposer, keeper.bankKeeper.GetCoins(ctx, msg.Proposer),
+	err = common.HasSufficientCoins(msg.Proposer, keeper.BankKeeper().GetAllBalances(ctx, msg.Proposer),
 		msg.InitialDeposit)
 	if err != nil {
-		return sdk.NewError(types.DefaultCodespace, sdk.CodeInsufficientCoins, err.Error())
+		return sdkerror.Wrap(sdkerror.ErrInsufficientFunds, err.Error())
 	}
 	return nil
 }
@@ -307,7 +299,7 @@ func (keeper Keeper) CheckMsgSubmitProposal(ctx sdk.Context, msg types.MsgSubmit
 func (keeper Keeper) AfterSubmitProposalHandler(ctx sdk.Context, proposal types.Proposal) {}
 
 // nolint
-func (keeper Keeper) VoteHandler(ctx sdk.Context, proposal types.Proposal, vote types.Vote) (string, sdk.Error) {
+func (keeper Keeper) VoteHandler(ctx sdk.Context, proposal types.Proposal, vote types.Vote) (string, error) {
 	return "", nil
 }
 

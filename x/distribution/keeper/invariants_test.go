@@ -48,9 +48,9 @@ func TestInvariants(t *testing.T) {
 	valOpAddrs, _, _ := GetTestAddrs()
 	tests := getTestInvariantParams()
 	for _, test := range tests {
-		ctx, ak, keeper, sk, supplyKeeper := CreateTestInputDefault(t, false, 1000)
-		acc := supplyKeeper.GetModuleAccount(ctx, types.ModuleName)
-		err := acc.SetCoins(test.totalCommission)
+		ctx, ak, keeper, sk, bankKeeper := CreateTestInputDefault(t, false, 1000)
+		acc := ak.GetModuleAccount(ctx, types.ModuleName)
+		err := bankKeeper.SetBalances(ctx, acc.GetAddress(), test.totalCommission)
 		require.NoError(t, err)
 		ak.SetAccount(ctx, acc)
 		for i, commission := range test.commissions {

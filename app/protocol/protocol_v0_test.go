@@ -2,12 +2,12 @@ package protocol
 
 import (
 	"encoding/json"
+	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
+	ordertypes "github.com/okex/okchain/x/order/types"
+	tokentypes "github.com/okex/okchain/x/token/types"
 	"os"
 
-	"github.com/cosmos/cosmos-sdk/x/auth"
 	"github.com/okex/okchain/x/common"
-	"github.com/okex/okchain/x/order"
-	"github.com/okex/okchain/x/token"
 	"github.com/okex/okchain/x/upgrade"
 
 	"github.com/cosmos/cosmos-sdk/baseapp"
@@ -66,11 +66,11 @@ func TestProtocolV0_InitChainer_BeginBlocker_EndBlocker_ExportGenesis_ExportAppS
 	mockApp := baseapp.NewBaseApp("mockApp", logger, db, nil)
 	protocolV0 := NewProtocolV0(mockApp, 0, logger, 0, protocolKeeper)
 	protocolV0.setCodec()
-	mockApp.SetTxDecoder(auth.DefaultTxDecoder(protocolV0.GetCodec()))
+	mockApp.SetTxDecoder(authtypes.DefaultTxDecoder(protocolV0.GetCodec()))
 	// mount db
 	mockApp.MountKVStores(protocolV0.GetKVStoreKeysMap())
 	mockApp.MountTransientStores(protocolV0.GetTransientStoreKeysMap())
-	require.NoError(t, mockApp.LoadLatestVersion(GetMainStoreKey()))
+	require.NoError(t, mockApp.LoadLatestVersion())
 	protocolV0.LoadContext()
 	/****************************** test members ******************************/
 
@@ -166,9 +166,9 @@ func TestProtocolV0_Stop(t *testing.T) {
 func TestProtocolV0_Hooks(t *testing.T) {
 	///////////////////////////// test isSystemFreeHook /////////////////////////////
 	var mockMsgs1, mockMsgs2, mockMsgs3 []sdk.Msg
-	mockMsgs1 = append(mockMsgs1, order.MsgNewOrders{})
-	mockMsgs2 = append(mockMsgs2, order.MsgNewOrders{}, token.MsgSend{})
-	mockMsgs3 = append(mockMsgs3, token.MsgSend{})
+	mockMsgs1 = append(mockMsgs1, &ordertypes.MsgNewOrders{})
+	mockMsgs2 = append(mockMsgs2, &ordertypes.MsgNewOrders{}, &tokentypes.MsgSend{})
+	mockMsgs3 = append(mockMsgs3, &tokentypes.MsgSend{})
 
 	// height < 1
 	mockContext := sdk.NewContext(nil, abci.Header{}, false, nil)

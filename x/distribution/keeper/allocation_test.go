@@ -1,10 +1,10 @@
 package keeper
 
 import (
+	authkeeper "github.com/cosmos/cosmos-sdk/x/auth/keeper"
 	"testing"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/cosmos/cosmos-sdk/x/auth"
 	"github.com/okex/okchain/x/distribution/types"
 	"github.com/okex/okchain/x/staking"
 	"github.com/stretchr/testify/require"
@@ -74,20 +74,20 @@ func TestAllocateTokensToManyValidators(t *testing.T) {
 		commissions := NewTestDecCoins(0, 0)
 		k.IterateValidatorAccumulatedCommissions(ctx,
 			func(val sdk.ValAddress, commission types.ValidatorAccumulatedCommission) (stop bool) {
-				commissions = commissions.Add(commission)
+				commissions = commissions.Add(commission...)
 				return false
 			})
-		totalCommissions := k.GetDistributionAccount(ctx).GetCoins()
+		totalCommissions := k.bankKeeper.GetAllBalances(ctx, k.GetDistributionAccount(ctx).GetAddress())
 		communityCoins := k.GetFeePoolCommunityCoins(ctx)
-		require.Equal(t, totalCommissions, communityCoins.Add(commissions))
+		require.Equal(t, totalCommissions, communityCoins.Add(commissions...))
 		require.Equal(t, test.fee, totalCommissions)
 	}
 }
 
-func setTestFees(t *testing.T, ctx sdk.Context, k Keeper, ak auth.AccountKeeper, fees sdk.DecCoins) {
-	feeCollector := k.supplyKeeper.GetModuleAccount(ctx, k.feeCollectorName)
+func setTestFees(t *testing.T, ctx sdk.Context, k Keeper, ak authkeeper.AccountKeeper, fees sdk.DecCoins) {
+	feeCollector := k.accKeeper.GetModuleAccount(ctx, k.feeCollectorName)
 	require.NotNil(t, feeCollector)
-	err := feeCollector.SetCoins(fees)
+	err := k.bankKeeper.SetBalances(ctx, feeCollector.GetAddress(), fees)
 	require.NoError(t, err)
 	ak.SetAccount(ctx, feeCollector)
 }

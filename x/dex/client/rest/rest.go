@@ -3,6 +3,7 @@ package rest
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/cosmos/cosmos-sdk/client"
 	"net/http"
 	"strings"
 
@@ -12,18 +13,17 @@ import (
 	"github.com/okex/okchain/x/common"
 	govRest "github.com/okex/okchain/x/gov/client/rest"
 
-	"github.com/cosmos/cosmos-sdk/client/context"
 	"github.com/gorilla/mux"
 )
 
 // RegisterRoutes - Central function to define routes that get registered by the main application
-func RegisterRoutes(cliCtx context.CLIContext, r *mux.Router) {
+func RegisterRoutes(cliCtx client.Context, r *mux.Router) {
 	r.HandleFunc("/products", productsHandler(cliCtx)).Methods("GET")
 	r.HandleFunc("/deposits", depositsHandler(cliCtx)).Methods("GET")
 	r.HandleFunc("/match_order", matchOrderHandler(cliCtx)).Methods("GET")
 }
 
-func productsHandler(cliContext context.CLIContext) func(http.ResponseWriter, *http.Request) {
+func productsHandler(cliContext client.Context) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ownerAddress := r.URL.Query().Get("address")
 		pageStr := r.URL.Query().Get("page")
@@ -60,7 +60,7 @@ func productsHandler(cliContext context.CLIContext) func(http.ResponseWriter, *h
 
 }
 
-func depositsHandler(cliContext context.CLIContext) func(http.ResponseWriter, *http.Request) {
+func depositsHandler(cliContext client.Context) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		address := r.URL.Query().Get("address")
 		pageStr := r.URL.Query().Get("page")
@@ -101,7 +101,7 @@ func depositsHandler(cliContext context.CLIContext) func(http.ResponseWriter, *h
 
 }
 
-func matchOrderHandler(cliContext context.CLIContext) func(http.ResponseWriter, *http.Request) {
+func matchOrderHandler(cliContext client.Context) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		pageStr := r.URL.Query().Get("page")
 		perPageStr := r.URL.Query().Get("per_page")
@@ -138,6 +138,6 @@ func matchOrderHandler(cliContext context.CLIContext) func(http.ResponseWriter, 
 }
 
 // DelistProposalRESTHandler defines dex proposal handler
-func DelistProposalRESTHandler(context.CLIContext) govRest.ProposalRESTHandler {
+func DelistProposalRESTHandler(client.Context) govRest.ProposalRESTHandler {
 	return govRest.ProposalRESTHandler{}
 }

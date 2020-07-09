@@ -3,6 +3,7 @@ package keeper
 import (
 	"bytes"
 	"fmt"
+	gogotypes "github.com/gogo/protobuf/types"
 	"sort"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -66,7 +67,7 @@ func (k Keeper) ApplyAndReturnValidatorSetUpdates(ctx sdk.Context) (updates []ab
 
 		// calculate the new power bytes
 		newPower := validator.ConsensusPowerByShares()
-		newPowerBytes := k.cdc.MustMarshalBinaryLengthPrefixed(newPower)
+		newPowerBytes := k.cdc.MustMarshalBinaryBare(&gogotypes.Int64Value{Value: newPower})
 
 		// update the validator set if power has changed
 		if !found || !bytes.Equal(oldPowerBytes, newPowerBytes) {

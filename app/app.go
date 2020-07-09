@@ -11,13 +11,14 @@ import (
 	"github.com/okex/okchain/x/upgrade"
 
 	"github.com/cosmos/cosmos-sdk/baseapp"
+	"github.com/cosmos/cosmos-sdk/client/rpc"
+	"github.com/cosmos/cosmos-sdk/server/api"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/cosmos/cosmos-sdk/x/auth"
-
+	authrest "github.com/cosmos/cosmos-sdk/x/auth/client/rest"
+	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	abci "github.com/tendermint/tendermint/abci/types"
-	cmn "github.com/tendermint/tendermint/libs/common"
 	"github.com/tendermint/tendermint/libs/log"
-	tmstat "github.com/tendermint/tendermint/state"
+	tmos "github.com/tendermint/tendermint/libs/os"
 	dbm "github.com/tendermint/tm-db"
 )
 
@@ -26,6 +27,12 @@ const appName = "OKChainApp"
 // OKChainApp extends BaseApp(ABCI application)
 type OKChainApp struct {
 	*baseapp.BaseApp
+}
+
+func (app *OKChainApp) RegisterAPIRoutes(apiSvr *api.Server) {
+	rpc.RegisterRoutes(apiSvr.ClientCtx, apiSvr.Router)
+	authrest.RegisterTxRoutes(apiSvr.ClientCtx, apiSvr.Router)
+	ModuleBasics.RegisterRESTRoutes(apiSvr.ClientCtx, apiSvr.Router)
 }
 
 // NewOKChainApp returns a reference to an initialized OKChainApp.
@@ -56,12 +63,12 @@ func NewOKChainApp(logger log.Logger, db dbm.DB, traceStore io.Writer, loadLates
 	isLoaded, current := protocol.GetEngine().LoadCurrentProtocol(app.GetCommitMultiStore().GetKVStore(
 		protocol.GetMainStoreKey()))
 	if !isLoaded {
-		cmn.Exit(fmt.Sprintf("Your software doesn't support the required protocol (version %d)!", current))
+		tmos.Exit(fmt.Sprintf("Your software doesn't support the required protocol (version %d)!", current))
 	}
 	logger.Debug(fmt.Sprintf("launch app with version: %v", current))
 
 	// set txDecoder for BaseApp
-	app.SetTxDecoder(auth.DefaultTxDecoder(protocol.GetEngine().GetCurrentProtocol().GetCodec()))
+	app.SetTxDecoder(authtypes.DefaultTxDecoder(protocol.GetEngine().GetCurrentProtocol().GetCodec()))
 
 	// enable perf
 	perf.GetPerf().EnableCheck()
@@ -72,7 +79,7 @@ func NewOKChainApp(logger log.Logger, db dbm.DB, traceStore io.Writer, loadLates
 // LoadHeight loads data on a particular height
 func (app *OKChainApp) LoadHeight(height int64) error {
 	//return app.LoadVersion(height, app.keys[bam.MainStoreKey])
-	return app.LoadVersion(height, protocol.GetMainStoreKey())
+	return app.LoadVersion(height)
 }
 
 // hook function for BaseApp's EndBlock(upgrade)
@@ -105,7 +112,7 @@ func (app *OKChainApp) postEndBlocker(res *abci.ResponseEndBlock) {
 
 	// activate the new protocol
 	if success := protocol.GetEngine().Activate(appVersion); success {
-		txDecoder := auth.DefaultTxDecoder(protocol.GetEngine().GetCurrentProtocol().GetCodec())
+		txDecoder := authtypes.DefaultTxDecoder(protocol.GetEngine().GetCurrentProtocol().GetCodec())
 		app.SetTxDecoder(txDecoder)
 		app.log("app version %v was activated successfully\n", appVersion)
 		return
@@ -114,12 +121,12 @@ func (app *OKChainApp) postEndBlocker(res *abci.ResponseEndBlock) {
 	// protocol upgraded failed
 	if upgradeConfig, ok := protocol.GetEngine().GetUpgradeConfigByStore(app.GetCommitMultiStore().
 		GetKVStore(protocol.GetMainStoreKey())); ok {
-		newEvent := sdk.NewEvent(upgrade.EventTypeUpgradeFailure, sdk.NewAttribute(tmstat.UpgradeFailureTagKey,
+		newEvent := sdk.NewEvent(upgrade.EventTypeUpgradeFailure, sdk.NewAttribute("upgrade_failure",
 			fmt.Sprintf("Please install the right application version from %s", upgradeConfig.ProtocolDef.Software)))
 		res.Events = append(res.Events, abci.Event{Type: newEvent.Type, Attributes: newEvent.Attributes})
 	} else {
 		newEvent := sdk.NewEvent(upgrade.EventTypeUpgradeFailure,
-			sdk.NewAttribute(tmstat.UpgradeFailureTagKey, "Please install the right application version"))
+			sdk.NewAttribute("upgrade_failure", "Please install the right application version"))
 		res.Events = append(res.Events, abci.Event{Type: newEvent.Type, Attributes: newEvent.Attributes})
 	}
 }
@@ -133,12 +140,12 @@ func (app *OKChainApp) recoverLocalEnv(loadLatest bool) {
 	// it will mount protocolv0.GetTransientStoreKeysMap()
 	app.MountTransientStores(protocol.GetTransientStoreKeysMap())
 	if loadLatest {
-		if err := app.LoadLatestVersion(protocol.GetMainStoreKey()); err != nil {
-			cmn.Exit(err.Error())
+		if err := app.LoadLatestVersion(); err != nil {
+			tmos.Exit(err.Error())
 		}
 	} else {
 		if err := app.GetCommitMultiStore().LoadVersion(0); err != nil {
-			cmn.Exit(err.Error())
+			tmos.Exit(err.Error())
 		}
 	}
 }

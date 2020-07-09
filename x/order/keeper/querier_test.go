@@ -1,6 +1,7 @@
 package keeper
 
 import (
+	sdkerror "github.com/cosmos/cosmos-sdk/types/errors"
 	"testing"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -214,8 +215,8 @@ func TestQueryStore(t *testing.T) {
 	keeper.DumpStore(ctx)
 
 	path = []string{types.QueryDepthBookV2}
-	_, sdkErr := querier(ctx, path, abci.RequestQuery{})
-	require.EqualValues(t, sdk.CodeUnknownRequest, sdkErr.Code())
+	_, err = querier(ctx, path, abci.RequestQuery{})
+	require.Contains(t, err, sdkerror.ErrUnknownRequest)
 }
 
 func TestQueryParameters(t *testing.T) {
@@ -249,5 +250,5 @@ func TestQueryInvalidPath(t *testing.T) {
 	path := []string{"invalid-path"}
 	_, err := querier(ctx, path, abci.RequestQuery{})
 	require.NotNil(t, err)
-	require.EqualValues(t, sdk.CodeUnknownRequest, err.Code())
+	require.Contains(t, err, sdkerror.ErrUnknownRequest)
 }

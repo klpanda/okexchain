@@ -2,39 +2,39 @@
 package types
 
 import (
-	sdk "github.com/cosmos/cosmos-sdk/types"
+	sdkerror "github.com/cosmos/cosmos-sdk/types/errors"
 )
 
-type CodeType = sdk.CodeType
+type CodeType = uint32
 
 const (
-	DefaultCodespace            sdk.CodespaceType = "distr"
+	DefaultCodespace            = ModuleName
 	CodeInvalidInput            CodeType          = 103
 	CodeNoValidatorCommission   CodeType          = 105
 	CodeSetWithdrawAddrDisabled CodeType          = 106
 )
 
-func ErrNilDelegatorAddr(codespace sdk.CodespaceType) sdk.Error {
-	return sdk.NewError(codespace, CodeInvalidInput, "delegator address is nil")
+func ErrNilDelegatorAddr(codespace string) error {
+	return sdkerror.New(codespace, CodeInvalidInput, "delegator address is nil")
 }
-func ErrNilWithdrawAddr(codespace sdk.CodespaceType) sdk.Error {
-	return sdk.NewError(codespace, CodeInvalidInput, "withdraw address is nil")
+func ErrNilWithdrawAddr(codespace string) error {
+	return sdkerror.New(codespace, CodeInvalidInput, "withdraw address is nil")
 }
-func ErrNilValidatorAddr(codespace sdk.CodespaceType) sdk.Error {
-	return sdk.NewError(codespace, CodeInvalidInput, "validator address is nil")
+func ErrNilValidatorAddr(codespace string) error {
+	return sdkerror.New(codespace, CodeInvalidInput, "validator address is nil")
 }
-func ErrNoValidatorCommission(codespace sdk.CodespaceType) sdk.Error {
-	return sdk.NewError(codespace, CodeNoValidatorCommission, "no validator commission to withdraw")
+func ErrNoValidatorCommission(codespace string) error {
+	return sdkerror.New(codespace, CodeNoValidatorCommission, "no validator commission to withdraw")
 }
-func ErrSetWithdrawAddrDisabled(codespace sdk.CodespaceType) sdk.Error {
-	return sdk.NewError(codespace, CodeSetWithdrawAddrDisabled, "set withdraw address disabled")
+func ErrSetWithdrawAddrDisabled(codespace string) error {
+	return sdkerror.New(codespace, CodeSetWithdrawAddrDisabled, "set withdraw address disabled")
 }
-func ErrBadDistribution(codespace sdk.CodespaceType) sdk.Error {
-	return sdk.NewError(codespace, CodeInvalidInput, "community pool does not have sufficient coins to distribute")
+func ErrBadDistribution(codespace string) error {
+	return sdkerror.New(codespace, CodeInvalidInput, "community pool does not have sufficient coins to distribute")
 }
-func ErrInvalidProposalAmount(codespace sdk.CodespaceType) sdk.Error {
-	return sdk.NewError(codespace, CodeInvalidInput, "invalid community pool spend proposal amount")
+func ErrInvalidProposalAmount(codespace string) error {
+	return sdkerror.New(codespace, CodeInvalidInput, "invalid community pool spend proposal amount")
 }
-func ErrEmptyProposalRecipient(codespace sdk.CodespaceType) sdk.Error {
-	return sdk.NewError(codespace, CodeInvalidInput, "invalid community pool spend proposal recipient")
+func ErrEmptyProposalRecipient(codespace string) error {
+	return sdkerror.New(codespace, CodeInvalidInput, "invalid community pool spend proposal recipient")
 }

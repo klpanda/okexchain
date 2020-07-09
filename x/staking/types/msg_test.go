@@ -42,11 +42,15 @@ func TestMsgCreateValidator(t *testing.T) {
 		description := NewDescription(tc.moniker, tc.identity, tc.website, tc.details)
 		coin := sdk.NewDecCoin(sdk.DefaultBondDenom, tc.minSelfDelegation)
 
+		var pkStr string
+		if tc.pubkey != nil {
+			pkStr = sdk.MustBech32ifyPubKey(sdk.Bech32PubKeyTypeConsPub, tc.pubkey)
+		}
 		msg := MsgCreateValidator{
 			Description:       description,
 			DelegatorAddress:  tc.delegatorAddr,
 			ValidatorAddress:  tc.validatorAddr,
-			PubKey:            tc.pubkey,
+			PubKey:            pkStr,
 			MinSelfDelegation: coin,
 		}
 
@@ -74,7 +78,7 @@ func TestMsgDestroyValidator(t *testing.T) {
 		msg := NewMsgDestroyValidator(tc.valAddr)
 		if tc.expectPass {
 			require.Nil(t, msg.ValidateBasic(), "test: %v", tc.name)
-			checkMsg(t, msg, "destroy_validator")
+			checkMsg(t, &msg, "destroy_validator")
 		} else {
 			require.NotNil(t, msg.ValidateBasic(), "test: %v", tc.name)
 		}
@@ -122,7 +126,7 @@ func TestMsgEditValidator(t *testing.T) {
 		msg := NewMsgEditValidator(tc.validatorAddr, description)
 		if tc.expectPass {
 			require.Nil(t, msg.ValidateBasic(), "test: %v", tc.name)
-			checkMsg(t, msg, "edit_validator")
+			checkMsg(t, &msg, "edit_validator")
 		} else {
 			require.NotNil(t, msg.ValidateBasic(), "test: %v", tc.name)
 		}
@@ -157,7 +161,7 @@ func TestMsgDeposit(t *testing.T) {
 		msg := NewMsgDeposit(tc.delegatorAddr, tc.amount)
 		if tc.expectPass {
 			require.Nil(t, msg.ValidateBasic(), "test: %v", tc.name)
-			checkMsg(t, msg, "deposit")
+			checkMsg(t, &msg, "deposit")
 		} else {
 			require.NotNil(t, msg.ValidateBasic(), "test: %v", tc.name)
 		}
@@ -185,7 +189,7 @@ func TestMsgWithdraw(t *testing.T) {
 		msg := NewMsgWithdraw(tc.delegatorAddr, tc.amount)
 		if tc.expectPass {
 			require.Nil(t, msg.ValidateBasic(), "test: %v", tc.name)
-			checkMsg(t, msg, "withdraw")
+			checkMsg(t, &msg, "withdraw")
 		} else {
 			require.NotNil(t, msg.ValidateBasic(), "test: %v", tc.name)
 		}
@@ -210,7 +214,7 @@ func TestMsgBindProxy(t *testing.T) {
 		msg := NewMsgBindProxy(tc.dlgAddr, tc.valAddr)
 		if tc.expectPass {
 			require.Nil(t, msg.ValidateBasic(), "test: %v", tc.name)
-			checkMsg(t, msg, "bind_proxy")
+			checkMsg(t, &msg, "bind_proxy")
 		} else {
 			require.NotNil(t, msg.ValidateBasic(), "test: %v", tc.name)
 		}
@@ -233,7 +237,7 @@ func TestMsgUnbindProxy(t *testing.T) {
 		msg := NewMsgUnbindProxy(tc.valAddr)
 		if tc.expectPass {
 			require.Nil(t, msg.ValidateBasic(), "test: %v", tc.name)
-			checkMsg(t, msg, "unbind_proxy")
+			checkMsg(t, &msg, "unbind_proxy")
 		} else {
 			require.NotNil(t, msg.ValidateBasic(), "test: %v", tc.name)
 		}
@@ -257,7 +261,7 @@ func TestMsgRegProxy(t *testing.T) {
 		msg := NewMsgRegProxy(tc.dlgAddr, tc.doReg)
 		if tc.expectPass {
 			require.Nil(t, msg.ValidateBasic(), "test: %v", tc.name)
-			checkMsg(t, msg, "reg_or_unreg_proxy")
+			checkMsg(t, &msg, "reg_or_unreg_proxy")
 		} else {
 			require.NotNil(t, msg.ValidateBasic(), "test: %v", tc.name)
 		}
@@ -284,7 +288,7 @@ func TestMsgAddShares(t *testing.T) {
 		msg := NewMsgAddShares(tc.dlgAddr, tc.valAddrs)
 		if tc.expectPass {
 			require.Nil(t, msg.ValidateBasic(), "test: %v", tc.name)
-			checkMsg(t, msg, "add_shares_to_validators")
+			checkMsg(t, &msg, "add_shares_to_validators")
 		} else {
 			require.NotNil(t, msg.ValidateBasic(), "test: %v", tc.name)
 		}

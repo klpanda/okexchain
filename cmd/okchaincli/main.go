@@ -8,21 +8,20 @@ import (
 	"github.com/okex/okchain/app"
 
 	"github.com/cosmos/cosmos-sdk/client"
+	"github.com/cosmos/cosmos-sdk/client/flags"
 	"github.com/cosmos/cosmos-sdk/client/keys"
-	"github.com/cosmos/cosmos-sdk/client/lcd"
 	"github.com/cosmos/cosmos-sdk/client/rpc"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/version"
-	"github.com/cosmos/cosmos-sdk/x/auth"
 	authcmd "github.com/cosmos/cosmos-sdk/x/auth/client/cli"
-	"github.com/cosmos/cosmos-sdk/x/bank"
-	tokencli "github.com/okex/okchain/x/token/client/cli"
+	"github.com/cosmos/cosmos-sdk/x/auth/types"
+	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
+	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
+	"github.com/okex/okchain/app/protocol"
 	debugcli "github.com/okex/okchain/x/debug/client/cli"
-
+	tokencli "github.com/okex/okchain/x/token/client/cli"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-
-	"github.com/tendermint/go-amino"
 	"github.com/tendermint/tendermint/libs/cli"
 )
 
@@ -31,7 +30,7 @@ func main() {
 	cobra.EnableCommandSorting = false
 
 	// instantiate the codec for the command line application
-	cdc := app.MakeCodec()
+	cdcCfg := app.MakeEncodingConfig()
 
 	// read in the configuration file for the sdk
 	config := sdk.GetConfig()
@@ -49,8 +48,8 @@ func main() {
 	}
 
 	// add --chain-id to persistent flags and mark it required
-	rootCmd.PersistentFlags().String(client.FlagChainID, "", "Chain ID of tendermint node")
-	rootCmd.PersistentFlags().String(client.FlagKeyPass, client.DefaultKeyPass, "Pass word of sender")
+	rootCmd.PersistentFlags().String(flags.FlagChainID, "", "Chain ID of tendermint node")
+	rootCmd.PersistentFlags().String(keys.FlagKeyPass, keys.DefaultKeyPass, "Pass word of sender")
 
 	rootCmd.PersistentPreRunE = func(_ *cobra.Command, _ []string) error {
 		return initConfig(rootCmd)
@@ -59,17 +58,15 @@ func main() {
 	// construct root command
 	rootCmd.AddCommand(
 		rpc.StatusCommand(),
-		client.ConfigCmd(app.DefaultCLIHome),
-		queryCmd(cdc),
-		txCmd(cdc),
-		debugcli.GetDebugCmd(cdc),
-		client.LineBreak,
-		lcd.ServeCommand(cdc, registerRoutes),
-		client.LineBreak,
+		queryCmd(cdcCfg),
+		txCmd(cdcCfg),
+		debugcli.GetDebugCmd(cdcCfg),
+		flags.LineBreak,
+		flags.LineBreak,
 		keys.Commands(),
-		client.LineBreak,
+		flags.LineBreak,
 		version.Cmd,
-		client.NewCompletionCmd(rootCmd, true),
+		flags.NewCompletionCmd(rootCmd, true),
 	)
 
 	// add flags and prefix all env exposed with OKCHAIN
@@ -81,54 +78,69 @@ func main() {
 	}
 }
 
-func queryCmd(cdc *amino.Codec) *cobra.Command {
+func queryCmd(config protocol.EncodingConfig) *cobra.Command {
 	queryCmd := &cobra.Command{
 		Use:     "query",
 		Aliases: []string{"q"},
 		Short:   "Querying subcommands",
 	}
 
+	cdc := config.Amino
 	queryCmd.AddCommand(
 		authcmd.GetAccountCmd(cdc),
-		client.LineBreak,
+		flags.LineBreak,
 		rpc.ValidatorCommand(cdc),
 		rpc.BlockCommand(),
 		authcmd.QueryTxsByEventsCmd(cdc),
 		authcmd.QueryTxCmd(cdc),
-		client.LineBreak,
+		flags.LineBreak,
 	)
 
 	// add modules' query commands
-	app.ModuleBasics.AddQueryCommands(queryCmd, cdc)
+	clientCtx := client.Context{}
+	clientCtx = clientCtx.
+		WithJSONMarshaler(config.Marshaler).
+		WithCodec(cdc)
+
+	// add modules' query commands
+	app.ModuleBasics.AddQueryCommands(queryCmd, clientCtx)
 
 	return queryCmd
 }
 
-func txCmd(cdc *amino.Codec) *cobra.Command {
+func txCmd(config protocol.EncodingConfig) *cobra.Command {
 	txCmd := &cobra.Command{
 		Use:   "tx",
 		Short: "Transactions subcommands",
 	}
 
+	cdc := config.Amino
+	clientCtx := client.Context{}
+	clientCtx = clientCtx.
+		WithJSONMarshaler(config.Marshaler).
+		WithTxGenerator(config.TxGenerator).
+		WithAccountRetriever(types.NewAccountRetriever(config.Marshaler)).
+		WithCodec(cdc)
+
 	txCmd.AddCommand(
 		tokencli.SendTxCmd(cdc),
-		client.LineBreak,
-		authcmd.GetSignCommand(cdc),
-		authcmd.GetMultiSignCommand(cdc),
-		client.LineBreak,
-		authcmd.GetBroadcastCommand(cdc),
-		authcmd.GetEncodeCommand(cdc),
-		client.LineBreak,
+		flags.LineBreak,
+		authcmd.GetSignCommand(clientCtx),
+		authcmd.GetMultiSignCommand(clientCtx),
+		flags.LineBreak,
+		authcmd.GetBroadcastCommand(clientCtx),
+		authcmd.GetEncodeCommand(clientCtx),
+		flags.LineBreak,
 	)
 
 	// add modules' tx commands
-	app.ModuleBasics.AddTxCommands(txCmd, cdc)
+	app.ModuleBasics.AddTxCommands(txCmd, clientCtx)
 
 	// remove auth and bank commands as they're mounted under the root tx command
 	var cmdsToRemove []*cobra.Command
 
 	for _, cmd := range txCmd.Commands() {
-		if cmd.Use == auth.ModuleName || cmd.Use == bank.ModuleName {
+		if cmd.Use == authtypes.ModuleName || cmd.Use == banktypes.ModuleName {
 			cmdsToRemove = append(cmdsToRemove, cmd)
 		}
 	}
@@ -136,14 +148,6 @@ func txCmd(cdc *amino.Codec) *cobra.Command {
 	txCmd.RemoveCommand(cmdsToRemove...)
 
 	return txCmd
-}
-
-// registerRoutes registers the routes from the different modules for the LCD.
-// NOTE: details on the routes added for each module are in the module documentation
-// NOTE: If making updates here you also need to update the test helper in client/lcd/test_helper.go
-func registerRoutes(rs *lcd.RestServer) {
-	client.RegisterRoutes(rs.CliCtx, rs.Mux)
-	app.ModuleBasics.RegisterRESTRoutes(rs.CliCtx, rs.Mux)
 }
 
 func initConfig(cmd *cobra.Command) error {
@@ -160,7 +164,7 @@ func initConfig(cmd *cobra.Command) error {
 			return err
 		}
 	}
-	if err := viper.BindPFlag(client.FlagChainID, cmd.PersistentFlags().Lookup(client.FlagChainID)); err != nil {
+	if err := viper.BindPFlag(flags.FlagChainID, cmd.PersistentFlags().Lookup(flags.FlagChainID)); err != nil {
 		return err
 	}
 	if err := viper.BindPFlag(cli.EncodingFlag, cmd.PersistentFlags().Lookup(cli.EncodingFlag)); err != nil {

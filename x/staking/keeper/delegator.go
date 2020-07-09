@@ -19,7 +19,7 @@ func (k Keeper) GetDelegator(ctx sdk.Context, delAddr sdk.AccAddress) (delegator
 // SetDelegator sets Delegator info to store
 func (k Keeper) SetDelegator(ctx sdk.Context, delegator types.Delegator) {
 	key := types.GetDelegatorKey(delegator.DelegatorAddress)
-	bytes := k.cdc.MustMarshalBinaryLengthPrefixed(delegator)
+	bytes := k.cdc.MustMarshalBinaryBare(&delegator)
 	ctx.KVStore(k.storeKey).Set(key, bytes)
 }
 

@@ -50,7 +50,7 @@ func TestRegisterCodec(t *testing.T) {
 	var proposal sdkGovTypes.Content
 	proposalBytes := cdc.MustMarshalBinaryBare(&sdkGovTypes.TextProposal{})
 	cdc.MustUnmarshalBinaryBare(proposalBytes, &proposal)
-	_, ok := proposal.(sdkGovTypes.TextProposal)
+	_, ok := proposal.(*sdkGovTypes.TextProposal)
 	require.True(t, ok)
 
 	proposal = nil

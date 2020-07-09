@@ -69,7 +69,7 @@ func TestQueryCommunityPool(t *testing.T) {
 	ctx, _, k, _, _ := CreateTestInputDefault(t, false, 1000)
 	querior := NewQuerier(k)
 	feePool := k.GetFeePool(ctx)
-	feePool.CommunityPool = feePool.CommunityPool.Add(NewTestDecCoins(123,2))
+	feePool.CommunityPool = feePool.CommunityPool.Add(NewTestDecCoins(123,2)...)
 	k.SetFeePool(ctx, feePool)
 
 	communityPool, err := querior(ctx, []string{types.QueryCommunityPool}, abci.RequestQuery{})

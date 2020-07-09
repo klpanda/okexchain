@@ -2,11 +2,10 @@ package keeper
 
 import (
 	"fmt"
+	sdkGovtypes "github.com/cosmos/cosmos-sdk/x/gov/types"
 	"time"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	sdkGov "github.com/cosmos/cosmos-sdk/x/gov"
-
 	"github.com/okex/okchain/x/gov/types"
 )
 
@@ -24,12 +23,12 @@ type ProposalHandlerRouter interface {
 
 // ProposalHandler defines the interface handler in different periods of proposal
 type ProposalHandler interface {
-	GetMinDeposit(ctx sdk.Context, content sdkGov.Content) sdk.DecCoins
-	GetMaxDepositPeriod(ctx sdk.Context, content sdkGov.Content) time.Duration
-	GetVotingPeriod(ctx sdk.Context, content sdkGov.Content) time.Duration
-	CheckMsgSubmitProposal(ctx sdk.Context, msg types.MsgSubmitProposal) sdk.Error
+	GetMinDeposit(ctx sdk.Context, content sdkGovtypes.Content) sdk.DecCoins
+	GetMaxDepositPeriod(ctx sdk.Context, content sdkGovtypes.Content) time.Duration
+	GetVotingPeriod(ctx sdk.Context, content sdkGovtypes.Content) time.Duration
+	CheckMsgSubmitProposal(ctx sdk.Context, msg types.MsgSubmitProposal) error
 	AfterSubmitProposalHandler(ctx sdk.Context, proposal types.Proposal)
-	VoteHandler(ctx sdk.Context, proposal types.Proposal, vote types.Vote) (string, sdk.Error)
+	VoteHandler(ctx sdk.Context, proposal types.Proposal, vote types.Vote) (string, error)
 	AfterDepositPeriodPassed(ctx sdk.Context, proposal types.Proposal)
 	RejectedHandler(ctx sdk.Context, content types.Content)
 }
@@ -62,7 +61,7 @@ func (phr *proposalHandlerRouter) AddRoute(path string, mp ProposalHandler) Prop
 		panic("router sealed; cannot add route handler")
 	}
 
-	if !sdkGov.IsAlphaNumeric(path) {
+	if !sdk.IsAlphaNumeric(path) {
 		panic("route expressions can only contain alphanumeric characters")
 	}
 	if phr.HasRoute(path) {

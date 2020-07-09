@@ -8,7 +8,7 @@ import (
 	upgradeTypes "github.com/okex/okchain/x/upgrade/types"
 
 	sdkGovTypes "github.com/cosmos/cosmos-sdk/x/gov/types"
-	sdkparams "github.com/cosmos/cosmos-sdk/x/params"
+	sdkparams "github.com/cosmos/cosmos-sdk/x/params/types/proposal"
 )
 
 // Migrate accepts exported genesis state from v0.34 and migrates it to v0.36
@@ -93,7 +93,7 @@ func migrateContent(proposal v08gov.Proposal) (content sdkGovTypes.Content) {
 			panic("interface proposal failed to convert to ParameterProposal")
 		}
 		return params.ParameterChangeProposal{
-			sdkparams.ParameterChangeProposal{
+			&sdkparams.ParameterChangeProposal{
 				paramChange.Title,
 				paramChange.Description,
 				convertParams(paramChange.Params),

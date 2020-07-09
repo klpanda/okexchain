@@ -24,8 +24,8 @@ func (k Keeper) AllocateTokens(ctx sdk.Context, totalPreviousPower int64,
 	// fetch and clear the collected fees for distribution, since this is
 	// called in BeginBlock, collected fees will be from the previous block
 	// (and distributed to the previous proposer)
-	feeCollector := k.supplyKeeper.GetModuleAccount(ctx, k.feeCollectorName)
-	feesCollected := feeCollector.GetCoins()
+	feeCollector := k.accKeeper.GetModuleAccount(ctx, k.feeCollectorName)
+	feesCollected := k.bankKeeper.GetAllBalances(ctx, feeCollector.GetAddress())
 
 	if feesCollected.Empty() {
 		logger.Debug("No fee to distributed.")
@@ -34,14 +34,14 @@ func (k Keeper) AllocateTokens(ctx sdk.Context, totalPreviousPower int64,
 	logger.Debug("AllocateTokens", "TotalFee", feesCollected.String())
 
 	// transfer collected fees to the distribution module account
-	err := k.supplyKeeper.SendCoinsFromModuleToModule(ctx, k.feeCollectorName, types.ModuleName, feesCollected)
+	err := k.bankKeeper.SendCoinsFromModuleToModule(ctx, k.feeCollectorName, types.ModuleName, feesCollected)
 	if err != nil {
 		panic(err)
 	}
 
 	feePool := k.GetFeePool(ctx)
 	if totalPreviousPower == 0 {
-		feePool.CommunityPool = feePool.CommunityPool.Add(feesCollected)
+		feePool.CommunityPool = feePool.CommunityPool.Add(feesCollected...)
 		k.SetFeePool(ctx, feePool)
 		logger.Debug("totalPreviousPower is zero, send fees to community pool", "fees", feesCollected)
 		return
@@ -62,14 +62,14 @@ func (k Keeper) AllocateTokens(ctx sdk.Context, totalPreviousPower int64,
 
 	feesToVals := feesCollected.MulDecTruncate(sdk.OneDec().Sub(k.GetCommunityTax(ctx)))
 	feeByEqual, feeByVote := feesToVals.MulDecTruncate(valPortion), feesToVals.MulDecTruncate(votePortion)
-	feesToCommunity := feesCollected.Sub(feeByEqual.Add(feeByVote))
+	feesToCommunity := feesCollected.Sub(feeByEqual.Add(feeByVote...))
 	remainByEqual := k.allocateByEqual(ctx, feeByEqual, previousVotes) //allocate rewards equally between validators
 	remainByShare := k.allocateByShares(ctx, feeByVote)                //allocate rewards by shares
-	feesToCommunity = feesToCommunity.Add(remainByEqual.Add(remainByShare))
+	feesToCommunity = feesToCommunity.Add(remainByEqual.Add(remainByShare...)...)
 
 	// allocate community funding
 	if !feesToCommunity.IsZero() {
-		feePool.CommunityPool = feePool.CommunityPool.Add(feesToCommunity)
+		feePool.CommunityPool = feePool.CommunityPool.Add(feesToCommunity...)
 		k.SetFeePool(ctx, feePool)
 		logger.Debug("Send fees to community pool", "community_pool", feesToCommunity)
 	}
@@ -147,7 +147,7 @@ func (k Keeper) AllocateTokensToValidator(ctx sdk.Context, val exported.Validato
 	// commissions is always 1.0, so tokens.MulDec(val.GetCommission()) = tokens
 	// only update current commissions
 	commission := k.GetValidatorAccumulatedCommission(ctx, val.GetOperator())
-	commission = commission.Add(tokens)
+	commission = commission.Add(tokens...)
 	k.SetValidatorAccumulatedCommission(ctx, val.GetOperator(), commission)
 	ctx.EventManager().EmitEvent(
 		sdk.NewEvent(

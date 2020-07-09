@@ -1,14 +1,17 @@
 package token
 
 import (
+	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
+	cryptocodec "github.com/cosmos/cosmos-sdk/crypto/codec"
+	authkeeper "github.com/cosmos/cosmos-sdk/x/auth/keeper"
+	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
+	bankkeeper "github.com/cosmos/cosmos-sdk/x/bank/keeper"
+	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	"testing"
 
 	"github.com/cosmos/cosmos-sdk/codec"
 	"github.com/cosmos/cosmos-sdk/store"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/cosmos/cosmos-sdk/x/auth"
-	"github.com/cosmos/cosmos-sdk/x/bank"
-	"github.com/cosmos/cosmos-sdk/x/supply"
 	"github.com/okex/okchain/x/params"
 	"github.com/okex/okchain/x/staking"
 	"github.com/okex/okchain/x/token/types"
@@ -21,10 +24,10 @@ import (
 func CreateParam(t *testing.T, isCheckTx bool) (sdk.Context, Keeper, *sdk.KVStoreKey, []byte) {
 	keyStaking := sdk.NewKVStoreKey(staking.StoreKey)
 	tkeyStaking := sdk.NewTransientStoreKey(staking.TStoreKey)
-	keyAcc := sdk.NewKVStoreKey(auth.StoreKey)
+	keyAcc := sdk.NewKVStoreKey(authtypes.StoreKey)
 	keyParams := sdk.NewKVStoreKey(params.StoreKey)
 	tkeyParams := sdk.NewTransientStoreKey(params.TStoreKey)
-	keySupply := sdk.NewKVStoreKey(supply.StoreKey)
+	keyBank := sdk.NewKVStoreKey(banktypes.StoreKey)
 
 	keyToken := sdk.NewKVStoreKey("token")
 	keyLock := sdk.NewKVStoreKey("lock")
@@ -38,7 +41,7 @@ func CreateParam(t *testing.T, isCheckTx bool) (sdk.Context, Keeper, *sdk.KVStor
 	ms.MountStoreWithDB(tkeyParams, sdk.StoreTypeTransient, db)
 	ms.MountStoreWithDB(keyToken, sdk.StoreTypeIAVL, db)
 	ms.MountStoreWithDB(keyLock, sdk.StoreTypeIAVL, db)
-	ms.MountStoreWithDB(keySupply, sdk.StoreTypeIAVL, db)
+	ms.MountStoreWithDB(keyBank, sdk.StoreTypeIAVL, db)
 
 	err := ms.LoadLatestVersion()
 	require.Nil(t, err)
@@ -47,35 +50,38 @@ func CreateParam(t *testing.T, isCheckTx bool) (sdk.Context, Keeper, *sdk.KVStor
 
 	cdc := codec.New()
 	RegisterCodec(cdc)
-	codec.RegisterCrypto(cdc)
+	cryptocodec.RegisterCrypto(cdc)
+	interfaceRegistry := codectypes.NewInterfaceRegistry()
+	appCodec := codec.NewHybridCodec(cdc, interfaceRegistry)
 
-	pk := params.NewKeeper(cdc, keyParams, tkeyParams, params.DefaultCodespace)
 
-	accountKeeper := auth.NewAccountKeeper(
-		cdc,    // amino codec
-		keyAcc, // target store
-		pk.Subspace(auth.DefaultParamspace),
-		auth.ProtoBaseAccount, // prototype
-	)
+	pk := params.NewKeeper(appCodec, keyParams, tkeyParams)
 	//feeCollectorAcc := supply.NewEmptyModuleAccount(auth.FeeCollectorName)
 	blacklistedAddrs := make(map[string]bool)
 	//blacklistedAddrs[feeCollectorAcc.String()] = true
-
-	bk := bank.NewBaseKeeper(
-		accountKeeper,
-		pk.Subspace(bank.DefaultParamspace),
-		bank.DefaultCodespace,
-		blacklistedAddrs,
-	)
 	maccPerms := map[string][]string{
-		auth.FeeCollectorName: nil,
+		authtypes.FeeCollectorName: nil,
 		types.ModuleName:      nil,
 	}
-	supplyKeeper := supply.NewKeeper(cdc, keySupply, accountKeeper, bk, maccPerms)
+
+	accountKeeper := authkeeper.NewAccountKeeper(
+		appCodec,    // amino codec
+		keyAcc, // target store
+		pk.Subspace(authtypes.ModuleName),
+		authtypes.ProtoBaseAccount, // prototype
+		maccPerms,
+	)
+
+	bk := bankkeeper.NewBaseKeeper( appCodec, keyBank,
+		accountKeeper,
+		pk.Subspace(banktypes.ModuleName),
+		blacklistedAddrs,
+	)
+
 	tk := NewKeeper(bk,
 		pk.Subspace(DefaultParamspace),
-		auth.FeeCollectorName,
-		supplyKeeper,
+		authtypes.FeeCollectorName,
+		accountKeeper,
 		keyToken,
 		keyLock,
 		cdc,

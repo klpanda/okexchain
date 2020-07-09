@@ -2,6 +2,8 @@ package types
 
 import (
 	"fmt"
+	"github.com/cosmos/cosmos-sdk/codec"
+	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	"github.com/willf/bitset"
 	"sort"
 	"testing"
@@ -10,7 +12,6 @@ import (
 	"github.com/okex/okchain/x/common"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/cosmos/cosmos-sdk/x/auth"
 	"github.com/okex/okchain/x/order"
 	orderKeeper "github.com/okex/okchain/x/order/keeper"
 	tokenKeeper "github.com/okex/okchain/x/token"
@@ -20,7 +21,7 @@ import (
 )
 
 func TestGenerateTx(t *testing.T) {
-	txbldr := auth.NewTxBuilder(auth.DefaultTxEncoder(auth.ModuleCdc), 1, 2, 3, 4, false, "okchain", "memo", nil, nil)
+	txbldr := authtypes.NewTxBuilder(authtypes.DefaultTxEncoder(codec.New()), 1, 2, 3, 4, false, "okchain", "memo", nil, nil)
 	testInput := orderKeeper.CreateTestInput(t)
 	keeper := testInput.OrderKeeper
 
@@ -38,28 +39,28 @@ func TestGenerateTx(t *testing.T) {
 	sendMsg := token.NewMsgTokenSend(accFrom, accTo, decCoins)
 
 	sendMsgSig, _ := priKeyFrom.Sign(sendMsg.GetSignBytes())
-	sigs := []auth.StdSignature{
+	sigs := []authtypes.StdSignature{
 		{
-			PubKey:    pubKeyFrom,
+			PubKey:    pubKeyFrom.Bytes(),
 			Signature: sendMsgSig,
 		},
 	}
-	txSigMsg, _ := txbldr.BuildSignMsg([]sdk.Msg{sendMsg})
-	tx := auth.NewStdTx(txSigMsg.Msgs, txSigMsg.Fee, sigs, "")
+	txSigMsg, _ := txbldr.BuildSignMsg([]sdk.Msg{&sendMsg})
+	tx := authtypes.NewStdTx(txSigMsg.Msgs, txSigMsg.Fee, sigs, "")
 	ctx0, _, _, _ := tokenKeeper.CreateParam(t, false)
 	GenerateTx(&tx, "", ctx0, keeper, time.Now().Unix())
 
 	// order/new
 	orderNewMsg := order.NewMsgNewOrder(accFrom, "btc_"+common.NativeToken, SellOrder, "23.76", "289")
 	orderNewMsgSig, _ := priKeyFrom.Sign(orderNewMsg.GetSignBytes())
-	sigs = []auth.StdSignature{
+	sigs = []authtypes.StdSignature{
 		{
-			PubKey:    pubKeyFrom,
+			PubKey:    pubKeyFrom.Bytes(),
 			Signature: orderNewMsgSig,
 		},
 	}
 	txSigMsg, _ = txbldr.BuildSignMsg([]sdk.Msg{orderNewMsg})
-	tx = auth.NewStdTx(txSigMsg.Msgs, txSigMsg.Fee, sigs, "")
+	tx = authtypes.NewStdTx(txSigMsg.Msgs, txSigMsg.Fee, sigs, "")
 	var tmpBitset bitset.BitSet
 	tmpBitset.Set(1)
 	keeper.AddTxHandlerMsgResult(tmpBitset)
@@ -68,14 +69,14 @@ func TestGenerateTx(t *testing.T) {
 	// order/cancel
 	orderCancelMsg := order.NewMsgCancelOrder(accFrom, "ORDER-123")
 	orderCancelMsgSig, _ := priKeyFrom.Sign(orderCancelMsg.GetSignBytes())
-	sigs = []auth.StdSignature{
+	sigs = []authtypes.StdSignature{
 		{
-			PubKey:    pubKeyFrom,
+			PubKey:    pubKeyFrom.Bytes(),
 			Signature: orderCancelMsgSig,
 		},
 	}
 	txSigMsg, _ = txbldr.BuildSignMsg([]sdk.Msg{orderCancelMsg})
-	tx = auth.NewStdTx(txSigMsg.Msgs, txSigMsg.Fee, sigs, "")
+	tx = authtypes.NewStdTx(txSigMsg.Msgs, txSigMsg.Fee, sigs, "")
 
 	ctx := testInput.Ctx.WithBlockHeight(10)
 	or := &order.Order{

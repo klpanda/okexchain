@@ -28,7 +28,10 @@ type Keeper struct {
 
 	dexKeeper DexKeeper
 
-	supplyKeeper     SupplyKeeper
+	accKeeper AccountKeeper
+
+	bankKeeper BankKeeper
+
 	feeCollectorName string
 
 	// Unexposed key to access name store from sdk.Context
@@ -45,7 +48,7 @@ type Keeper struct {
 }
 
 // NewKeeper creates new instances of the nameservice Keeper
-func NewKeeper(tokenKeeper TokenKeeper, supplyKeeper SupplyKeeper, dexKeeper DexKeeper,
+func NewKeeper(tokenKeeper TokenKeeper, accKeeper AccountKeeper, bankKeeper BankKeeper, dexKeeper DexKeeper,
 	paramSpace params.Subspace, feeCollectorName string, ordersStoreKey sdk.StoreKey,
 	cdc *codec.Codec,
 	enableBackend bool, metrics *monitor.OrderMetric) Keeper {
@@ -56,10 +59,11 @@ func NewKeeper(tokenKeeper TokenKeeper, supplyKeeper SupplyKeeper, dexKeeper Dex
 		enableBackend:    enableBackend,
 		feeCollectorName: feeCollectorName,
 
-		tokenKeeper:  tokenKeeper,
-		supplyKeeper: supplyKeeper,
-		dexKeeper:    dexKeeper,
-		paramSpace:   paramSpace.WithKeyTable(types.ParamKeyTable()),
+		tokenKeeper: tokenKeeper,
+		accKeeper:   accKeeper,
+		bankKeeper:  bankKeeper,
+		dexKeeper:   dexKeeper,
+		paramSpace:  paramSpace.WithKeyTable(types.ParamKeyTable()),
 
 		orderStoreKey: ordersStoreKey,
 
@@ -441,7 +445,7 @@ func (k Keeper) AddCollectedFees(ctx sdk.Context, coins sdk.DecCoins, from sdk.A
 		k.tokenKeeper.AddFeeDetail(ctx, from.String(), coins, feeType)
 	}
 	baseCoins := coins
-	return k.supplyKeeper.SendCoinsFromAccountToModule(ctx, from, k.feeCollectorName, baseCoins)
+	return k.bankKeeper.SendCoinsFromAccountToModule(ctx, from, k.feeCollectorName, baseCoins)
 }
 
 // GetParams gets inflation params from the global param store

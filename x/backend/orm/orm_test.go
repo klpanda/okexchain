@@ -17,7 +17,7 @@ import (
 	"github.com/okex/okchain/x/token"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	tcommon "github.com/tendermint/tendermint/libs/common"
+	tmos "github.com/tendermint/tendermint/libs/os"
 )
 
 func TestGorm(t *testing.T) {
@@ -377,7 +377,7 @@ func TestCandles_NewKlinesFactory(t *testing.T) {
 
 	r, _ := json.Marshal(result)
 
-	err = tcommon.WriteFile("/tmp/k1.txt", r, os.ModePerm)
+	err = tmos.WriteFile("/tmp/k1.txt", r, os.ModePerm)
 	require.Nil(t, err)
 }
 

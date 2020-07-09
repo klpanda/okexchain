@@ -51,8 +51,8 @@ func TestFillDepthBook(t *testing.T) {
 		sdk.NewDecCoinFromDec(common.NativeToken, sdk.MustNewDecFromStr("99.4816")),
 		sdk.NewDecCoinFromDec(common.TestToken, sdk.MustNewDecFromStr("97.8")),
 	}
-	require.EqualValues(t, expectCoins0, acc0.GetCoins())
-	require.EqualValues(t, expectCoins1, acc1.GetCoins())
+	require.EqualValues(t, expectCoins0, testInput.BankKeeper.GetAllBalances(ctx, acc0.GetAddress()))
+	require.EqualValues(t, expectCoins1, testInput.BankKeeper.GetAllBalances(ctx, acc1.GetAddress()))
 
 	// call fillDepthBook
 	buyExecuted := sdk.ZeroDec()
@@ -111,8 +111,8 @@ func TestFillDepthBook(t *testing.T) {
 		sdk.NewDecCoinFromDec(common.NativeToken, sdk.MustNewDecFromStr("109.4716")), // 100 + 10 * (1 - 0.001) - 0.004
 		sdk.NewDecCoinFromDec(common.TestToken, sdk.MustNewDecFromStr("97.8")),       // no change
 	}
-	require.EqualValues(t, expectCoins0, acc0.GetCoins())
-	require.EqualValues(t, expectCoins1, acc1.GetCoins())
+	require.EqualValues(t, expectCoins0, testInput.BankKeeper.GetAllBalances(ctx, acc0.GetAddress()))
+	require.EqualValues(t, expectCoins1, testInput.BankKeeper.GetAllBalances(ctx, acc1.GetAddress()))
 }
 
 func TestFillDepthBookSecondCase(t *testing.T) {
@@ -153,8 +153,8 @@ func TestFillDepthBookSecondCase(t *testing.T) {
 		sdk.NewDecCoinFromDec(common.NativeToken, sdk.MustNewDecFromStr("99.4816")),
 		sdk.NewDecCoinFromDec(common.TestToken, sdk.MustNewDecFromStr("97.9")),
 	}
-	require.EqualValues(t, expectCoins0.String(), acc0.GetCoins().String())
-	require.EqualValues(t, expectCoins1.String(), acc1.GetCoins().String())
+	require.EqualValues(t, expectCoins0.String(), testInput.BankKeeper.GetAllBalances(ctx, acc0.GetAddress()).String())
+	require.EqualValues(t, expectCoins1.String(), testInput.BankKeeper.GetAllBalances(ctx, acc1.GetAddress()).String())
 
 	buyExecuted := sdk.ZeroDec()
 	sellExecuted := sdk.ZeroDec()
@@ -212,8 +212,8 @@ func TestFillDepthBookSecondCase(t *testing.T) {
 		sdk.NewDecCoinFromDec(common.NativeToken, sdk.MustNewDecFromStr("109.7308")), // 100 + 10 * (1 - 0.001) - 0.004
 		sdk.NewDecCoinFromDec(common.TestToken, sdk.MustNewDecFromStr("97.9")),       // no change
 	}
-	require.EqualValues(t, expectCoins0.String(), acc0.GetCoins().String())
-	require.EqualValues(t, expectCoins1.String(), acc1.GetCoins().String())
+	require.EqualValues(t, expectCoins0.String(), testInput.BankKeeper.GetAllBalances(ctx, acc0.GetAddress()).String())
+	require.EqualValues(t, expectCoins1.String(), testInput.BankKeeper.GetAllBalances(ctx, acc1.GetAddress()).String())
 }
 
 func TestPartialFillDepthBook(t *testing.T) {
@@ -255,8 +255,8 @@ func TestPartialFillDepthBook(t *testing.T) {
 		sdk.NewDecCoinFromDec(common.NativeToken, sdk.MustNewDecFromStr("99.4816")),
 		sdk.NewDecCoinFromDec(common.TestToken, sdk.MustNewDecFromStr("96")),
 	}
-	require.EqualValues(t, expectCoins0.String(), acc0.GetCoins().String())
-	require.EqualValues(t, expectCoins1.String(), acc1.GetCoins().String())
+	require.EqualValues(t, expectCoins0.String(), testInput.BankKeeper.GetAllBalances(ctx, acc0.GetAddress()).String())
+	require.EqualValues(t, expectCoins1.String(), testInput.BankKeeper.GetAllBalances(ctx, acc1.GetAddress()).String())
 
 	// call fillDepthBook
 	buyExecuted := sdk.ZeroDec()
@@ -310,8 +310,8 @@ func TestPartialFillDepthBook(t *testing.T) {
 		sdk.NewDecCoinFromDec(common.NativeToken, sdk.MustNewDecFromStr("99.4816")), // no change
 		sdk.NewDecCoinFromDec(common.TestToken, sdk.MustNewDecFromStr("96")),        // no change
 	}
-	require.EqualValues(t, expectCoins0.String(), acc0.GetCoins().String())
-	require.EqualValues(t, expectCoins1.String(), acc1.GetCoins().String())
+	require.EqualValues(t, expectCoins0.String(), testInput.BankKeeper.GetAllBalances(ctx, acc0.GetAddress()).String())
+	require.EqualValues(t, expectCoins1.String(), testInput.BankKeeper.GetAllBalances(ctx, acc1.GetAddress()).String())
 
 	// fill orders[1] & orders[2]
 	remainDeals = int64(1000)
@@ -335,8 +335,8 @@ func TestPartialFillDepthBook(t *testing.T) {
 		sdk.NewDecCoinFromDec(common.NativeToken, sdk.MustNewDecFromStr("129.7108")), // 99.4816 + 0.2592 + 30 * (1 - 0.001)
 		sdk.NewDecCoinFromDec(common.TestToken, sdk.MustNewDecFromStr("96")),         // no change
 	}
-	require.EqualValues(t, expectCoins0.String(), acc0.GetCoins().String())
-	require.EqualValues(t, expectCoins1.String(), acc1.GetCoins().String())
+	require.EqualValues(t, expectCoins0.String(), testInput.BankKeeper.GetAllBalances(ctx, acc0.GetAddress()).String())
+	require.EqualValues(t, expectCoins1.String(), testInput.BankKeeper.GetAllBalances(ctx, acc1.GetAddress()).String())
 }
 
 func TestFillDepthBookByZeroMaxExecution(t *testing.T) {

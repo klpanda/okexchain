@@ -3,17 +3,18 @@ package params
 import (
 	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	sdkparams "github.com/cosmos/cosmos-sdk/x/params"
+	sdkparamskeeper "github.com/cosmos/cosmos-sdk/x/params/keeper"
+	sdkparamstypes "github.com/cosmos/cosmos-sdk/x/params/types"
 
 	"github.com/okex/okchain/x/params/types"
 )
 
 // Keeper is the struct of params keeper
 type Keeper struct {
-	cdc *codec.Codec
-	sdkparams.Keeper
+	cdc codec.Marshaler
+	sdkparamskeeper.Keeper
 	// the reference to the Paramstore to get and set gov specific params
-	paramSpace sdkparams.Subspace
+	paramSpace sdkparamstypes.Subspace
 	// the reference to the DelegationSet and ValidatorSet to get information about validators and delegators
 	sk StakingKeeper
 	// the reference to the CoinKeeper to modify balances
@@ -23,10 +24,10 @@ type Keeper struct {
 }
 
 // NewKeeper creates a new instance of params keeper
-func NewKeeper(cdc *codec.Codec, key *sdk.KVStoreKey, tkey *sdk.TransientStoreKey, codespace sdk.CodespaceType) (
+func NewKeeper(cdc codec.Marshaler, key *sdk.KVStoreKey, tkey *sdk.TransientStoreKey) (
 	k Keeper) {
 	k = Keeper{
-		Keeper: sdkparams.NewKeeper(cdc, key, tkey, codespace),
+		Keeper: sdkparamskeeper.NewKeeper(cdc, key, tkey),
 	}
 	k.cdc = cdc
 	k.paramSpace = k.Subspace(DefaultParamspace).WithKeyTable(types.ParamKeyTable())

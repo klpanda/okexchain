@@ -21,15 +21,16 @@ func ModuleAccountInvariant(keeper keeper.Keeper) sdk.Invariant {
 		var expectedDeposits sdk.Coins
 
 		keeper.IterateAllDeposits(ctx, func(deposit types.Deposit) bool {
-			expectedDeposits = expectedDeposits.Add(deposit.Amount)
+			expectedDeposits = expectedDeposits.Add(deposit.Amount...)
 			return false
 		})
 
 		macc := keeper.GetGovernanceAccount(ctx)
-		broken := !macc.GetCoins().IsEqual(expectedDeposits)
+		bals := keeper.BankKeeper().GetAllBalances(ctx, macc.GetAddress())
+		broken := !bals.IsEqual(expectedDeposits)
 
 		return sdk.FormatInvariant(types.ModuleName, "deposits",
 			fmt.Sprintf("\tgov ModuleAccount coins: %s\n\tsum of deposit amounts:  %s\n",
-				macc.GetCoins(), expectedDeposits)), broken
+				bals, expectedDeposits)), broken
 	}
 }

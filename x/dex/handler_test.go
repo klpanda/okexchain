@@ -1,6 +1,8 @@
 package dex
 
 import (
+	"github.com/cosmos/cosmos-sdk/client"
+	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	"testing"
 
 	"github.com/okex/okchain/x/common"
@@ -12,21 +14,24 @@ import (
 )
 
 func getMockTestCaseEvn(t *testing.T) (mApp *mockApp,
-	tkKeeper *mockTokenKeeper, spKeeper *mockSupplyKeeper, dexKeeper *mockDexKeeper, testContext sdk.Context) {
+	tkKeeper *mockTokenKeeper, spKeeper *mockBankKeeper, dexKeeper *mockDexKeeper, testContext sdk.Context, cliCtx client.Context) {
 	fakeTokenKeeper := newMockTokenKeeper()
-	fakeSupplyKeeper := newMockSupplyKeeper()
+	fakeBankKeeper := newMockBankKeeper()
 
-	mApp, mockDexKeeper, err := newMockApp(fakeTokenKeeper, fakeSupplyKeeper, 10)
-	require.True(t, err == nil)
+	mApp, mockDexKeeper, err := newMockApp(fakeTokenKeeper, fakeBankKeeper, 10)
+	require.Nil(t, err)
 
 	mApp.BeginBlock(abci.RequestBeginBlock{Header: abci.Header{Height: 2}})
 	ctx := mApp.BaseApp.NewContext(false, abci.Header{})
+	clientCtx := client.NewContext().WithJSONMarshaler(mApp.AppCodec).
+		WithAccountRetriever(authtypes.NewAccountRetriever(mApp.AppCodec)).
+		WithCodec(mApp.Cdc)
 
-	return mApp, fakeTokenKeeper, fakeSupplyKeeper, mockDexKeeper, ctx
+	return mApp, fakeTokenKeeper, fakeBankKeeper, mockDexKeeper, ctx, clientCtx
 }
 
 func TestHandler_HandleMsgList(t *testing.T) {
-	mApp, tkKeeper, spKeeper, mDexKeeper, ctx := getMockTestCaseEvn(t)
+	mApp, tkKeeper, spKeeper, mDexKeeper, ctx, _ := getMockTestCaseEvn(t)
 
 	address := mApp.GenesisAccounts[0].GetAddress()
 	listMsg := NewMsgList(address, "btc", common.NativeToken, sdk.NewDec(10))
@@ -35,33 +40,32 @@ func TestHandler_HandleMsgList(t *testing.T) {
 
 	// fail case : failed to list because token is invalid
 	tkKeeper.exist = false
-	badResult := handlerFunctor(ctx, listMsg)
-	require.True(t, badResult.Code != sdk.CodeOK)
+	badResult, err  := handlerFunctor(ctx, &listMsg)
+	require.NotNil(t, err)
 
 	// fail case : failed to list because tokenpair has been exist
 	tkKeeper.exist = true
-	badResult = handlerFunctor(ctx, listMsg)
-	require.True(t, badResult.Code != sdk.CodeOK)
+	badResult, err = handlerFunctor(ctx, &listMsg)
+	require.NotNil(t, err)
 	require.True(t, badResult.Events == nil)
 
 	// fail case : failed to list because SendCoinsFromModuleToAccount return error
 	tkKeeper.exist = true
 	mDexKeeper.getFakeTokenPair = false
 	spKeeper.behaveEvil = true
-	badResult = handlerFunctor(ctx, listMsg)
-	require.True(t, badResult.Code != sdk.CodeOK)
-
+	badResult, err = handlerFunctor(ctx, &listMsg)
+	require.NotNil(t, err)
 	// successful case
 	tkKeeper.exist = true
 	spKeeper.behaveEvil = false
 	mDexKeeper.getFakeTokenPair = false
-	goodResult := handlerFunctor(ctx, listMsg)
-	require.True(t, goodResult.Code == sdk.CodeOK)
+	goodResult, err := handlerFunctor(ctx, &listMsg)
+	require.Nil(t, err)
 	require.True(t, goodResult.Events != nil)
 }
 
 func TestHandler_HandleMsgDeposit(t *testing.T) {
-	mApp, _, _, mDexKeeper, ctx := getMockTestCaseEvn(t)
+	mApp, _, _, mDexKeeper, ctx, _ := getMockTestCaseEvn(t)
 	builtInTP := GetBuiltInTokenPair()
 	depositMsg := NewMsgDeposit(builtInTP.Name(),
 		sdk.NewDecCoin(builtInTP.QuoteAssetSymbol, sdk.NewInt(100)), builtInTP.Owner)
@@ -70,18 +74,18 @@ func TestHandler_HandleMsgDeposit(t *testing.T) {
 
 	// Case1: failed to deposit
 	mDexKeeper.failToDeposit = true
-	bad1 := handlerFunctor(ctx, depositMsg)
-	require.True(t, bad1.Code != sdk.CodeOK)
+	_, err  := handlerFunctor(ctx, &depositMsg)
+	require.NotNil(t, err)
 
 	// Case2: success to deposit
 	mDexKeeper.failToDeposit = false
-	good1 := handlerFunctor(ctx, depositMsg)
-	require.True(t, good1.Code == sdk.CodeOK)
+	good1, err := handlerFunctor(ctx, &depositMsg)
+	require.Nil(t, err)
 	require.True(t, good1.Events != nil)
 }
 
 func TestHandler_HandleMsgWithdraw(t *testing.T) {
-	mApp, _, _, mDexKeeper, ctx := getMockTestCaseEvn(t)
+	mApp, _, _, mDexKeeper, ctx, _ := getMockTestCaseEvn(t)
 	builtInTP := GetBuiltInTokenPair()
 	withdrawMsg := NewMsgWithdraw(builtInTP.Name(),
 		sdk.NewDecCoin(builtInTP.QuoteAssetSymbol, sdk.NewInt(100)), builtInTP.Owner)
@@ -90,26 +94,25 @@ func TestHandler_HandleMsgWithdraw(t *testing.T) {
 
 	// Case1: failed to deposit
 	mDexKeeper.failToWithdraw = true
-	bad1 := handlerFunctor(ctx, withdrawMsg)
-	require.True(t, bad1.Code != sdk.CodeOK)
-
+	_, err := handlerFunctor(ctx, &withdrawMsg)
+	require.NotNil(t, err)
 	// Case2: success to deposit
 	mDexKeeper.failToWithdraw = false
-	good1 := handlerFunctor(ctx, withdrawMsg)
-	require.True(t, good1.Code == sdk.CodeOK)
+	good1 , err := handlerFunctor(ctx, &withdrawMsg)
+	require.Nil(t, err)
 	require.True(t, good1.Events != nil)
 }
 
 func TestHandler_HandleMsgBad(t *testing.T) {
-	mApp, _, _, _, ctx := getMockTestCaseEvn(t)
+	mApp, _, _, _, ctx, _ := getMockTestCaseEvn(t)
 	handlerFunctor := NewHandler(mApp.dexKeeper)
 
-	res := handlerFunctor(ctx, sdk.NewTestMsg())
-	require.False(t, res.Code.IsOK())
+	_, err := handlerFunctor(ctx, sdk.NewTestMsg())
+	require.Nil(t, err)
 }
 
 func TestHandler_handleMsgTransferOwnership(t *testing.T) {
-	mApp, _, spKeeper, mDexKeeper, ctx := getMockTestCaseEvn(t)
+	mApp, _, spKeeper, mDexKeeper, ctx, _ := getMockTestCaseEvn(t)
 
 	tokenPair := GetBuiltInTokenPair()
 	err := mDexKeeper.SaveTokenPair(ctx, tokenPair)
@@ -118,17 +121,17 @@ func TestHandler_handleMsgTransferOwnership(t *testing.T) {
 	to := mApp.GenesisAccounts[0].GetAddress()
 
 	// successful case
-	msgTransferOwnership := types.NewMsgTransferOwnership(tokenPair.Owner, to, tokenPair.Name())
+	msgTransferOwnership := types.NewMsgTransferOwnership(tokenPair.Owner, to, tokenPair.Name(), nil, nil)
 	spKeeper.behaveEvil = false
-	handlerFunctor(ctx, msgTransferOwnership)
+	handlerFunctor(ctx, &msgTransferOwnership)
 
 	// fail case : failed to TransferOwnership because product is not exist
-	msgFailedTransferOwnership := types.NewMsgTransferOwnership(tokenPair.Owner, to, "no-product")
+	msgFailedTransferOwnership := types.NewMsgTransferOwnership(tokenPair.Owner, to, "no-product", nil, nil)
 	spKeeper.behaveEvil = false
-	handlerFunctor(ctx, msgFailedTransferOwnership)
+	handlerFunctor(ctx, &msgFailedTransferOwnership)
 
 	// fail case : failed to SendCoinsFromModuleToAccount return error
-	msgFailedTransferOwnership = types.NewMsgTransferOwnership(tokenPair.Owner, to, tokenPair.Name())
+	msgFailedTransferOwnership = types.NewMsgTransferOwnership(tokenPair.Owner, to, tokenPair.Name(), nil, nil)
 	spKeeper.behaveEvil = true
-	handlerFunctor(ctx, msgFailedTransferOwnership)
+	handlerFunctor(ctx, &msgFailedTransferOwnership)
 }

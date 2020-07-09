@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"github.com/cosmos/cosmos-sdk/client/flags"
 	"strings"
 
 	"github.com/spf13/viper"
@@ -9,7 +10,6 @@ import (
 	"github.com/okex/okchain/x/dex/types"
 
 	"github.com/cosmos/cosmos-sdk/client"
-	"github.com/cosmos/cosmos-sdk/client/context"
 	"github.com/cosmos/cosmos-sdk/codec"
 	"github.com/spf13/cobra"
 )
@@ -18,10 +18,10 @@ import (
 func GetQueryCmd(queryRoute string, cdc *codec.Codec) *cobra.Command {
 	queryCmd := &cobra.Command{
 		Use:   "dex",
-		Short: "Querying commands for the dex module",
+		Short: "Querying commands fe dex module",
 	}
 
-	queryCmd.AddCommand(client.GetCommands(
+	queryCmd.AddCommand(flags.GetCommands(
 		GetCmdQueryProducts(queryRoute, cdc),
 		GetCmdQueryDeposits(queryRoute, cdc),
 		GetCmdQueryMatchOrder(queryRoute, cdc),
@@ -38,7 +38,7 @@ func GetCmdQueryProducts(queryRoute string, cdc *codec.Codec) *cobra.Command {
 		Use:   "products",
 		Short: "Query the list of token pairs",
 		RunE: func(_ *cobra.Command, _ []string) error {
-			cliCtx := context.NewCLIContext().WithCodec(cdc)
+			cliCtx := client.NewContext().WithCodec(cdc)
 			ownerAddress := viper.GetString("owner")
 			page := viper.GetInt("page-number")
 			perPage := viper.GetInt("items-per-page")
@@ -84,7 +84,7 @@ func GetCmdQueryDeposits(queryRoute string, cdc *codec.Codec) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			cliCtx := context.NewCLIContext().WithCodec(cdc)
+			cliCtx := client.NewContext().WithCodec(cdc)
 			res, _, err := cliCtx.QueryWithData(
 				fmt.Sprintf("custom/%s/%s", queryRoute, types.QueryDeposits), bz)
 			if err != nil {
@@ -115,7 +115,7 @@ func GetCmdQueryMatchOrder(queryRoute string, cdc *codec.Codec) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			cliCtx := context.NewCLIContext().WithCodec(cdc)
+			cliCtx := client.NewContext().WithCodec(cdc)
 			res, _, err := cliCtx.QueryWithData(fmt.Sprintf("custom/%s/%s", queryRoute, types.QueryMatchOrder), bz)
 			if err != nil {
 				return err
@@ -141,7 +141,7 @@ $ okchaincli query dex params
 `),
 		Args: cobra.NoArgs,
 		RunE: func(_ *cobra.Command, _ []string) error {
-			cliCtx := context.NewCLIContext().WithCodec(cdc)
+			cliCtx := client.NewContext().WithCodec(cdc)
 
 			route := fmt.Sprintf("custom/%s/%s", queryRoute, types.QueryParameters)
 			bz, _, err := cliCtx.QueryWithData(route, nil)
@@ -166,7 +166,7 @@ func GetCmdQueryProductsUnderDelisting(queryRoute string, cdc *codec.Codec) *cob
 
 $ okchaincli query dex products-delisting`),
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			cliCtx := context.NewCLIContext().WithCodec(cdc)
+			cliCtx := client.NewContext().WithCodec(cdc)
 			res, _, err := cliCtx.QueryWithData(fmt.Sprintf("custom/%s/%s", queryRoute, types.QueryProductsDelisting), nil)
 			if err != nil {
 				return err

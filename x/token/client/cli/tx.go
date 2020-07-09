@@ -1,18 +1,17 @@
 package cli
 
 import (
+	"bufio"
 	"fmt"
+	"github.com/cosmos/cosmos-sdk/client/flags"
+	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	"io/ioutil"
 	"strings"
 
 	"github.com/cosmos/cosmos-sdk/client"
-	"github.com/cosmos/cosmos-sdk/client/context"
-	"github.com/cosmos/cosmos-sdk/client/keys"
 	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/cosmos/cosmos-sdk/x/auth"
-	authTypes "github.com/cosmos/cosmos-sdk/x/auth"
-	"github.com/cosmos/cosmos-sdk/x/auth/client/utils"
+	authclient "github.com/cosmos/cosmos-sdk/x/auth/client"
 	"github.com/okex/okchain/x/token/types"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -60,7 +59,7 @@ func GetTxCmd(storeKey string, cdc *codec.Codec) *cobra.Command {
 		RunE:                       client.ValidateCmd,
 	}
 
-	distTxCmd.AddCommand(client.PostCommands(
+	distTxCmd.AddCommand(flags.PostCommands(
 		getCmdTokenIssue(cdc),
 		getCmdTokenBurn(cdc),
 		getCmdTokenMint(cdc),
@@ -81,10 +80,11 @@ func getCmdTokenIssue(cdc *codec.Codec) *cobra.Command {
 		//Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 
-			cliCtx := context.NewCLIContext().WithCodec(cdc)
-			txBldr := auth.NewTxBuilderFromCLI().WithTxEncoder(utils.GetTxEncoder(cdc))
+			cliCtx := client.NewContext().WithCodec(cdc)
+			inBuf := bufio.NewReader(cmd.InOrStdin())
+			txBldr := authtypes.NewTxBuilderFromCLI(inBuf).WithTxEncoder(authclient.GetTxEncoder(cdc))
 
-			if err := authTypes.NewAccountRetriever(cliCtx).EnsureExists(cliCtx.FromAddress); err != nil {
+			if err := authtypes.NewAccountRetriever(authclient.Codec).EnsureExists(cliCtx, cliCtx.FromAddress); err != nil {
 				return err
 			}
 
@@ -130,11 +130,11 @@ func getCmdTokenIssue(cdc *codec.Codec) *cobra.Command {
 			// totalSupply int64 ,coins bigint
 			msg := types.NewMsgTokenIssue(tokenDesc, symbol, originalSymbol, wholeName, totalSupply, cliCtx.FromAddress, mintable)
 
-			return utils.CompleteAndBroadcastTxCLI(txBldr, cliCtx, []sdk.Msg{msg})
+			return authclient.CompleteAndBroadcastTxCLI(txBldr, cliCtx, []sdk.Msg{&msg})
 		},
 	}
 
-	cmd.Flags().StringP(Symbol, "s", "", "symbol of the new token")
+	cmd.Flags().String(Symbol, "", "symbol of the new token")
 	cmd.Flags().StringP(WholeName, "w", "", "whole name of the new token")
 	cmd.Flags().String(TokenDesc, "", "describe of the token")
 	cmd.Flags().StringP(TotalSupply, "n", "0", "total supply of the new token")
@@ -151,10 +151,11 @@ func getCmdTokenBurn(cdc *codec.Codec) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 
-			cliCtx := context.NewCLIContext().WithCodec(cdc)
-			txBldr := auth.NewTxBuilderFromCLI().WithTxEncoder(utils.GetTxEncoder(cdc))
+			cliCtx := client.NewContext().WithCodec(cdc)
+			inBuf := bufio.NewReader(cmd.InOrStdin())
+			txBldr := authtypes.NewTxBuilderFromCLI(inBuf).WithTxEncoder(authclient.GetTxEncoder(cdc))
 
-			if err := authTypes.NewAccountRetriever(cliCtx).EnsureExists(cliCtx.FromAddress); err != nil {
+			if err := authtypes.NewAccountRetriever(authclient.Codec).EnsureExists(cliCtx, cliCtx.FromAddress); err != nil {
 				return err
 			}
 
@@ -173,7 +174,7 @@ func getCmdTokenBurn(cdc *codec.Codec) *cobra.Command {
 
 			msg := types.NewMsgTokenBurn(amount, cliCtx.FromAddress)
 
-			return utils.CompleteAndBroadcastTxCLI(txBldr, cliCtx, []sdk.Msg{msg})
+			return authclient.CompleteAndBroadcastTxCLI(txBldr, cliCtx, []sdk.Msg{&msg})
 		},
 	}
 	return cmd
@@ -187,26 +188,27 @@ func getCmdTokenMint(cdc *codec.Codec) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 
-			cliCtx := context.NewCLIContext().WithCodec(cdc)
-			txBldr := auth.NewTxBuilderFromCLI().WithTxEncoder(utils.GetTxEncoder(cdc))
-			if err := authTypes.NewAccountRetriever(cliCtx).EnsureExists(cliCtx.FromAddress); err != nil {
+			cliCtx := client.NewContext().WithCodec(cdc)
+			inBuf := bufio.NewReader(cmd.InOrStdin())
+			txBldr := authtypes.NewTxBuilderFromCLI(inBuf).WithTxEncoder(authclient.GetTxEncoder(cdc))
+			if err := authtypes.NewAccountRetriever(authclient.Codec).EnsureExists(cliCtx, cliCtx.FromAddress); err != nil {
 				return err
 			}
-			flags := cmd.Flags()
+			flag := cmd.Flags()
 
 			amount, err := sdk.ParseDecCoin(args[0])
 			if err != nil {
 				return err
 			}
 
-			_, err = flags.GetString(From)
+			_, err = flag.GetString(From)
 			if err != nil {
 				return errFromNotValid
 			}
 
 			msg := types.NewMsgTokenMint(amount, cliCtx.FromAddress)
 
-			return utils.CompleteAndBroadcastTxCLI(txBldr, cliCtx, []sdk.Msg{msg})
+			return authclient.CompleteAndBroadcastTxCLI(txBldr, cliCtx, []sdk.Msg{&msg})
 		},
 	}
 	return cmd
@@ -219,9 +221,10 @@ func getCmdTokenMultiSend(cdc *codec.Codec) *cobra.Command {
 		Short: "Create and sign a multi send tx",
 		//Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cliCtx := context.NewCLIContext().WithCodec(cdc)
-			txBldr := auth.NewTxBuilderFromCLI().WithTxEncoder(utils.GetTxEncoder(cdc))
-			if err := authTypes.NewAccountRetriever(cliCtx).EnsureExists(cliCtx.FromAddress); err != nil {
+			cliCtx := client.NewContext().WithCodec(cdc)
+			inBuf := bufio.NewReader(cmd.InOrStdin())
+			txBldr := authtypes.NewTxBuilderFromCLI(inBuf).WithTxEncoder(authclient.GetTxEncoder(cdc))
+			if err := authtypes.NewAccountRetriever(authclient.Codec).EnsureExists(cliCtx, cliCtx.FromAddress); err != nil {
 				return err
 			}
 			flags := cmd.Flags()
@@ -270,7 +273,7 @@ func getCmdTokenMultiSend(cdc *codec.Codec) *cobra.Command {
 
 			msg := types.NewMsgMultiSend(cliCtx.FromAddress, transfers)
 
-			return utils.CompleteAndBroadcastTxCLI(txBldr, cliCtx, []sdk.Msg{msg})
+			return authclient.CompleteAndBroadcastTxCLI(txBldr, cliCtx, []sdk.Msg{&msg})
 		},
 	}
 	cmd.Flags().String(Transfers, "", `Transfers details, format: [{"to": "addr", "amount": "1okt,2btc"}, ...]`)
@@ -287,9 +290,10 @@ func getCmdTransferOwnership(cdc *codec.Codec) *cobra.Command {
 		//Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 
-			cliCtx := context.NewCLIContext().WithCodec(cdc)
-			txBldr := auth.NewTxBuilderFromCLI().WithTxEncoder(utils.GetTxEncoder(cdc))
-			if err := authTypes.NewAccountRetriever(cliCtx).EnsureExists(cliCtx.FromAddress); err != nil {
+			cliCtx := client.NewContext().WithCodec(cdc)
+			inBuf := bufio.NewReader(cmd.InOrStdin())
+			txBldr := authtypes.NewTxBuilderFromCLI(inBuf).WithTxEncoder(authclient.GetTxEncoder(cdc))
+			if err := authtypes.NewAccountRetriever(authclient.Codec).EnsureExists(cliCtx, cliCtx.FromAddress); err != nil {
 				return err
 			}
 			flags := cmd.Flags()
@@ -309,17 +313,17 @@ func getCmdTransferOwnership(cdc *codec.Codec) *cobra.Command {
 
 			from := cliCtx.GetFromAddress()
 
-			toBytes, err := sdk.AccAddressFromBech32(to)
+			toAddr, err := sdk.AccAddressFromBech32(to)
 			if err != nil {
 				return errFromNotValid
 			}
 
-			msg := types.NewMsgTransferOwnership(from, toBytes, symbol)
+			msg := types.NewMsgTransferOwnership(from, toAddr, symbol)
 
-			return utils.PrintUnsignedStdTx(txBldr, cliCtx, []sdk.Msg{msg})
+			return authclient.PrintUnsignedStdTx(txBldr, cliCtx, []sdk.Msg{&msg})
 		},
 	}
-	cmd.Flags().StringP("symbol", "s", "", "symbol of the token to be transferred")
+	cmd.Flags().String("symbol", "", "symbol of the token to be transferred")
 	cmd.Flags().String("to", "", "the user to be transferred")
 	return cmd
 }
@@ -331,50 +335,40 @@ func getMultiSignsCmd(cdc *codec.Codec) *cobra.Command {
 		Short: "append signature to the chown unsignedtx file",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cliCtx := context.NewCLIContext().WithCodec(cdc)
-			txBldr := auth.NewTxBuilderFromCLI().WithTxEncoder(utils.GetTxEncoder(cdc))
+			cliCtx := client.NewContext().WithCodec(cdc)
+			inBuf := bufio.NewReader(cmd.InOrStdin())
+			txBldr := authtypes.NewTxBuilderFromCLI(inBuf).WithTxEncoder(authclient.GetTxEncoder(cdc))
 
-			stdTx, err := utils.ReadStdTxFromFile(cdc, args[0])
+			stdTx, err := authclient.ReadTxFromFile(cliCtx, args[0])
 			if err != nil {
 				return err
 			}
 
-			if len(stdTx.Msgs) == 0 {
+			if len(stdTx.GetMsgs()) == 0 {
 				return err
 			}
 
-			msg, ok := stdTx.Msgs[0].(types.MsgTransferOwnership)
+			msg, ok := stdTx.GetMsgs()[0].(*types.MsgTransferOwnership)
 			if !ok {
 				// todo
 				return errSign
 			}
 
-			flags := cmd.Flags()
-			_, err = flags.GetString(From)
+			flag := cmd.Flags()
+			_, err = flag.GetString(From)
 			if err != nil {
 				return errFromNotValid
 			}
 
-			//
-			passphrase, err := keys.GetPassphrase(cliCtx.GetFromName())
-			if err != nil {
-				return err
-			}
-			ToSignature, _, err := txBldr.Keybase().Sign(cliCtx.GetFromName(), passphrase, msg.GetSignBytes())
+			toSignature, pub, err := txBldr.Keybase().Sign(cliCtx.GetFromName(), msg.GetSignBytes())
 			if err != nil {
 				return errSign
 			}
-			info, err := txBldr.Keybase().Get(cliCtx.GetFromName())
-			if err != nil {
-				return err
-			}
-			stdSig := auth.StdSignature{
-				PubKey:    info.GetPubKey(),
-				Signature: ToSignature,
-			}
-			msg.ToSignature = stdSig
 
-			return utils.PrintUnsignedStdTx(txBldr, cliCtx, []sdk.Msg{msg})
+			msg.Pubkey = pub.Bytes()
+			msg.ToSignature = toSignature
+
+			return authclient.PrintUnsignedStdTx(txBldr, cliCtx, []sdk.Msg{msg})
 
 		},
 	}
@@ -388,8 +382,9 @@ func SendTxCmd(cdc *codec.Codec) *cobra.Command {
 		Short: "Create and sign a send tx",
 		Args:  cobra.ExactArgs(3),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			txBldr := auth.NewTxBuilderFromCLI().WithTxEncoder(utils.GetTxEncoder(cdc))
-			cliCtx := context.NewCLIContextWithFrom(args[0]).WithCodec(cdc)
+			inBuf := bufio.NewReader(cmd.InOrStdin())
+			txBldr := authtypes.NewTxBuilderFromCLI(inBuf).WithTxEncoder(authclient.GetTxEncoder(cdc))
+			cliCtx := client.NewContextWithFrom(args[0]).WithCodec(cdc)
 
 			to, err := sdk.AccAddressFromBech32(args[1])
 			if err != nil {
@@ -403,11 +398,11 @@ func SendTxCmd(cdc *codec.Codec) *cobra.Command {
 
 			// build and sign the transaction, then broadcast to Tendermint
 			msg := types.NewMsgTokenSend(cliCtx.GetFromAddress(), to, coins)
-			return utils.GenerateOrBroadcastMsgs(cliCtx, txBldr, []sdk.Msg{msg})
+			return authclient.GenerateOrBroadcastMsgs(cliCtx, txBldr, []sdk.Msg{&msg})
 		},
 	}
 
-	cmd = client.PostCommands(cmd)[0]
+	cmd = flags.PostCommands(cmd)[0]
 
 	return cmd
 }
@@ -420,10 +415,11 @@ func getCmdTokenEdit(cdc *codec.Codec) *cobra.Command {
 		//Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 
-			cliCtx := context.NewCLIContext().WithCodec(cdc)
-			txBldr := auth.NewTxBuilderFromCLI().WithTxEncoder(utils.GetTxEncoder(cdc))
+			cliCtx := client.NewContext().WithCodec(cdc)
+			inBuf := bufio.NewReader(cmd.InOrStdin())
+			txBldr := authtypes.NewTxBuilderFromCLI(inBuf).WithTxEncoder(authclient.GetTxEncoder(cdc))
 
-			if err := authTypes.NewAccountRetriever(cliCtx).EnsureExists(cliCtx.FromAddress); err != nil {
+			if err := authtypes.NewAccountRetriever(authclient.Codec).EnsureExists(cliCtx, cliCtx.FromAddress); err != nil {
 				return err
 			}
 
@@ -468,10 +464,10 @@ func getCmdTokenEdit(cdc *codec.Codec) *cobra.Command {
 			}
 
 			msg := types.NewMsgTokenModify(symbol, tokenDesc, wholeName, isDescEdit, isWholeNameEdit, cliCtx.FromAddress)
-			return utils.CompleteAndBroadcastTxCLI(txBldr, cliCtx, []sdk.Msg{msg})
+			return authclient.CompleteAndBroadcastTxCLI(txBldr, cliCtx, []sdk.Msg{&msg})
 		},
 	}
-	cmd.Flags().StringP(Symbol, "s", "", "symbol of the token")
+	cmd.Flags().String(Symbol, "", "symbol of the token")
 	cmd.Flags().StringP(WholeName, "w", "", "whole name of the token")
 	cmd.Flags().String(TokenDesc, "", "description of the token")
 

@@ -1,6 +1,13 @@
 package keeper
 
 import (
+	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
+	cryptocodec "github.com/cosmos/cosmos-sdk/crypto/codec"
+	authkeeper "github.com/cosmos/cosmos-sdk/x/auth/keeper"
+	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
+	bankkeeper "github.com/cosmos/cosmos-sdk/x/bank/keeper"
+	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
+	stakingtypes "github.com/okex/okchain/x/staking/types"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -14,10 +21,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/codec"
 	"github.com/cosmos/cosmos-sdk/store"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/cosmos/cosmos-sdk/x/auth"
-	"github.com/cosmos/cosmos-sdk/x/bank"
-	"github.com/cosmos/cosmos-sdk/x/params"
-	"github.com/cosmos/cosmos-sdk/x/supply"
+	"github.com/okex/okchain/x/params"
 	"github.com/okex/okchain/x/staking"
 
 	"github.com/okex/okchain/x/distribution/types"
@@ -63,7 +67,7 @@ var (
 		valAccAddr1, valAccAddr2, valAccAddr3, valAccAddr4,
 	}
 
-	distrAcc = supply.NewEmptyModuleAccount(types.ModuleName)
+	distrAcc = authtypes.NewEmptyModuleAccount(types.ModuleName)
 )
 
 // GetTestAddrs returns valOpAddrs, valConsPks, valConsAddrs for test
@@ -87,12 +91,11 @@ func NewTestDecCoin(i int64, precison int64) sdk.DecCoin {
 // MakeTestCodec creates a codec used only for testing
 func MakeTestCodec() *codec.Codec {
 	var cdc = codec.New()
-	bank.RegisterCodec(cdc)
-	staking.RegisterCodec(cdc)
-	auth.RegisterCodec(cdc)
-	supply.RegisterCodec(cdc)
+	banktypes.RegisterCodec(cdc)
+	stakingtypes.RegisterCodec(cdc)
+	authtypes.RegisterCodec(cdc)
 	sdk.RegisterCodec(cdc)
-	codec.RegisterCrypto(cdc)
+	cryptocodec.RegisterCrypto(cdc)
 
 	types.RegisterCodec(cdc) // distr
 	return cdc
@@ -100,33 +103,34 @@ func MakeTestCodec() *codec.Codec {
 
 // CreateTestInputDefault test input with default values
 func CreateTestInputDefault(t *testing.T, isCheckTx bool, initPower int64) (
-	sdk.Context, auth.AccountKeeper, Keeper, staking.Keeper, types.SupplyKeeper) {
+	sdk.Context, authkeeper.AccountKeeper, Keeper, staking.Keeper, types.BankKeeper) {
 	communityTax := sdk.NewDecWithPrec(2, 2)
-	ctx, ak, _, dk, sk, _, supplyKeeper := CreateTestInputAdvanced(t, isCheckTx, initPower, communityTax)
+	ctx, ak, bk, dk, sk, _ := CreateTestInputAdvanced(t, isCheckTx, initPower, communityTax)
 	sh := staking.NewHandler(sk)
 	valOpAddrs, valConsPks, _ := GetTestAddrs()
 	// create four validators
 	for i := int64(0); i < 4; i++ {
 		msg := staking.NewMsgCreateValidator(valOpAddrs[i], valConsPks[i],
 			staking.Description{}, NewTestDecCoin(i+1, 0))
-		require.True(t, sh(ctx, msg).IsOK())
+		_, err := sh(ctx, &msg)
+		require.Nil(t, err)
 		// assert initial state: zero current rewards
 		require.True(t, dk.GetValidatorAccumulatedCommission(ctx, valOpAddrs[i]).IsZero())
 	}
-	return ctx, ak, dk, sk, supplyKeeper
+	return ctx, ak, dk, sk, bk
 }
 
 // CreateTestInputAdvanced hogpodge of all sorts of input required for testing
 func CreateTestInputAdvanced(t *testing.T, isCheckTx bool, initPower int64, communityTax sdk.Dec) (
-	sdk.Context, auth.AccountKeeper, bank.Keeper, Keeper, staking.Keeper, params.Keeper, types.SupplyKeeper) {
+	sdk.Context, authkeeper.AccountKeeper, bankkeeper.BaseKeeper, Keeper, staking.Keeper, params.Keeper) {
 
 	initTokens := sdk.TokensFromConsensusPower(initPower)
 
 	keyDistr := sdk.NewKVStoreKey(types.StoreKey)
 	keyStaking := sdk.NewKVStoreKey(staking.StoreKey)
 	tkeyStaking := sdk.NewTransientStoreKey(staking.TStoreKey)
-	keyAcc := sdk.NewKVStoreKey(auth.StoreKey)
-	keySupply := sdk.NewKVStoreKey(supply.StoreKey)
+	keyAcc := sdk.NewKVStoreKey(authtypes.StoreKey)
+	keyBank := sdk.NewKVStoreKey(banktypes.StoreKey)
 	keyParams := sdk.NewKVStoreKey(params.StoreKey)
 	tkeyParams := sdk.NewTransientStoreKey(params.TStoreKey)
 
@@ -136,7 +140,7 @@ func CreateTestInputAdvanced(t *testing.T, isCheckTx bool, initPower int64, comm
 	ms.MountStoreWithDB(keyDistr, sdk.StoreTypeIAVL, db)
 	ms.MountStoreWithDB(tkeyStaking, sdk.StoreTypeTransient, nil)
 	ms.MountStoreWithDB(keyStaking, sdk.StoreTypeIAVL, db)
-	ms.MountStoreWithDB(keySupply, sdk.StoreTypeIAVL, db)
+	ms.MountStoreWithDB(keyBank, sdk.StoreTypeIAVL, db)
 	ms.MountStoreWithDB(keyAcc, sdk.StoreTypeIAVL, db)
 	ms.MountStoreWithDB(keyParams, sdk.StoreTypeIAVL, db)
 	ms.MountStoreWithDB(tkeyParams, sdk.StoreTypeTransient, db)
@@ -144,9 +148,9 @@ func CreateTestInputAdvanced(t *testing.T, isCheckTx bool, initPower int64, comm
 	err := ms.LoadLatestVersion()
 	require.Nil(t, err)
 
-	feeCollectorAcc := supply.NewEmptyModuleAccount(auth.FeeCollectorName)
-	notBondedPool := supply.NewEmptyModuleAccount(staking.NotBondedPoolName, supply.Burner, supply.Staking)
-	bondPool := supply.NewEmptyModuleAccount(staking.BondedPoolName, supply.Burner, supply.Staking)
+	feeCollectorAcc := authtypes.NewEmptyModuleAccount(authtypes.FeeCollectorName)
+	notBondedPool := authtypes.NewEmptyModuleAccount(staking.NotBondedPoolName, authtypes.Burner, authtypes.Staking)
+	bondPool := authtypes.NewEmptyModuleAccount(staking.BondedPoolName, authtypes.Burner, authtypes.Staking)
 
 	blacklistedAddrs := make(map[string]bool)
 	blacklistedAddrs[feeCollectorAcc.GetAddress().String()] = true
@@ -155,31 +159,31 @@ func CreateTestInputAdvanced(t *testing.T, isCheckTx bool, initPower int64, comm
 	blacklistedAddrs[distrAcc.GetAddress().String()] = true
 
 	cdc := MakeTestCodec()
-	pk := params.NewKeeper(cdc, keyParams, tkeyParams, params.DefaultCodespace)
+	interfaceRegistry := codectypes.NewInterfaceRegistry()
+	appCodec := codec.NewHybridCodec(cdc, interfaceRegistry)
+	pk := params.NewKeeper(appCodec, keyParams, tkeyParams)
 
 	ctx := sdk.NewContext(ms, abci.Header{ChainID: "foochainid"}, isCheckTx, log.NewNopLogger())
-	accountKeeper := auth.NewAccountKeeper(cdc, keyAcc, pk.Subspace(auth.DefaultParamspace), auth.ProtoBaseAccount)
-	bankKeeper := bank.NewBaseKeeper(accountKeeper, pk.Subspace(bank.DefaultParamspace),
-		bank.DefaultCodespace, blacklistedAddrs)
 	maccPerms := map[string][]string{
-		auth.FeeCollectorName:     nil,
+		authtypes.FeeCollectorName:     nil,
 		types.ModuleName:          nil,
-		staking.NotBondedPoolName: {supply.Burner, supply.Staking},
-		staking.BondedPoolName:    {supply.Burner, supply.Staking},
+		staking.NotBondedPoolName: {authtypes.Burner, authtypes.Staking},
+		staking.BondedPoolName:    {authtypes.Burner, authtypes.Staking},
 	}
-	supplyKeeper := supply.NewKeeper(cdc, keySupply, accountKeeper, bankKeeper, maccPerms)
+	accountKeeper := authkeeper.NewAccountKeeper(appCodec, keyAcc, pk.Subspace(authtypes.ModuleName), authtypes.ProtoBaseAccount, maccPerms)
+	bankKeeper := bankkeeper.NewBaseKeeper(appCodec, keyBank, accountKeeper, pk.Subspace(banktypes.ModuleName), blacklistedAddrs)
 
-	sk := staking.NewKeeper(cdc, keyStaking, tkeyStaking, supplyKeeper,
+	sk := staking.NewKeeper(appCodec, keyStaking, tkeyStaking, accountKeeper, bankKeeper,
 		pk.Subspace(staking.DefaultParamspace), staking.DefaultCodespace)
 	sk.SetParams(ctx, staking.DefaultParams())
 
-	keeper := NewKeeper(cdc, keyDistr, pk.Subspace(DefaultParamspace), sk, supplyKeeper,
-		types.DefaultCodespace, auth.FeeCollectorName, blacklistedAddrs)
+	keeper := NewKeeper(cdc, keyDistr, pk.Subspace(DefaultParamspace), sk, accountKeeper, bankKeeper,
+		types.DefaultCodespace, authtypes.FeeCollectorName, blacklistedAddrs)
 
 	keeper.SetWithdrawAddrEnabled(ctx, true)
 	initCoins := sdk.NewCoins(sdk.NewCoin(sk.BondDenom(ctx), initTokens))
 	totalSupply := sdk.NewCoins(sdk.NewCoin(sk.BondDenom(ctx), initTokens.MulRaw(int64(len(TestAddrs)))))
-	supplyKeeper.SetSupply(ctx, supply.NewSupply(totalSupply))
+	bankKeeper.SetSupply(ctx, banktypes.NewSupply(totalSupply))
 
 	// fill all the addresses with some coins, set the loose pool tokens simultaneously
 	for _, addr := range TestAddrs {
@@ -188,10 +192,10 @@ func CreateTestInputAdvanced(t *testing.T, isCheckTx bool, initPower int64, comm
 	}
 
 	// set module accounts
-	keeper.supplyKeeper.SetModuleAccount(ctx, feeCollectorAcc)
-	keeper.supplyKeeper.SetModuleAccount(ctx, notBondedPool)
-	keeper.supplyKeeper.SetModuleAccount(ctx, bondPool)
-	keeper.supplyKeeper.SetModuleAccount(ctx, distrAcc)
+	keeper.accKeeper.SetModuleAccount(ctx, feeCollectorAcc)
+	keeper.accKeeper.SetModuleAccount(ctx, notBondedPool)
+	keeper.accKeeper.SetModuleAccount(ctx, bondPool)
+	keeper.accKeeper.SetModuleAccount(ctx, distrAcc)
 
 	// set the distribution hooks on staking
 	sk.SetHooks(keeper.Hooks())
@@ -200,5 +204,5 @@ func CreateTestInputAdvanced(t *testing.T, isCheckTx bool, initPower int64, comm
 	keeper.SetFeePool(ctx, types.InitialFeePool())
 	keeper.SetCommunityTax(ctx, communityTax)
 
-	return ctx, accountKeeper, bankKeeper, keeper, sk, pk, supplyKeeper
+	return ctx, accountKeeper, bankKeeper, keeper, sk, pk
 }

@@ -2,6 +2,7 @@ package types
 
 import (
 	"fmt"
+	sdkerror "github.com/cosmos/cosmos-sdk/types/errors"
 	"strings"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -14,15 +15,6 @@ const (
 	OrderItemLimit            = 200
 	MultiCancelOrderItemLimit = 200
 )
-
-// nolint
-type MsgNewOrder struct {
-	Sender   sdk.AccAddress `json:"sender"`   // order maker address
-	Product  string         `json:"product"`  // product for trading pair in full name of the tokens
-	Side     string         `json:"side"`     // BUY/SELL
-	Price    sdk.Dec        `json:"price"`    // price of the order
-	Quantity sdk.Dec        `json:"quantity"` // quantity of the order
-}
 
 // NewMsgNewOrder is a constructor function for MsgNewOrder
 func NewMsgNewOrder(sender sdk.AccAddress, product string, side string, price string,
@@ -41,12 +33,6 @@ func NewMsgNewOrder(sender sdk.AccAddress, product string, side string, price st
 	}
 }
 
-// nolint
-type MsgCancelOrder struct {
-	Sender  sdk.AccAddress `json:"sender"`
-	OrderID string         `json:"order_id"`
-}
-
 // NewMsgCancelOrder is a constructor function for MsgCancelOrder
 func NewMsgCancelOrder(sender sdk.AccAddress, orderID string) MsgCancelOrders {
 	msgCancelOrder := MsgCancelOrders{
@@ -58,18 +44,7 @@ func NewMsgCancelOrder(sender sdk.AccAddress, orderID string) MsgCancelOrders {
 
 //********************MsgNewOrders*************
 // nolint
-type MsgNewOrders struct {
-	Sender     sdk.AccAddress `json:"sender"` // order maker address
-	OrderItems []OrderItem    `json:"order_items"`
-}
-
-// nolint
-type OrderItem struct {
-	Product  string  `json:"product"`  // product for trading pair in full name of the tokens
-	Side     string  `json:"side"`     // BUY/SELL
-	Price    sdk.Dec `json:"price"`    // price of the order
-	Quantity sdk.Dec `json:"quantity"` // quantity of the order
-}
+var _ sdk.Msg = &MsgNewOrders{}
 
 // nolint
 func NewOrderItem(product string, side string, price string,
@@ -97,33 +72,33 @@ func (msg MsgNewOrders) Route() string { return "order" }
 func (msg MsgNewOrders) Type() string { return "new" }
 
 // ValidateBasic : Implements Msg.
-func (msg MsgNewOrders) ValidateBasic() sdk.Error {
+func (msg MsgNewOrders) ValidateBasic() error {
 	if msg.Sender.Empty() {
-		return sdk.ErrInvalidAddress(msg.Sender.String())
+		return sdkerror.Wrap(sdkerror.ErrInvalidAddress, msg.Sender.String())
 	}
 	if msg.OrderItems == nil || len(msg.OrderItems) == 0 {
-		return sdk.ErrUnknownRequest("invalid OrderItems")
+		return sdkerror.Wrap(sdkerror.ErrUnknownRequest, "invalid OrderItems")
 	}
 	if len(msg.OrderItems) > OrderItemLimit {
-		return sdk.ErrUnknownRequest("Numbers of NewOrderItem should not be more than " + strconv.Itoa(OrderItemLimit))
+		return sdkerror.Wrap(sdkerror.ErrUnknownRequest, "Numbers of NewOrderItem should not be more than "+strconv.Itoa(OrderItemLimit))
 	}
 	for _, item := range msg.OrderItems {
 		if len(item.Product) == 0 {
-			return sdk.ErrUnknownRequest("Product cannot be empty")
+			return sdkerror.Wrap(sdkerror.ErrUnknownRequest, "Product cannot be empty")
 		}
 		symbols := strings.Split(item.Product, "_")
 		if len(symbols) != 2 {
-			return sdk.ErrUnknownRequest("Product should be in the format of \"base_quote\"")
+			return sdkerror.Wrap(sdkerror.ErrUnknownRequest, "Product should be in the format of \"base_quote\"")
 		}
 		if symbols[0] == symbols[1] {
-			return sdk.ErrUnknownRequest("invalid product")
+			return sdkerror.Wrap(sdkerror.ErrUnknownRequest, "invalid product")
 		}
 		if item.Side != BuyOrder && item.Side != SellOrder {
-			return sdk.ErrUnknownRequest(
+			return sdkerror.Wrap(sdkerror.ErrUnknownRequest,
 				fmt.Sprintf("Side is expected to be \"BUY\" or \"SELL\", but got \"%s\"", item.Side))
 		}
 		if !(item.Price.IsPositive() && item.Quantity.IsPositive()) {
-			return sdk.ErrUnknownRequest("Price/Quantity must be positive")
+			return sdkerror.Wrap(sdkerror.ErrUnknownRequest, "Price/Quantity must be positive")
 		}
 	}
 
@@ -147,10 +122,7 @@ func (msg MsgNewOrders) CalculateGas(gasUnit uint64) uint64 {
 }
 
 // nolint
-type MsgCancelOrders struct {
-	Sender   sdk.AccAddress `json:"sender"` // order maker address
-	OrderIDs []string       `json:"order_ids"`
-}
+var _ sdk.Msg = &MsgCancelOrders{}
 
 // NewMsgCancelOrders is a constructor function for MsgCancelOrder
 func NewMsgCancelOrders(sender sdk.AccAddress, orderIDItems []string) MsgCancelOrders {
@@ -168,22 +140,22 @@ func (msg MsgCancelOrders) Route() string { return "order" }
 func (msg MsgCancelOrders) Type() string { return "cancel" }
 
 // nolint
-func (msg MsgCancelOrders) ValidateBasic() sdk.Error {
+func (msg MsgCancelOrders) ValidateBasic() error {
 	if msg.Sender.Empty() {
-		return sdk.ErrInvalidAddress(msg.Sender.String())
+		return sdkerror.Wrap(sdkerror.ErrInvalidAddress, msg.Sender.String())
 	}
 	if msg.OrderIDs == nil || len(msg.OrderIDs) == 0 {
-		return sdk.ErrUnknownRequest("invalid OrderIDs")
+		return sdkerror.Wrap(sdkerror.ErrUnknownRequest, "invalid OrderIDs")
 	}
 	if len(msg.OrderIDs) > MultiCancelOrderItemLimit {
-		return sdk.ErrUnknownRequest("Numbers of CancelOrderItem should not be more than " + strconv.Itoa(OrderItemLimit))
+		return sdkerror.Wrap(sdkerror.ErrUnknownRequest, "Numbers of CancelOrderItem should not be more than " + strconv.Itoa(OrderItemLimit))
 	}
 	if hasDuplicatedID(msg.OrderIDs) {
-		return sdk.ErrUnknownRequest("Duplicated order ids detected")
+		return sdkerror.Wrap(sdkerror.ErrUnknownRequest, "Duplicated order ids detected")
 	}
 	for _, item := range msg.OrderIDs {
 		if item == "" {
-			return sdk.ErrUnauthorized("orderID cannot be empty")
+			return sdkerror.Wrap(sdkerror.ErrUnauthorized, "orderID cannot be empty")
 		}
 	}
 
@@ -220,7 +192,7 @@ func (msg MsgCancelOrders) CalculateGas(gasUnit uint64) uint64 {
 
 // nolint
 type OrderResult struct {
-	Code    sdk.CodeType `json:"code"`    // order return code
-	Message string       `json:"msg"`     // order return error message
-	OrderID string       `json:"orderid"` // order return orderid
+	Code    string `json:"code"`    // order return code
+	Message string `json:"msg"`     // order return error message
+	OrderID string `json:"orderid"` // order return orderid
 }

@@ -2,6 +2,7 @@ package keeper
 
 import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	sdkerror "github.com/cosmos/cosmos-sdk/types/errors"
 	"github.com/okex/okchain/x/poolswap/types"
 )
 
@@ -9,12 +10,12 @@ import (
 func (k Keeper) IsTokenExist(ctx sdk.Context, token string) error {
 	isExist := k.tokenKeeper.TokenExist(ctx, token)
 	if !isExist {
-		return sdk.ErrInternal("Failed: token does not exist")
+		return sdkerror.Wrap(sdkerror.ErrInternal, "Failed: token does not exist")
 	}
 
 	t := k.tokenKeeper.GetTokenInfo(ctx, token)
 	if t.Type == types.GenerateTokenType {
-		return sdk.ErrInvalidCoins("Failed to create exchange with pool token")
+		return sdkerror.Wrap(sdkerror.ErrInvalidCoins, "Failed to create exchange with pool token")
 	}
 	return nil
 

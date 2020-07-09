@@ -22,7 +22,7 @@ func (k Keeper) GetShares(ctx sdk.Context, delAddr sdk.AccAddress, valAddr sdk.V
 // SetShares sets the shares that added to validators to store
 func (k Keeper) SetShares(ctx sdk.Context, delAddr sdk.AccAddress, valAddr sdk.ValAddress, shares types.Shares) {
 	key := types.GetSharesKey(valAddr, delAddr)
-	sharesBytes := k.cdc.MustMarshalBinaryLengthPrefixed(shares)
+	sharesBytes := k.cdc.MustMarshalBinaryBare(&sdk.DecProto{shares})
 	ctx.KVStore(k.storeKey).Set(key, sharesBytes)
 }
 
@@ -67,11 +67,11 @@ func (k Keeper) IterateShares(ctx sdk.Context, fn func(index int64, delAddr sdk.
 		valAddr, delAddr := sdk.ValAddress(key[1:boundIndex]), sdk.AccAddress(key[boundIndex:])
 
 		// 2.get the shares
-		var shares types.Shares
-		k.cdc.MustUnmarshalBinaryLengthPrefixed(iterator.Value(), &shares)
+		var shares sdk.DecProto
+		k.cdc.MustUnmarshalBinaryBare(iterator.Value(), &shares)
 
 		// 3.call back the function
-		if stop := fn(i, delAddr, valAddr, shares); stop {
+		if stop := fn(i, delAddr, valAddr, shares.Dec); stop {
 			break
 		}
 		i++

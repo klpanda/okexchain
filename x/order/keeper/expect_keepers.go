@@ -2,7 +2,7 @@ package keeper
 
 import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/cosmos/cosmos-sdk/x/supply/exported"
+	exported "github.com/cosmos/cosmos-sdk/x/auth/types"
 
 	dex "github.com/okex/okchain/x/dex/types"
 	"github.com/okex/okchain/x/order/types"
@@ -23,15 +23,19 @@ type TokenKeeper interface {
 	IterateLockedFees(ctx sdk.Context, cb func(acc sdk.AccAddress, coins sdk.DecCoins) (stop bool))
 }
 
-// SupplyKeeper : expected supply keeper
-type SupplyKeeper interface {
-	SendCoinsFromAccountToModule(ctx sdk.Context, senderAddr sdk.AccAddress, recipientModule string,
-		amt sdk.Coins) sdk.Error
-	SendCoinsFromModuleToAccount(ctx sdk.Context, senderModule string, recipientAddr sdk.AccAddress,
-		amt sdk.Coins) sdk.Error
+// BankKeeper : expected supply keeper
+type AccountKeeper interface {
 	GetModuleAccount(ctx sdk.Context, moduleName string) exported.ModuleAccountI
 	GetModuleAddress(moduleName string) sdk.AccAddress
-	MintCoins(ctx sdk.Context, moduleName string, amt sdk.Coins) sdk.Error
+}
+
+type BankKeeper interface {
+	SendCoinsFromAccountToModule(ctx sdk.Context, senderAddr sdk.AccAddress, recipientModule string,
+		amt sdk.Coins) error
+	SendCoinsFromModuleToAccount(ctx sdk.Context, senderModule string, recipientAddr sdk.AccAddress,
+		amt sdk.Coins) error
+	MintCoins(ctx sdk.Context, moduleName string, amt sdk.Coins) error
+	GetAllBalances(ctx sdk.Context, addr sdk.AccAddress) sdk.Coins
 }
 
 // DexKeeper : expected dex keeper

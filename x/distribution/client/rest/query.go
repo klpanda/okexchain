@@ -2,6 +2,7 @@ package rest
 
 import (
 	"fmt"
+	"github.com/cosmos/cosmos-sdk/client"
 	"net/http"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -10,11 +11,10 @@ import (
 	"github.com/okex/okchain/x/distribution/client/common"
 	"github.com/okex/okchain/x/distribution/types"
 
-	"github.com/cosmos/cosmos-sdk/client/context"
 	"github.com/cosmos/cosmos-sdk/types/rest"
 )
 
-func registerQueryRoutes(cliCtx context.CLIContext, r *mux.Router, queryRoute string) {
+func registerQueryRoutes(cliCtx client.Context, r *mux.Router, queryRoute string) {
 	// Get the rewards withdrawal address
 	r.HandleFunc(
 		"/distribution/delegators/{delegatorAddr}/withdraw_address",
@@ -41,7 +41,7 @@ func registerQueryRoutes(cliCtx context.CLIContext, r *mux.Router, queryRoute st
 }
 
 // HTTP request handler to query a delegation rewards
-func delegatorWithdrawalAddrHandlerFn(cliCtx context.CLIContext, queryRoute string) http.HandlerFunc {
+func delegatorWithdrawalAddrHandlerFn(cliCtx client.Context, queryRoute string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		delegatorAddr, ok := checkDelegatorAddressVar(w, r)
 		if !ok {
@@ -66,7 +66,7 @@ func delegatorWithdrawalAddrHandlerFn(cliCtx context.CLIContext, queryRoute stri
 }
 
 // HTTP request handler to query the distribution params values
-func paramsHandlerFn(cliCtx context.CLIContext, queryRoute string) http.HandlerFunc {
+func paramsHandlerFn(cliCtx client.Context, queryRoute string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		cliCtx, ok := rest.ParseQueryHeightOrReturnBadRequest(w, cliCtx, r)
 		if !ok {
@@ -84,7 +84,7 @@ func paramsHandlerFn(cliCtx context.CLIContext, queryRoute string) http.HandlerF
 }
 
 // HTTP request handler to query the community pool coins
-func communityPoolHandler(cliCtx context.CLIContext, queryRoute string) http.HandlerFunc {
+func communityPoolHandler(cliCtx client.Context, queryRoute string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		cliCtx, ok := rest.ParseQueryHeightOrReturnBadRequest(w, cliCtx, r)
 		if !ok {
@@ -109,7 +109,7 @@ func communityPoolHandler(cliCtx context.CLIContext, queryRoute string) http.Han
 }
 
 // HTTP request handler to query the accumulated commission of one single validator
-func accumulatedCommissionHandlerFn(cliCtx context.CLIContext, queryRoute string) http.HandlerFunc {
+func accumulatedCommissionHandlerFn(cliCtx client.Context, queryRoute string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		validatorAddr, ok := checkValidatorAddressVar(w, r)
 		if !ok {

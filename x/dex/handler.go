@@ -2,6 +2,7 @@ package dex
 
 import (
 	"fmt"
+	sdkerror "github.com/cosmos/cosmos-sdk/types/errors"
 	"strconv"
 
 	"github.com/okex/okchain/x/dex/types"
@@ -13,36 +14,36 @@ import (
 
 // NewHandler handles all "dex" type messages.
 func NewHandler(k IKeeper) sdk.Handler {
-	return func(ctx sdk.Context, msg sdk.Msg) sdk.Result {
+	return func(ctx sdk.Context, msg sdk.Msg) (*sdk.Result, error) {
 		ctx = ctx.WithEventManager(sdk.NewEventManager())
 		logger := ctx.Logger().With("module", ModuleName)
 
-		var handlerFun func() sdk.Result
+		var handlerFun func() (*sdk.Result, error)
 		var name string
 		switch msg := msg.(type) {
-		case MsgList:
+		case *MsgList:
 			name = "handleMsgList"
-			handlerFun = func() sdk.Result {
+			handlerFun = func() (*sdk.Result, error) {
 				return handleMsgList(ctx, k, msg, logger)
 			}
-		case MsgDeposit:
+		case *MsgDeposit:
 			name = "handleMsgDeposit"
-			handlerFun = func() sdk.Result {
+			handlerFun = func() (*sdk.Result, error) {
 				return handleMsgDeposit(ctx, k, msg, logger)
 			}
-		case MsgWithdraw:
+		case *MsgWithdraw:
 			name = "handleMsgWithDraw"
-			handlerFun = func() sdk.Result {
+			handlerFun = func() (*sdk.Result, error) {
 				return handleMsgWithDraw(ctx, k, msg, logger)
 			}
-		case MsgTransferOwnership:
+		case *MsgTransferOwnership:
 			name = "handleMsgTransferOwnership"
-			handlerFun = func() sdk.Result {
+			handlerFun = func() (*sdk.Result, error) {
 				return handleMsgTransferOwnership(ctx, k, msg, logger)
 			}
 		default:
 			errMsg := fmt.Sprintf("unrecognized dex message type: %T", msg)
-			return sdk.ErrUnknownRequest(errMsg).Result()
+			return nil, sdkerror.Wrapf(sdkerror.ErrUnknownRequest, errMsg)
 		}
 
 		seq := perf.GetPerf().OnDeliverTxEnter(ctx, ModuleName, name)
@@ -51,12 +52,12 @@ func NewHandler(k IKeeper) sdk.Handler {
 	}
 }
 
-func handleMsgList(ctx sdk.Context, keeper IKeeper, msg MsgList, logger log.Logger) sdk.Result {
+func handleMsgList(ctx sdk.Context, keeper IKeeper, msg *MsgList, logger log.Logger) (*sdk.Result, error) {
 
 	if !keeper.GetTokenKeeper().TokenExist(ctx, msg.ListAsset) ||
 		!keeper.GetTokenKeeper().TokenExist(ctx, msg.QuoteAsset) {
-		return sdk.ErrInvalidCoins(
-			fmt.Sprintf("%s or %s is not valid", msg.ListAsset, msg.QuoteAsset)).Result()
+		return nil, sdkerror.Wrap(sdkerror.ErrInvalidCoins,
+			fmt.Sprintf("%s or %s is not valid", msg.ListAsset, msg.QuoteAsset))
 	}
 
 	tokenPair := &TokenPair{
@@ -76,20 +77,20 @@ func handleMsgList(ctx sdk.Context, keeper IKeeper, msg MsgList, logger log.Logg
 	// Note: aaa_bbb and bbb_aaa are actually one token pair
 	if keeper.GetTokenPair(ctx, fmt.Sprintf("%s_%s", tokenPair.BaseAssetSymbol, tokenPair.QuoteAssetSymbol)) != nil ||
 		keeper.GetTokenPair(ctx, fmt.Sprintf("%s_%s", tokenPair.QuoteAssetSymbol, tokenPair.BaseAssetSymbol)) != nil {
-		return types.ErrTokenPairExisted(tokenPair.BaseAssetSymbol, tokenPair.QuoteAssetSymbol).Result()
+		return nil, types.ErrTokenPairExisted(tokenPair.BaseAssetSymbol, tokenPair.QuoteAssetSymbol)
 	}
 
 	// deduction fee
 	feeCoins := keeper.GetParams(ctx).ListFee.ToCoins()
-	err := keeper.GetSupplyKeeper().SendCoinsFromAccountToModule(ctx, msg.Owner, keeper.GetFeeCollector(), feeCoins)
+	err := keeper.GetBankKeeper().SendCoinsFromAccountToModule(ctx, msg.Owner, keeper.GetFeeCollector(), feeCoins)
 	if err != nil {
-		return sdk.ErrInsufficientCoins(fmt.Sprintf("insufficient fee coins(need %s)",
-			feeCoins.String())).Result()
+		return nil, sdkerror.Wrap(sdkerror.ErrInsufficientFunds, fmt.Sprintf("insufficient fee coins(need %s)",
+			feeCoins.String()))
 	}
 
 	err2 := keeper.SaveTokenPair(ctx, tokenPair)
 	if err2 != nil {
-		return sdk.ErrInternal(fmt.Sprintf("failed to SaveTokenPair: %s", err2.Error())).Result()
+		return nil, sdkerror.Wrap(sdkerror.ErrInternal, fmt.Sprintf("failed to SaveTokenPair: %s", err2.Error()))
 	}
 
 	logger.Debug(fmt.Sprintf("successfully handleMsgList: "+
@@ -109,12 +110,12 @@ func handleMsgList(ctx sdk.Context, keeper IKeeper, msg MsgList, logger log.Logg
 		),
 	)
 
-	return sdk.Result{Events: ctx.EventManager().Events()}
+	return &sdk.Result{Events: ctx.EventManager().Events().ToABCIEvents()}, nil
 }
 
-func handleMsgDeposit(ctx sdk.Context, keeper IKeeper, msg MsgDeposit, logger log.Logger) sdk.Result {
-	if sdkErr := keeper.Deposit(ctx, msg.Product, msg.Depositor, msg.Amount); sdkErr != nil {
-		return sdkErr.Result()
+func handleMsgDeposit(ctx sdk.Context, keeper IKeeper, msg *MsgDeposit, logger log.Logger) (*sdk.Result, error) {
+	if err := keeper.Deposit(ctx, msg.Product, msg.Depositor, msg.Amount); err != nil {
+		return nil, err
 	}
 
 	logger.Debug(fmt.Sprintf("successfully handleMsgDeposit: "+
@@ -127,13 +128,13 @@ func handleMsgDeposit(ctx sdk.Context, keeper IKeeper, msg MsgDeposit, logger lo
 		),
 	)
 
-	return sdk.Result{Events: ctx.EventManager().Events()}
+	return &sdk.Result{Events: ctx.EventManager().Events().ToABCIEvents()}, nil
 
 }
 
-func handleMsgWithDraw(ctx sdk.Context, keeper IKeeper, msg MsgWithdraw, logger log.Logger) sdk.Result {
-	if sdkErr := keeper.Withdraw(ctx, msg.Product, msg.Depositor, msg.Amount); sdkErr != nil {
-		return sdkErr.Result()
+func handleMsgWithDraw(ctx sdk.Context, keeper IKeeper, msg *MsgWithdraw, logger log.Logger) (*sdk.Result, error) {
+	if err := keeper.Withdraw(ctx, msg.Product, msg.Depositor, msg.Amount); err != nil {
+		return nil, err
 	}
 
 	logger.Debug(fmt.Sprintf("successfully handleMsgWithDraw: "+
@@ -146,21 +147,21 @@ func handleMsgWithDraw(ctx sdk.Context, keeper IKeeper, msg MsgWithdraw, logger 
 		),
 	)
 
-	return sdk.Result{Events: ctx.EventManager().Events()}
+	return &sdk.Result{Events: ctx.EventManager().Events().ToABCIEvents()}, nil
 }
 
-func handleMsgTransferOwnership(ctx sdk.Context, keeper IKeeper, msg MsgTransferOwnership,
-	logger log.Logger) sdk.Result {
-	if sdkErr := keeper.TransferOwnership(ctx, msg.Product, msg.FromAddress, msg.ToAddress); sdkErr != nil {
-		return sdkErr.Result()
+func handleMsgTransferOwnership(ctx sdk.Context, keeper IKeeper, msg *MsgTransferOwnership,
+	logger log.Logger) (*sdk.Result, error) {
+	if err := keeper.TransferOwnership(ctx, msg.Product, msg.FromAddress, msg.ToAddress); err != nil {
+		return nil, err
 	}
 
 	// deduction fee
 	feeCoins := keeper.GetParams(ctx).TransferOwnershipFee.ToCoins()
-	err := keeper.GetSupplyKeeper().SendCoinsFromAccountToModule(ctx, msg.FromAddress, keeper.GetFeeCollector(), feeCoins)
+	err := keeper.GetBankKeeper().SendCoinsFromAccountToModule(ctx, msg.FromAddress, keeper.GetFeeCollector(), feeCoins)
 	if err != nil {
-		return sdk.ErrInsufficientCoins(fmt.Sprintf("insufficient fee coins(need %s)",
-			feeCoins.String())).Result()
+		return nil, sdkerror.Wrap(sdkerror.ErrInsufficientFunds, fmt.Sprintf("insufficient fee coins(need %s)",
+			feeCoins.String()))
 	}
 
 	logger.Debug(fmt.Sprintf("successfully handleMsgTransferOwnership: "+
@@ -173,5 +174,5 @@ func handleMsgTransferOwnership(ctx sdk.Context, keeper IKeeper, msg MsgTransfer
 			sdk.NewAttribute(sdk.AttributeKeyFee, feeCoins.String()),
 		),
 	)
-	return sdk.Result{Events: ctx.EventManager().Events()}
+	return &sdk.Result{Events: ctx.EventManager().Events().ToABCIEvents()}, nil
 }

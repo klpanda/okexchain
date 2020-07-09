@@ -1,10 +1,10 @@
 package gov
 
 import (
+	"github.com/cosmos/cosmos-sdk/client"
+	"github.com/cosmos/cosmos-sdk/server/api"
 	"testing"
 
-	"github.com/cosmos/cosmos-sdk/client/context"
-	cliLcd "github.com/cosmos/cosmos-sdk/client/lcd"
 	"github.com/cosmos/cosmos-sdk/codec"
 	sdkGovClient "github.com/cosmos/cosmos-sdk/x/gov/client"
 	sdkGovRest "github.com/cosmos/cosmos-sdk/x/gov/client/rest"
@@ -20,16 +20,16 @@ func TestAppModule_BeginBlock(t *testing.T) {
 
 }
 
-func getCmdSubmitProposal(cdc *codec.Codec) *cobra.Command {
+func getCmdSubmitProposal(cliCtx client.Context) *cobra.Command {
 	return &cobra.Command{}
 }
 
-func proposalRESTHandler(cliCtx context.CLIContext) sdkGovRest.ProposalRESTHandler {
+func proposalRESTHandler(cliCtx client.Context) sdkGovRest.ProposalRESTHandler {
 	return sdkGovRest.ProposalRESTHandler{}
 }
 
 func TestNewAppModuleBasic(t *testing.T) {
-	ctx, _, gk, _, crisisKeeper := keeper.CreateTestInput(t, false, 1000)
+	ctx, ak, gk, _, crisisKeeper := keeper.CreateTestInput(t, false, 1000)
 
 	moduleBasic := NewAppModuleBasic(sdkGovClient.ProposalHandler{
 		CLIHandler:  getCmdSubmitProposal,
@@ -44,22 +44,23 @@ func TestNewAppModuleBasic(t *testing.T) {
 	require.NotNil(t, bz)
 	require.Nil(t, err)
 
-	jsonMsg := moduleBasic.DefaultGenesis()
-	err = moduleBasic.ValidateGenesis(jsonMsg)
+	cliCtx := client.NewContext().WithCodec(cdc)
+	jsonMsg := moduleBasic.DefaultGenesis(cdc)
+	err = moduleBasic.ValidateGenesis(cdc, jsonMsg)
 	require.Nil(t, err)
-	err = moduleBasic.ValidateGenesis(jsonMsg[:len(jsonMsg)-1])
+	err = moduleBasic.ValidateGenesis(cdc, jsonMsg[:len(jsonMsg)-1])
 	require.NotNil(t, err)
 
-	rs := cliLcd.NewRestServer(cdc, nil)
-	moduleBasic.RegisterRESTRoutes(rs.CliCtx, rs.Mux)
+	rs := api.New(cliCtx, nil)
+	moduleBasic.RegisterRESTRoutes(rs.ClientCtx, rs.Router)
 
 	// todo: check diff after GetTxCmd
-	moduleBasic.GetTxCmd(cdc)
+	moduleBasic.GetTxCmd(cliCtx)
 
 	// todo: check diff after GetQueryCmd
-	moduleBasic.GetQueryCmd(cdc)
+	moduleBasic.GetQueryCmd(cliCtx)
 
-	appModule := NewAppModule(version.CurrentProtocolVersion, gk, gk.SupplyKeeper())
+	appModule := NewAppModule(version.CurrentProtocolVersion, gk, ak, gk.BankKeeper())
 	require.Equal(t, types.ModuleName, appModule.Name())
 
 	// todo: check diff after RegisterInvariants
@@ -71,11 +72,11 @@ func TestNewAppModuleBasic(t *testing.T) {
 
 	require.Equal(t, QuerierRoute, appModule.QuerierRoute())
 
-	require.IsType(t, NewQuerier(gk), appModule.NewQuerierHandler())
+	require.IsType(t, NewQuerier(gk.Keeper), appModule.NewQuerierHandler())
 
-	require.Equal(t, []abci.ValidatorUpdate{}, appModule.InitGenesis(ctx, jsonMsg))
+	require.Equal(t, []abci.ValidatorUpdate{}, appModule.InitGenesis(ctx, cliCtx.Codec, jsonMsg))
 
-	require.Equal(t, jsonMsg, appModule.ExportGenesis(ctx))
+	require.Equal(t, jsonMsg, appModule.ExportGenesis(ctx, cliCtx.Codec))
 
 	appModule.BeginBlock(ctx, abci.RequestBeginBlock{})
 

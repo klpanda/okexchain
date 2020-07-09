@@ -1,11 +1,12 @@
 package token
 
 import (
+	"github.com/cosmos/cosmos-sdk/client"
+	"github.com/cosmos/cosmos-sdk/server/api"
 	"testing"
 
 	"github.com/cosmos/cosmos-sdk/codec"
 
-	cliLcd "github.com/cosmos/cosmos-sdk/client/lcd"
 	"github.com/okex/okchain/x/common/version"
 	"github.com/okex/okchain/x/token/types"
 	"github.com/stretchr/testify/require"
@@ -14,21 +15,22 @@ import (
 
 func TestAppModule_InitGenesis(t *testing.T) {
 	app, tokenKeeper, _ := getMockDexAppEx(t, 0)
-	module := NewAppModule(version.ProtocolVersionV0, tokenKeeper, app.supplyKeeper)
+	module := NewAppModule(version.ProtocolVersionV0, tokenKeeper)
 	ctx := app.NewContext(true, abci.Header{})
 	gs := defaultGenesisState()
 	gs.Tokens = nil
 	gsJSON := types.ModuleCdc.MustMarshalJSON(gs)
+	cliCtx := client.NewContext().WithCodec(app.Cdc).WithJSONMarshaler(app.AppCodec)
 
-	err := module.ValidateGenesis(gsJSON)
+	err := module.ValidateGenesis(app.AppCodec, gsJSON)
 	require.NoError(t, err)
 
-	vu := module.InitGenesis(ctx, gsJSON)
+	vu := module.InitGenesis(ctx, app.AppCodec, gsJSON)
 	params := tokenKeeper.GetParams(ctx)
 	require.Equal(t, gs.Params, params)
 	require.Equal(t, vu, []abci.ValidatorUpdate{})
 
-	export := module.ExportGenesis(ctx)
+	export := module.ExportGenesis(ctx, app.AppCodec)
 	require.EqualValues(t, gsJSON, []byte(export))
 
 	require.EqualValues(t, types.ModuleName, module.Name())
@@ -36,17 +38,17 @@ func TestAppModule_InitGenesis(t *testing.T) {
 	require.EqualValues(t, types.RouterKey, module.Route())
 	require.EqualValues(t, types.QuerierRoute, module.QuerierRoute())
 	module.NewHandler()
-	module.GetQueryCmd(app.Cdc)
-	module.GetTxCmd(app.Cdc)
+	module.GetQueryCmd(cliCtx)
+	module.GetTxCmd(cliCtx)
 	module.NewQuerierHandler()
-	rs := cliLcd.NewRestServer(app.Cdc, nil)
-	module.RegisterRESTRoutes(rs.CliCtx, rs.Mux)
+	rs := api.New(cliCtx, nil)
+	module.RegisterRESTRoutes(rs.ClientCtx, rs.Router)
 	module.BeginBlock(ctx, abci.RequestBeginBlock{})
 	module.EndBlock(ctx, abci.RequestEndBlock{})
-	module.DefaultGenesis()
+	module.DefaultGenesis(app.AppCodec)
 	module.RegisterCodec(codec.New())
 
 	gsJSON = []byte("[[],{}]")
-	err = module.ValidateGenesis(gsJSON)
+	err = module.ValidateGenesis(app.AppCodec, gsJSON)
 	require.NotNil(t, err)
 }

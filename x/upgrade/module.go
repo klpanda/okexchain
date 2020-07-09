@@ -2,11 +2,12 @@ package upgrade
 
 import (
 	"encoding/json"
+	"github.com/cosmos/cosmos-sdk/client"
+	"github.com/gogo/protobuf/grpc"
 
 	"github.com/okex/okchain/x/upgrade/keeper"
 	"github.com/okex/okchain/x/upgrade/types"
 
-	"github.com/cosmos/cosmos-sdk/client/context"
 	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/module"
@@ -36,19 +37,19 @@ func (AppModuleBasic) RegisterCodec(cdc *codec.Codec) {
 }
 
 // DefaultGenesis returns default genesis state
-func (AppModuleBasic) DefaultGenesis() json.RawMessage {
-	return ModuleCdc.MustMarshalJSON(types.DefaultGenesisState())
+func (AppModuleBasic) DefaultGenesis(cdc codec.JSONMarshaler) json.RawMessage {
+	return cdc.MustMarshalJSON(types.DefaultGenesisState())
 }
 
 // GetQueryCmd gets the root query command of this module
-func (AppModuleBasic) GetQueryCmd(cdc *codec.Codec) *cobra.Command {
-	return cli.GetQueryCmd(StoreKey, cdc)
+func (AppModuleBasic) GetQueryCmd(ctx client.Context) *cobra.Command {
+	return cli.GetQueryCmd(StoreKey, ctx.Codec)
 }
 
 // nolint
-func (AppModuleBasic) ValidateGenesis(_ json.RawMessage) error                { return nil }
-func (AppModuleBasic) RegisterRESTRoutes(_ context.CLIContext, _ *mux.Router) { return }
-func (AppModuleBasic) GetTxCmd(cdc *codec.Codec) *cobra.Command               { return nil }
+func (AppModuleBasic) ValidateGenesis(cdc codec.JSONMarshaler, _ json.RawMessage) error                { return nil }
+func (AppModuleBasic) RegisterRESTRoutes(ctx client.Context, _ *mux.Router) { return }
+func (AppModuleBasic) GetTxCmd(ctx client.Context) *cobra.Command               { return nil }
 
 // AppModule is a struct of app module
 type AppModule struct {
@@ -64,17 +65,19 @@ func NewAppModule(keeper Keeper) AppModule {
 	}
 }
 
+func (am AppModule) RegisterQueryService(grpc.Server) {}
+
 // InitGenesis initializes module genesis
-func (am AppModule) InitGenesis(ctx sdk.Context, data json.RawMessage) []abci.ValidatorUpdate {
+func (am AppModule) InitGenesis(ctx sdk.Context, cdc codec.JSONMarshaler, data json.RawMessage) []abci.ValidatorUpdate {
 	var genesisState types.GenesisState
-	types.ModuleCdc.MustUnmarshalJSON(data, &genesisState)
+	cdc.MustUnmarshalJSON(data, &genesisState)
 	InitGenesis(ctx, am.keeper, genesisState)
 	return []abci.ValidatorUpdate{}
 }
 
 // Route returns module message route name
-func (AppModule) Route() string {
-	return RouterKey
+func (AppModule) Route() sdk.Route {
+	return sdk.NewRoute(RouterKey, nil)
 }
 
 // QuerierRoute returns module querier route name
@@ -95,6 +98,6 @@ func (am AppModule) EndBlock(ctx sdk.Context, _ abci.RequestEndBlock) []abci.Val
 
 // nolint
 func (AppModule) NewHandler() sdk.Handler                            { return nil }
-func (AppModule) ExportGenesis(_ sdk.Context) json.RawMessage        { return nil }
+func (AppModule) ExportGenesis(_ sdk.Context, cdc codec.JSONMarshaler) json.RawMessage        { return nil }
 func (AppModule) RegisterInvariants(_ sdk.InvariantRegistry)         { return }
 func (AppModule) BeginBlock(_ sdk.Context, _ abci.RequestBeginBlock) {}

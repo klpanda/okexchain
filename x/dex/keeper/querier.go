@@ -2,6 +2,7 @@ package keeper
 
 import (
 	"fmt"
+	sdkerror "github.com/cosmos/cosmos-sdk/types/errors"
 	"sort"
 
 	"github.com/okex/okchain/x/dex/types"
@@ -14,7 +15,7 @@ import (
 
 // NewQuerier is the module level router for state queries
 func NewQuerier(keeper IKeeper) sdk.Querier {
-	return func(ctx sdk.Context, path []string, req abci.RequestQuery) (res []byte, err sdk.Error) {
+	return func(ctx sdk.Context, path []string, req abci.RequestQuery) (res []byte, err error) {
 		switch path[0] {
 		case types.QueryProducts:
 			return queryProduct(ctx, req, keeper)
@@ -27,24 +28,24 @@ func NewQuerier(keeper IKeeper) sdk.Querier {
 		case types.QueryProductsDelisting:
 			return queryProductsDelisting(ctx, keeper)
 		default:
-			return nil, sdk.ErrUnknownRequest("unknown dex query endpoint")
+			return nil, sdkerror.Wrapf(sdkerror.ErrUnknownRequest, "unknown dex query endpoint")
 		}
 	}
 }
 
-func queryProduct(ctx sdk.Context, req abci.RequestQuery, keeper IKeeper) (res []byte, err sdk.Error) {
+func queryProduct(ctx sdk.Context, req abci.RequestQuery, keeper IKeeper) (res []byte, err error) {
 
 	var params types.QueryDexInfoParams
 	errUnmarshal := types.ModuleCdc.UnmarshalJSON(req.Data, &params)
 	if errUnmarshal != nil {
-		return nil, sdk.ErrUnknownRequest(sdk.AppendMsgToErr("incorrectly formatted request data", errUnmarshal.Error()))
+		return nil, sdkerror.Wrapf(sdkerror.ErrUnknownRequest, "incorrectly formatted request data", errUnmarshal.Error())
 	}
 
 	var tokenPairs []*types.TokenPair
 	if params.Owner != "" {
 		ownerAddr, err := sdk.AccAddressFromBech32(params.Owner)
 		if err != nil {
-			return nil, sdk.ErrInvalidAddress(fmt.Sprintf("invalid address：%s", params.Owner))
+			return nil, sdkerror.Wrap(sdkerror.ErrInvalidAddress, fmt.Sprintf("invalid address：%s", params.Owner))
 		}
 
 		tokenPairs = keeper.GetUserTokenPairs(ctx, ownerAddr)
@@ -70,7 +71,7 @@ func queryProduct(ctx sdk.Context, req abci.RequestQuery, keeper IKeeper) (res [
 
 	res, errMarshal := codec.MarshalJSONIndent(types.ModuleCdc, tokenPairs)
 	if errMarshal != nil {
-		return nil, sdk.ErrInternal(sdk.AppendMsgToErr("failed to  marshal result to JSON", errMarshal.Error()))
+		return nil, sdkerror.Wrap(sdkerror.ErrInternal, "failed to  marshal result to JSON" + errMarshal.Error())
 	}
 	return res, nil
 
@@ -81,19 +82,19 @@ type depositsData struct {
 	ProductDeposits sdk.DecCoin `json:"deposits"`
 }
 
-func queryDeposits(ctx sdk.Context, req abci.RequestQuery, keeper IKeeper) (res []byte, err sdk.Error) {
+func queryDeposits(ctx sdk.Context, req abci.RequestQuery, keeper IKeeper) (res []byte, err error) {
 
 	var params types.QueryDexInfoParams
 	errUnmarshal := types.ModuleCdc.UnmarshalJSON(req.Data, &params)
 	if errUnmarshal != nil {
-		return nil, sdk.ErrUnknownRequest(sdk.AppendMsgToErr("incorrectly formatted request data", errUnmarshal.Error()))
+		return nil, sdkerror.Wrap(sdkerror.ErrUnknownRequest, "incorrectly formatted request data" + errUnmarshal.Error())
 	}
 
 	var tokenPairs []*types.TokenPair
 	if params.Owner != "" {
 		ownerAddr, err := sdk.AccAddressFromBech32(params.Owner)
 		if err != nil {
-			return nil, sdk.ErrInvalidAddress(fmt.Sprintf("invalid address：%s", params.Owner))
+			return nil, sdkerror.Wrap(sdkerror.ErrInvalidAddress, fmt.Sprintf("invalid address：%s", params.Owner))
 		}
 
 		tokenPairs = keeper.GetUserTokenPairs(ctx, ownerAddr)
@@ -128,17 +129,17 @@ func queryDeposits(ctx sdk.Context, req abci.RequestQuery, keeper IKeeper) (res 
 
 	res, errMarshal := codec.MarshalJSONIndent(types.ModuleCdc, deposits)
 	if errMarshal != nil {
-		return nil, sdk.ErrInternal(sdk.AppendMsgToErr("failed to  marshal result to JSON", errMarshal.Error()))
+		return nil, sdkerror.Wrap(sdkerror.ErrInternal, "failed to  marshal result to JSON" + errMarshal.Error())
 	}
 	return res, nil
 }
 
-func queryMatchOrder(ctx sdk.Context, req abci.RequestQuery, keeper IKeeper) (res []byte, err sdk.Error) {
+func queryMatchOrder(ctx sdk.Context, req abci.RequestQuery, keeper IKeeper) (res []byte, err error) {
 
 	var params types.QueryDexInfoParams
 	errUnmarshal := types.ModuleCdc.UnmarshalJSON(req.Data, &params)
 	if errUnmarshal != nil {
-		return nil, sdk.ErrUnknownRequest(sdk.AppendMsgToErr("incorrectly formatted request data", errUnmarshal.Error()))
+		return nil, sdkerror.Wrap(sdkerror.ErrUnknownRequest, "incorrectly formatted request data" + errUnmarshal.Error())
 	}
 
 	tokenPairs := keeper.GetTokenPairsOrdered(ctx)
@@ -166,23 +167,23 @@ func queryMatchOrder(ctx sdk.Context, req abci.RequestQuery, keeper IKeeper) (re
 	res, errMarshal := codec.MarshalJSONIndent(types.ModuleCdc, products)
 
 	if errMarshal != nil {
-		return nil, sdk.ErrInternal(sdk.AppendMsgToErr("failed to  marshal result to JSON", errMarshal.Error()))
+		return nil, sdkerror.Wrap(sdkerror.ErrInternal, "failed to  marshal result to JSON" + errMarshal.Error())
 	}
 	return res, nil
 
 }
 
-func queryParams(ctx sdk.Context, _ abci.RequestQuery, keeper IKeeper) (res []byte, err sdk.Error) {
+func queryParams(ctx sdk.Context, _ abci.RequestQuery, keeper IKeeper) (res []byte, err error) {
 	params := keeper.GetParams(ctx)
 	res, errUnmarshal := codec.MarshalJSONIndent(types.ModuleCdc, params)
 	if errUnmarshal != nil {
-		return nil, sdk.ErrInternal(sdk.AppendMsgToErr("failed to marshal result to JSON", errUnmarshal.Error()))
+		return nil, sdkerror.Wrap(sdkerror.ErrInternal, "failed to marshal result to JSON" + errUnmarshal.Error())
 	}
 	return res, nil
 }
 
 //queryProductsDelisting query the tokenpair name under dex delisting
-func queryProductsDelisting(ctx sdk.Context, keeper IKeeper) (res []byte, err sdk.Error) {
+func queryProductsDelisting(ctx sdk.Context, keeper IKeeper) (res []byte, err error) {
 	var tokenPairNames []string
 	tokenPairs := keeper.GetTokenPairs(ctx)
 	tokenPairLen := len(tokenPairs)
@@ -197,7 +198,7 @@ func queryProductsDelisting(ctx sdk.Context, keeper IKeeper) (res []byte, err sd
 
 	res, errUnmarshal := codec.MarshalJSONIndent(types.ModuleCdc, tokenPairNames)
 	if errUnmarshal != nil {
-		return nil, sdk.ErrInternal(sdk.AppendMsgToErr("failed to  marshal result to JSON", errUnmarshal.Error()))
+		return nil, sdkerror.Wrap(sdkerror.ErrInternal, "failed to  marshal result to JSON" + errUnmarshal.Error())
 	}
 
 	return res, nil

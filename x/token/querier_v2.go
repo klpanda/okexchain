@@ -2,26 +2,26 @@ package token
 
 import (
 	"fmt"
+	sdkerror "github.com/cosmos/cosmos-sdk/types/errors"
 
-	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/okex/okchain/x/common"
 	"github.com/okex/okchain/x/token/types"
 	abci "github.com/tendermint/tendermint/abci/types"
 )
 
-func queryAccountV2(ctx sdk.Context, path []string, req abci.RequestQuery, keeper Keeper) ([]byte, sdk.Error) {
+func queryAccountV2(ctx sdk.Context, path []string, req abci.RequestQuery, keeper Keeper) ([]byte, error) {
 	addr, err := sdk.AccAddressFromBech32(path[0])
 	if err != nil {
-		return nil, sdk.ErrInvalidAddress(fmt.Sprintf("invalid address：%s", path[0]))
+		return nil, sdkerror.Wrap(sdkerror.ErrInvalidAddress, fmt.Sprintf("invalid address：%s", path[0]))
 	}
 
 	//var queryPage QueryPage
 	var accountParam types.AccountParamV2
 	//var symbol string
-	err = codec.Cdc.UnmarshalJSON(req.Data, &accountParam)
+	err = types.ModuleCdc.UnmarshalJSON(req.Data, &accountParam)
 	if err != nil {
-		return nil, sdk.ErrUnknownRequest(err.Error())
+		return nil, sdkerror.Wrap(sdkerror.ErrUnknownRequest, err.Error())
 	}
 
 	coinsInfo := keeper.GetCoinsInfo(ctx, addr)
@@ -58,33 +58,33 @@ func queryAccountV2(ctx sdk.Context, path []string, req abci.RequestQuery, keepe
 
 	res, err := common.JSONMarshalV2(coinsInfoChosen)
 	if err != nil {
-		return nil, sdk.ErrInternal(err.Error())
+		return nil, sdkerror.Wrap(sdkerror.ErrInternal, err.Error())
 	}
 	return res, nil
 }
 
-func queryTokensV2(ctx sdk.Context, path []string, req abci.RequestQuery, keeper Keeper) ([]byte, sdk.Error) {
+func queryTokensV2(ctx sdk.Context, path []string, req abci.RequestQuery, keeper Keeper) ([]byte, error) {
 	tokens := keeper.GetTokensInfo(ctx)
 
 	res, err := common.JSONMarshalV2(tokens)
 	if err != nil {
-		return nil, sdk.ErrInternal(err.Error())
+		return nil, sdkerror.Wrap(sdkerror.ErrInternal, err.Error())
 	}
 	return res, nil
 }
 
-func queryTokenV2(ctx sdk.Context, path []string, req abci.RequestQuery, keeper Keeper) ([]byte, sdk.Error) {
+func queryTokenV2(ctx sdk.Context, path []string, req abci.RequestQuery, keeper Keeper) ([]byte, error) {
 	name := path[0]
 
 	token := keeper.GetTokenInfo(ctx, name)
 
 	if token.Symbol == "" {
-		return nil, sdk.ErrInvalidCoins("unknown token")
+		return nil, sdkerror.Wrap(sdkerror.ErrInvalidCoins, "unknown token")
 	}
 
 	res, err := common.JSONMarshalV2(token)
 	if err != nil {
-		return nil, sdk.ErrInternal(err.Error())
+		return nil, sdkerror.Wrap(sdkerror.ErrInternal, err.Error())
 	}
 	return res, nil
 }

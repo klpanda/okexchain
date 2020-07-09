@@ -13,14 +13,9 @@ import (
 
 // Export returns the exported format of validator in genesis export
 func (v Validator) Export() ValidatorExported {
-	consPkStr, err := sdk.Bech32ifyConsPub(v.ConsPubKey)
-	if err != nil {
-		panic(fmt.Sprintf("bech32 of consensus pubkey error: %s", err.Error()))
-	}
-
 	return ValidatorExported{
 		v.OperatorAddress,
-		consPkStr,
+		v.ConsPubKey,
 		v.Jailed,
 		v.Status,
 		v.DelegatorShares,
@@ -35,7 +30,7 @@ func (v Validator) Export() ValidatorExported {
 func (v Validator) Standardize() StandardizedValidator {
 	return StandardizedValidator{
 		v.OperatorAddress,
-		v.ConsPubKey,
+		sdk.MustGetPubKeyFromBech32(sdk.Bech32PubKeyTypeConsPub, v.ConsPubKey),
 		v.Jailed,
 		v.Status,
 		v.DelegatorShares,
@@ -83,11 +78,6 @@ type StandardizedValidator struct {
 
 // String returns a human readable string representation of a StandardizeValidator
 func (sv StandardizedValidator) String() string {
-	bechConsPubkey, err := sdk.Bech32ifyConsPub(sv.ConsPubKey)
-	if err != nil {
-		panic(err)
-	}
-
 	return fmt.Sprintf(`Validator
   Operator Address:           %s
   Validator Consensus Pubkey: %s
@@ -98,7 +88,7 @@ func (sv StandardizedValidator) String() string {
   Unbonding Height:           %d
   Unbonding Completion Time:  %v
   Minimum Self Delegation:    %v`,
-		sv.OperatorAddress, bechConsPubkey, sv.Jailed, sv.Status,
+		sv.OperatorAddress, sv.ConsPubKey, sv.Jailed, sv.Status,
 		sv.DelegatorShares, sv.Description, sv.UnbondingHeight,
 		sv.UnbondingCompletionTime, sv.MinSelfDelegation)
 }
@@ -128,7 +118,7 @@ func (svs StandardizedValidators) String() string {
 
 // shares from the shares adding convert to the consensus power
 func sharesToConsensusPower(shares Shares) int64 {
-	return shares.QuoInt(sdk.PowerReduction).Int64()
+	return shares.TruncateInt64()
 }
 
 // PotentialConsensusPowerByShares gets potential consensus-engine power based on shares
@@ -147,8 +137,9 @@ func (v Validator) ConsensusPowerByShares() int64 {
 // ABCIValidatorUpdateByShares returns an abci.ValidatorUpdate from a staking validator type
 // with the full validator power based on shares
 func (v Validator) ABCIValidatorUpdateByShares() abci.ValidatorUpdate {
+	pub := sdk.MustGetPubKeyFromBech32(sdk.Bech32PubKeyTypeConsPub, v.ConsPubKey)
 	return abci.ValidatorUpdate{
-		PubKey: tmtypes.TM2PB.PubKey(v.ConsPubKey),
+		PubKey: tmtypes.TM2PB.PubKey(pub),
 		Power:  v.ConsensusPowerByShares(),
 	}
 }

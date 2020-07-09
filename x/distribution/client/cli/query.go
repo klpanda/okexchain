@@ -2,12 +2,12 @@ package cli
 
 import (
 	"fmt"
+	"github.com/cosmos/cosmos-sdk/client/flags"
 	"strings"
 
 	"github.com/spf13/cobra"
 
 	"github.com/cosmos/cosmos-sdk/client"
-	"github.com/cosmos/cosmos-sdk/client/context"
 	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/version"
@@ -26,7 +26,7 @@ func GetQueryCmd(queryRoute string, cdc *codec.Codec) *cobra.Command {
 		RunE:                       client.ValidateCmd,
 	}
 
-	distQueryCmd.AddCommand(client.GetCommands(
+	distQueryCmd.AddCommand(flags.GetCommands(
 		GetCmdQueryParams(queryRoute, cdc),
 		GetCmdQueryValidatorCommission(queryRoute, cdc),
 		GetCmdQueryCommunityPool(queryRoute, cdc),
@@ -42,7 +42,7 @@ func GetCmdQueryParams(queryRoute string, cdc *codec.Codec) *cobra.Command {
 		Args:  cobra.NoArgs,
 		Short: "Query distribution params",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cliCtx := context.NewCLIContext().WithCodec(cdc)
+			cliCtx := client.NewContext().WithCodec(cdc)
 			params, err := common.QueryParams(cliCtx, queryRoute)
 			if err != nil {
 				return err
@@ -68,7 +68,7 @@ $ %s query distr commission okchainvaloper1alq9na49n9yycysh889rl90g9nhe58lcs50wu
 			),
 		),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cliCtx := context.NewCLIContext().WithCodec(cdc)
+			cliCtx := client.NewContext().WithCodec(cdc)
 
 			validatorAddr, err := sdk.ValAddressFromBech32(args[0])
 			if err != nil {
@@ -105,7 +105,7 @@ $ %s query distr community-pool
 			),
 		),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cliCtx := context.NewCLIContext().WithCodec(cdc)
+			cliCtx := client.NewContext().WithCodec(cdc)
 
 			res, _, err := cliCtx.QueryWithData(fmt.Sprintf("custom/%s/community_pool", queryRoute), nil)
 			if err != nil {

@@ -1,6 +1,7 @@
 package types
 
 import (
+	cryptocodec "github.com/cosmos/cosmos-sdk/crypto/codec"
 	stakingtypes "github.com/okex/okchain/x/staking/types"
 
 	"github.com/cosmos/cosmos-sdk/codec"
@@ -18,6 +19,6 @@ func init() {
 	stakingtypes.RegisterCodec(ModuleCdc)
 	authtypes.RegisterCodec(ModuleCdc)
 	sdk.RegisterCodec(ModuleCdc)
-	codec.RegisterCrypto(ModuleCdc)
+	cryptocodec.RegisterCrypto(ModuleCdc)
 	ModuleCdc.Seal()
 }

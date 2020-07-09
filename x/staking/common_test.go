@@ -2,6 +2,7 @@ package staking
 
 import (
 	"fmt"
+	sdkerror "github.com/cosmos/cosmos-sdk/types/errors"
 	"testing"
 	"time"
 
@@ -134,16 +135,20 @@ func (a createValidatorAction) apply(ctx sdk.Context, expVaStatus IValidatorStat
 	resultCtx.t.Logf("====> Apply createValidatorAction[%d], addr:%s, msd: %s, maxVA: %d\n",
 		ctx.BlockHeight(), val.OperatorAddress, val.MinSelfDelegation, resultCtx.params.MaxValidators)
 
-	msgCreateValidator := NewTestMsgCreateValidator(val.OperatorAddress, val.ConsPubKey, val.MinSelfDelegation)
+	msgCreateValidator := NewTestMsgCreateValidator(val.OperatorAddress, sdk.MustGetPubKeyFromBech32(sdk.Bech32PubKeyTypeConsPub, val.ConsPubKey), val.MinSelfDelegation)
 	if err := msgCreateValidator.ValidateBasic(); err != nil {
 		panic(err)
 	}
 	handler := NewHandler(a.mStkKeeper.Keeper)
 
-	msgResponse := handler(ctx, msgCreateValidator)
+	msgResponse, err := handler(ctx, &msgCreateValidator)
+	if err != nil {
+		panic(err)
+	}
 
 	if resultCtx != nil {
-		resultCtx.txMsgResult = &msgResponse
+		resultCtx.txMsgResult = msgResponse
+		resultCtx.errorResult = err
 		resultCtx.isBlkHeightInc = false
 
 		validator, found := resultCtx.tc.mockKeeper.Keeper.GetValidator(ctx, val.OperatorAddress)
@@ -175,7 +180,11 @@ func (a otherMostPowerfulValidatorEnter) apply(ctx sdk.Context, vaStatus IValida
 
 	// increase the voting power by voting
 	handler := NewHandler(resultCtx.tc.mockKeeper.Keeper)
-	handler(ctx, NewMsgAddShares(ValidDelegator2, []sdk.ValAddress{newValidator.OperatorAddress}))
+	msgAddShares := NewMsgAddShares(ValidDelegator2, []sdk.ValAddress{newValidator.OperatorAddress})
+	_, err := handler(ctx, &msgAddShares)
+	if err != nil {
+
+	}
 
 	// get the info of powerful validator
 	validator, found := resultCtx.tc.mockKeeper.Keeper.GetValidator(ctx, newValidator.OperatorAddress)
@@ -202,10 +211,14 @@ func (a destroyValidatorAction) apply(ctx sdk.Context, vaStatus IValidatorStatus
 	}
 	handler := NewHandler(a.mStkKeeper.Keeper)
 
-	msgResponse := handler(ctx, msgDestroyValidator)
+	msgResponse, err := handler(ctx, &msgDestroyValidator)
+	if err != nil {
+		panic(err)
+	}
 
 	if resultCtx != nil {
-		resultCtx.txMsgResult = &msgResponse
+		resultCtx.txMsgResult = msgResponse
+		resultCtx.errorResult = err
 		resultCtx.isBlkHeightInc = false
 
 		validator, found := resultCtx.tc.mockKeeper.Keeper.GetValidator(ctx, val.OperatorAddress)
@@ -305,12 +318,13 @@ func (action newDelegatorAction) apply(ctx sdk.Context, vaStatus IValidatorStatu
 		panic(err)
 	}
 
-	res := handler(ctx, msgDelegate)
+	res, err := handler(ctx, &msgDelegate)
 
 	newDlg, _ := resultCtx.tc.mockKeeper.Keeper.GetDelegator(ctx, action.dlgAddr)
-	resultCtx.t.Logf("     ==>>> NewDelegatorInfo :%s, resOK: %+v, info: %+v \n", action.dlgAddr.String(), res.IsOK(), newDlg)
+	resultCtx.t.Logf("     ==>>> NewDelegatorInfo :%s, resOK: %+v, info: %+v \n", action.dlgAddr.String(), err == nil, newDlg)
 	if resultCtx != nil {
-		resultCtx.txMsgResult = &res
+		resultCtx.txMsgResult = res
+		resultCtx.errorResult = err
 	}
 }
 
@@ -352,9 +366,13 @@ func (action delegatorsAddSharesAction) apply(ctx sdk.Context, vaStatus IValidat
 		resultCtx.t.Logf("     ==>>> Delegator: %s add shares to Validators: %s\n", d.String(), vaAddrs)
 		addSharesMsg := NewMsgAddShares(d, vaAddrs)
 
-		res := handler(ctx, addSharesMsg)
+		res, err := handler(ctx, &addSharesMsg)
+		if err != nil {
+			panic(err)
+		}
 		if resultCtx != nil {
-			resultCtx.txMsgResult = &res
+			resultCtx.txMsgResult = res
+			resultCtx.errorResult = err
 		}
 	}
 
@@ -377,13 +395,14 @@ func (action delegatorUnbondAction) apply(ctx sdk.Context, vaStatus IValidatorSt
 	coins := sdk.NewDecCoinFromDec(action.tokenDenom, action.unbondToken)
 
 	msg := NewMsgWithdraw(action.dlgAddr, coins)
-	res := handler(ctx, msg)
+	res, err := handler(ctx, &msg)
 	if resultCtx != nil {
-		resultCtx.txMsgResult = &res
+		resultCtx.txMsgResult = res
+		resultCtx.errorResult = err
 	}
 
 	newDlg, _ := resultCtx.tc.mockKeeper.Keeper.GetDelegator(ctx, action.dlgAddr)
-	resultCtx.t.Logf("     ==>>> DelegatorUnbonded Result: %s unbond: %s, resOK: %+v, info: %+v \n", msg.DelegatorAddress, coins.String(), res.IsOK(), newDlg)
+	resultCtx.t.Logf("     ==>>> DelegatorUnbonded Result: %s unbond: %s, resOK: %+v, info: %+v \n", msg.DelegatorAddress, coins.String(), err == nil, newDlg)
 }
 
 type delegatorsUnBondAction struct {
@@ -442,10 +461,14 @@ func (action baseProxyRegAction) apply(ctx sdk.Context, vaStatus IValidatorStatu
 		panic(err)
 	}
 
-	res := handler(ctx, msg)
+	res, err := handler(ctx, &msg)
+	if err != nil {
+		panic(err)
+	}
 
 	if resultCtx != nil {
-		resultCtx.txMsgResult = &res
+		resultCtx.txMsgResult = res
+		resultCtx.errorResult = err
 	}
 }
 
@@ -459,10 +482,14 @@ func (action proxyBindAction) apply(ctx sdk.Context, vaStatus IValidatorStatus, 
 	resultCtx.t.Logf("====> Apply proxyBindAction[%d]\n", ctx.BlockHeight())
 	msg := types.NewMsgBindProxy(action.dlgAddr, action.proxyAddr)
 	handler := NewHandler(action.mStkKeeper.Keeper)
-	res := handler(ctx, msg)
+	res, err := handler(ctx, &msg)
+	if err != nil {
+		panic(err)
+	}
 
 	if resultCtx != nil {
-		resultCtx.txMsgResult = &res
+		resultCtx.txMsgResult = res
+		resultCtx.errorResult = err
 	}
 }
 
@@ -475,9 +502,13 @@ func (action proxyUnBindAction) apply(ctx sdk.Context, vaStatus IValidatorStatus
 	resultCtx.t.Logf("====> Apply proxyUnBindAction[%d]\n", ctx.BlockHeight())
 	msg := types.NewMsgUnbindProxy(action.dlgAddr)
 	handler := NewHandler(action.mStkKeeper.Keeper)
-	res := handler(ctx, msg)
+	res, err := handler(ctx, &msg)
+	if err != nil {
+		panic(err)
+	}
 	if resultCtx != nil {
-		resultCtx.txMsgResult = &res
+		resultCtx.txMsgResult = res
+		resultCtx.errorResult = err
 	}
 }
 
@@ -542,9 +573,9 @@ func noErrorInHandlerResult(expectNoError bool) actResChecker {
 	return func(t *testing.T, beforeStatus, afterStatus IValidatorStatus, resultCtx *ActionResultCtx) bool {
 		b1 := assert.NotNil(t, resultCtx.txMsgResult, resultCtx)
 		if expectNoError {
-			b1 = b1 && assert.True(t, resultCtx.txMsgResult.IsOK(), resultCtx.txMsgResult)
+			b1 = b1 && assert.Nil(t, resultCtx.errorResult == nil, resultCtx.txMsgResult)
 		} else {
-			b1 = b1 && assert.False(t, resultCtx.txMsgResult.IsOK(), resultCtx.txMsgResult)
+			b1 = b1 && assert.False(t, resultCtx.errorResult == nil, resultCtx.txMsgResult)
 		}
 
 		return b1
@@ -669,7 +700,7 @@ func queryDelegatorCheck(dlgAddr sdk.AccAddress, expExist bool, expVAs []sdk.Val
 			require.NoError(t, err)
 			res, sdkErr := q(ctx, []string{types.QueryUnbondingDelegation}, abci.RequestQuery{Data: bz})
 			if expUnbondingToken.Equal(sdk.ZeroDec()) && sdkErr != nil {
-				b5 = assert.True(t, sdkErr.Code() == 102, sdkErr.Error())
+				b5 = assert.True(t, sdkErr.(sdkerror.Error).ABCICode()==102, sdkErr.Error())
 			} else {
 				require.NoError(t, sdkErr)
 				unDelegationInfo := types.DefaultUndelegation()
@@ -989,11 +1020,13 @@ func (tc *basicStakingSMTestCase) SetupValidatorSetAndDelegatorSet(maxValidator 
 	// two delegators
 	handler := NewHandler(tc.mockKeeper.Keeper)
 
-	handler(ctx, NewMsgDeposit(ValidDelegator1, sdk.NewDecCoinFromDec(sdk.DefaultBondDenom, DelegatedToken1)))
+	msg := NewMsgDeposit(ValidDelegator1, sdk.NewDecCoinFromDec(sdk.DefaultBondDenom, DelegatedToken1))
+	handler(ctx, &msg)
 	delegator1, _ := tc.mockKeeper.Keeper.GetDelegator(ctx, ValidDelegator1)
 	tc.originDlgSet[delegator1.DelegatorAddress.String()] = &delegator1
 
-	handler(ctx, NewMsgDeposit(ValidDelegator2, sdk.NewDecCoinFromDec(sdk.DefaultBondDenom, DelegatedToken2)))
+	msg = NewMsgDeposit(ValidDelegator2, sdk.NewDecCoinFromDec(sdk.DefaultBondDenom, DelegatedToken2))
+	handler(ctx,&msg)
 	delegator2, _ := tc.mockKeeper.Keeper.GetDelegator(ctx, ValidDelegator2)
 	tc.originDlgSet[delegator2.DelegatorAddress.String()] = &delegator2
 

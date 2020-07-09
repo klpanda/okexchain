@@ -2,16 +2,14 @@ package main
 
 import (
 	"encoding/json"
+	"github.com/cosmos/cosmos-sdk/client/keys"
+	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	"io"
 
 	"github.com/cosmos/cosmos-sdk/baseapp"
-	"github.com/cosmos/cosmos-sdk/client"
+	"github.com/cosmos/cosmos-sdk/client/flags"
 	"github.com/cosmos/cosmos-sdk/server"
-	"github.com/cosmos/cosmos-sdk/store"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/cosmos/cosmos-sdk/x/genaccounts"
-	genaccscli "github.com/cosmos/cosmos-sdk/x/genaccounts/client/cli"
-	"github.com/okex/okchain/app"
 	genutilcli "github.com/okex/okchain/x/genutil/client/cli"
 	"github.com/okex/okchain/x/staking"
 	"github.com/spf13/cobra"
@@ -21,6 +19,8 @@ import (
 	"github.com/tendermint/tendermint/libs/log"
 	tmtypes "github.com/tendermint/tendermint/types"
 	dbm "github.com/tendermint/tm-db"
+
+	"github.com/okex/okchain/app"
 )
 
 const flagInvCheckPeriod = "inv-check-period"
@@ -28,8 +28,9 @@ const flagInvCheckPeriod = "inv-check-period"
 var invCheckPeriod uint
 
 func main() {
-	cdc := app.MakeCodec()
-
+	cdcCfg := app.MakeEncodingConfig()
+	cdc := cdcCfg.Amino
+	appCodec := cdcCfg.Marshaler
 	config := sdk.GetConfig()
 	config.SetBech32PrefixForAccount(sdk.Bech32PrefixAccAddr, sdk.Bech32PrefixAccPub)
 	config.SetBech32PrefixForValidator(sdk.Bech32PrefixValAddr, sdk.Bech32PrefixValPub)
@@ -45,16 +46,16 @@ func main() {
 	}
 
 	rootCmd.AddCommand(genutilcli.InitCmd(ctx, cdc, app.ModuleBasics, app.DefaultNodeHome))
-	rootCmd.AddCommand(genutilcli.CollectGenTxsCmd(ctx, cdc, genaccounts.AppModuleBasic{}, app.DefaultNodeHome))
+	rootCmd.AddCommand(genutilcli.CollectGenTxsCmd(ctx, cdc, banktypes.GenesisBalancesIterator{}, app.DefaultNodeHome))
 	rootCmd.AddCommand(genutilcli.MigrateGenesisCmd(ctx, cdc))
-	rootCmd.AddCommand(genutilcli.GenTxCmd(ctx, cdc, app.ModuleBasics, staking.AppModuleBasic{}, genaccounts.AppModuleBasic{}, app.DefaultNodeHome, app.DefaultCLIHome))
+	rootCmd.AddCommand(genutilcli.GenTxCmd(ctx, cdc, app.ModuleBasics, staking.AppModuleBasic{}, banktypes.GenesisBalancesIterator{}, app.DefaultNodeHome, app.DefaultCLIHome))
 	rootCmd.AddCommand(genutilcli.ValidateGenesisCmd(ctx, cdc, app.ModuleBasics))
-	rootCmd.AddCommand(genaccscli.AddGenesisAccountCmd(ctx, cdc, app.DefaultNodeHome, app.DefaultCLIHome))
-	rootCmd.AddCommand(client.NewCompletionCmd(rootCmd, true))
-	rootCmd.AddCommand(testnetCmd(ctx, cdc, app.ModuleBasics, genaccounts.AppModuleBasic{}))
+	rootCmd.AddCommand(AddGenesisAccountCmd(ctx, cdc, appCodec, app.DefaultNodeHome, app.DefaultCLIHome))
+	rootCmd.AddCommand(flags.NewCompletionCmd(rootCmd, true))
+	rootCmd.AddCommand(testnetCmd(ctx, cdc, app.ModuleBasics, banktypes.GenesisBalancesIterator{}))
 
-	server.AddCommands(ctx, cdc, rootCmd, newApp, exportAppStateAndTMValidators, registerRoutes)
-	rootCmd.PersistentFlags().String(client.FlagKeyPass, client.DefaultKeyPass, "Pass word of sender")
+	server.AddCommands(ctx, cdc, rootCmd, newApp, exportAppStateAndTMValidators)
+	rootCmd.PersistentFlags().String(keys.FlagKeyPass, keys.DefaultKeyPass, "Pass word of sender")
 
 	// prepare and add flags
 	executor := cli.PrepareBaseCmd(rootCmd, "OKCHAIN", app.DefaultNodeHome)
@@ -67,10 +68,14 @@ func main() {
 	}
 }
 
-func newApp(logger log.Logger, db dbm.DB, traceStore io.Writer) abci.Application {
+func newApp(logger log.Logger, db dbm.DB, traceStore io.Writer) server.Application {
+	pruningOpts, err := server.GetPruningOptionsFromFlags()
+	if err != nil {
+		panic(err)
+	}
 	return app.NewOKChainApp(
 		logger, db, traceStore, true, invCheckPeriod,
-		baseapp.SetPruning(store.NewPruningOptionsFromString(viper.GetString("pruning"))),
+		baseapp.SetPruning(pruningOpts),
 		baseapp.SetMinGasPrices(viper.GetString(server.FlagMinGasPrices)),
 		baseapp.SetHaltHeight(uint64(viper.GetInt(server.FlagHaltHeight))),
 	)
@@ -78,16 +83,17 @@ func newApp(logger log.Logger, db dbm.DB, traceStore io.Writer) abci.Application
 
 func exportAppStateAndTMValidators(
 	logger log.Logger, db dbm.DB, traceStore io.Writer, height int64, forZeroHeight bool, jailWhiteList []string,
-) (json.RawMessage, []tmtypes.GenesisValidator, error) {
+) (json.RawMessage, []tmtypes.GenesisValidator, *abci.ConsensusParams, error) {
 
+	var gApp *app.OKChainApp
 	if height != -1 {
-		gApp := app.NewOKChainApp(logger, db, traceStore, false, uint(1))
+		gApp = app.NewOKChainApp(logger, db, traceStore, false, uint(1))
 		err := gApp.LoadHeight(height)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
-		return gApp.ExportAppStateAndValidators(forZeroHeight, jailWhiteList)
+	} else {
+		gApp = app.NewOKChainApp(logger, db, traceStore, true, uint(1))
 	}
-	gApp := app.NewOKChainApp(logger, db, traceStore, true, uint(1))
 	return gApp.ExportAppStateAndValidators(forZeroHeight, jailWhiteList)
 }

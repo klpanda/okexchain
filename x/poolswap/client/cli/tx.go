@@ -1,14 +1,15 @@
 package cli
 
 import (
+	"bufio"
+	"github.com/cosmos/cosmos-sdk/client/flags"
+	authclient "github.com/cosmos/cosmos-sdk/x/auth/client"
+	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	"time"
 
 	"github.com/cosmos/cosmos-sdk/client"
-	"github.com/cosmos/cosmos-sdk/client/context"
 	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/cosmos/cosmos-sdk/x/auth"
-	"github.com/cosmos/cosmos-sdk/x/auth/client/utils"
 	"github.com/spf13/cobra"
 
 	"github.com/okex/okchain/x/poolswap/types"
@@ -21,7 +22,7 @@ func GetTxCmd(cdc *codec.Codec) *cobra.Command {
 		Short: "Poolswap transactions subcommands",
 	}
 
-	txCmd.AddCommand(client.PostCommands(
+	txCmd.AddCommand(flags.PostCommands(
 		getCmdAddLiquidity(cdc),
 		getCmdRemoveLiquidity(cdc),
 		getCmdCreateExchange(cdc),
@@ -41,8 +42,9 @@ func getCmdAddLiquidity(cdc *codec.Codec) *cobra.Command {
 		Use:   "add-liquidity",
 		Short: "add liquidity",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cliCtx := context.NewCLIContext().WithCodec(cdc)
-			txBldr := auth.NewTxBuilderFromCLI().WithTxEncoder(utils.GetTxEncoder(cdc))
+			cliCtx := client.NewContext().WithCodec(cdc)
+			inBuf := bufio.NewReader(cmd.InOrStdin())
+			txBldr := authtypes.NewTxBuilderFromCLI(inBuf).WithTxEncoder(authclient.GetTxEncoder(cdc))
 
 			minLiquidityDec, sdkErr := sdk.NewDecFromStr(minLiquidity)
 			if sdkErr != nil {
@@ -63,7 +65,7 @@ func getCmdAddLiquidity(cdc *codec.Codec) *cobra.Command {
 			deadline := time.Now().Add(duration).Unix()
 			msg := types.NewMsgAddLiquidity(minLiquidityDec, maxBaseAmountDecCoin, quoteAmountDecCoin, deadline, cliCtx.FromAddress)
 
-			return utils.CompleteAndBroadcastTxCLI(txBldr, cliCtx, []sdk.Msg{msg})
+			return authclient.CompleteAndBroadcastTxCLI(txBldr, cliCtx, []sdk.Msg{&msg})
 		},
 	}
 
@@ -84,8 +86,9 @@ func getCmdRemoveLiquidity(cdc *codec.Codec) *cobra.Command {
 		Use:   "remove-liquidity",
 		Short: "remove liquidity",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cliCtx := context.NewCLIContext().WithCodec(cdc)
-			txBldr := auth.NewTxBuilderFromCLI().WithTxEncoder(utils.GetTxEncoder(cdc))
+			cliCtx := client.NewContext().WithCodec(cdc)
+			inBuf := bufio.NewReader(cmd.InOrStdin())
+			txBldr := authtypes.NewTxBuilderFromCLI(inBuf).WithTxEncoder(authclient.GetTxEncoder(cdc))
 
 			liquidityDec, sdkErr := sdk.NewDecFromStr(liquidity)
 			if sdkErr != nil {
@@ -106,7 +109,7 @@ func getCmdRemoveLiquidity(cdc *codec.Codec) *cobra.Command {
 			deadline := time.Now().Add(duration).Unix()
 			msg := types.NewMsgRemoveLiquidity(liquidityDec, minBaseAmountDecCoin, minQuoteAmountDecCoin, deadline, cliCtx.FromAddress)
 
-			return utils.CompleteAndBroadcastTxCLI(txBldr, cliCtx, []sdk.Msg{msg})
+			return authclient.CompleteAndBroadcastTxCLI(txBldr, cliCtx, []sdk.Msg{&msg})
 		},
 	}
 
@@ -124,11 +127,12 @@ func getCmdCreateExchange(cdc *codec.Codec) *cobra.Command {
 		Use:   "create-exchange",
 		Short: "create exchange",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cliCtx := context.NewCLIContext().WithCodec(cdc)
-			txBldr := auth.NewTxBuilderFromCLI().WithTxEncoder(utils.GetTxEncoder(cdc))
+			cliCtx := client.NewContext().WithCodec(cdc)
+			inBuf := bufio.NewReader(cmd.InOrStdin())
+			txBldr := authtypes.NewTxBuilderFromCLI(inBuf).WithTxEncoder(authclient.GetTxEncoder(cdc))
 			msg := types.NewMsgCreateExchange(token, cliCtx.FromAddress)
 
-			return utils.CompleteAndBroadcastTxCLI(txBldr, cliCtx, []sdk.Msg{msg})
+			return authclient.CompleteAndBroadcastTxCLI(txBldr, cliCtx, []sdk.Msg{&msg})
 		},
 	}
 
@@ -146,8 +150,9 @@ func getCmdTokenSwap(cdc *codec.Codec) *cobra.Command {
 		Use:   "swap-token",
 		Short: "token exchange",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cliCtx := context.NewCLIContext().WithCodec(cdc)
-			txBldr := auth.NewTxBuilderFromCLI().WithTxEncoder(utils.GetTxEncoder(cdc))
+			cliCtx := client.NewContext().WithCodec(cdc)
+			inBuf := bufio.NewReader(cmd.InOrStdin())
+			txBldr := authtypes.NewTxBuilderFromCLI(inBuf).WithTxEncoder(authclient.GetTxEncoder(cdc))
 
 			soldTokenAmount, err := sdk.ParseDecCoin(soldTokenAmount)
 			if err != nil {
@@ -175,7 +180,7 @@ func getCmdTokenSwap(cdc *codec.Codec) *cobra.Command {
 			msg := types.NewMsgTokenToNativeToken(soldTokenAmount, minBoughtTokenAmount,
 				deadline, recip, cliCtx.FromAddress)
 
-			return utils.CompleteAndBroadcastTxCLI(txBldr, cliCtx, []sdk.Msg{msg})
+			return authclient.CompleteAndBroadcastTxCLI(txBldr, cliCtx, []sdk.Msg{&msg})
 		},
 	}
 

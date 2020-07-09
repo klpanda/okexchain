@@ -12,7 +12,7 @@ import (
 )
 
 func TestInitGenesisState(t *testing.T) {
-	ctx, _, gk, _, _ := keeper.CreateTestInput(t, false, 1000)
+	ctx, ak, gk, _, _ := keeper.CreateTestInput(t, false, 1000)
 
 	initialDeposit := sdk.DecCoins{sdk.NewInt64DecCoin(sdk.DefaultBondDenom, 50)}
 	deposits := types.Deposits{
@@ -43,7 +43,7 @@ func TestInitGenesisState(t *testing.T) {
 		WaitingProposals:   waitingProposals,
 	}
 
-	InitGenesis(ctx, gk, gk.SupplyKeeper(), data)
+	InitGenesis(ctx, gk, ak, gk.BankKeeper(), data)
 	// 0x00
 	proposal0, ok := gk.GetProposal(ctx, data.Proposals[0].ProposalID)
 	require.True(t, ok)
@@ -103,8 +103,8 @@ func TestInitGenesisState(t *testing.T) {
 	require.Equal(t, data.Deposits, exportGenesis.Deposits)
 	require.Equal(t, data.Votes, exportGenesis.Votes)
 
-	newCtx, _, newgk, _, _ := keeper.CreateTestInput(t, false, 1000)
-	InitGenesis(newCtx, newgk, newgk.SupplyKeeper(), exportGenesis)
+	newCtx, ak, newgk, _, _ := keeper.CreateTestInput(t, false, 1000)
+	InitGenesis(newCtx, newgk, ak, newgk.BankKeeper(), exportGenesis)
 	// 0x00
 	proposal0, ok = newgk.GetProposal(newCtx, exportGenesis.Proposals[0].ProposalID)
 	require.True(t, ok)
@@ -155,7 +155,7 @@ func TestInitGenesisState(t *testing.T) {
 
 func TestValidateGenesis(t *testing.T) {
 	data := GenesisState{}
-	var err sdk.Error
+	var err error
 	data.TallyParams.Threshold, err = sdk.NewDecFromStr("-23")
 	require.Nil(t, err)
 	require.NotNil(t, ValidateGenesis(data))

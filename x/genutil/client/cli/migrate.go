@@ -11,7 +11,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/server"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/version"
-	extypes "github.com/cosmos/cosmos-sdk/x/genutil"
+	extypes "github.com/cosmos/cosmos-sdk/x/genutil/types"
 	v09 "github.com/okex/okchain/x/genutil/legacy/v0_9"
 )
 

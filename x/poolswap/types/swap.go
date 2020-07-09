@@ -2,7 +2,7 @@ package types
 
 import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/cosmos/cosmos-sdk/x/supply"
+	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	token "github.com/okex/okchain/x/token/types"
 
 	"fmt"
@@ -51,7 +51,7 @@ func InitPoolToken(poolTokenName string) token.Token {
 		WholeName:           poolTokenName,
 		OriginalTotalSupply: sdk.NewDec(0),
 		TotalSupply:         sdk.NewDec(0),
-		Owner:               supply.NewModuleAddress(ModuleName),
+		Owner:               authtypes.NewModuleAddress(ModuleName),
 		Type:                GenerateTokenType,
 		Mintable:            true,
 	}

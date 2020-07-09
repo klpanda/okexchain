@@ -3,6 +3,7 @@ package keeper
 import (
 	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
+	sdkerror "github.com/cosmos/cosmos-sdk/types/errors"
 	"github.com/okex/okchain/x/upgrade/types"
 	abci "github.com/tendermint/tendermint/abci/types"
 )
@@ -16,7 +17,7 @@ const (
 
 // NewQuerier is the module level router for state queries
 func NewQuerier(keeper Keeper) sdk.Querier {
-	return func(ctx sdk.Context, path []string, req abci.RequestQuery) (res []byte, err sdk.Error) {
+	return func(ctx sdk.Context, path []string, req abci.RequestQuery) (res []byte, err error) {
 		switch path[0] {
 		case QueryUpgradeConfig:
 			return queryUpgradeConfig(ctx, req, keeper)
@@ -25,12 +26,12 @@ func NewQuerier(keeper Keeper) sdk.Querier {
 		case QueryUpgradeFailedVersion:
 			return queryUpgradeLastFailedVersion(ctx, req, keeper)
 		default:
-			return nil, sdk.ErrUnknownRequest("unknown query endpoint")
+			return nil, sdkerror.Wrap(sdkerror.ErrUnknownRequest, "unknown query endpoint")
 		}
 	}
 }
 
-func queryUpgradeConfig(ctx sdk.Context, req abci.RequestQuery, keeper Keeper) ([]byte, sdk.Error) {
+func queryUpgradeConfig(ctx sdk.Context, req abci.RequestQuery, keeper Keeper) ([]byte, error) {
 	appUpgradeConfig, found := keeper.GetAppUpgradeConfig(ctx)
 
 	if !found {
@@ -44,7 +45,7 @@ func queryUpgradeConfig(ctx sdk.Context, req abci.RequestQuery, keeper Keeper) (
 	return bz, nil
 }
 
-func queryUpgradeVersion(ctx sdk.Context, req abci.RequestQuery, keeper Keeper) ([]byte, sdk.Error) {
+func queryUpgradeVersion(ctx sdk.Context, req abci.RequestQuery, keeper Keeper) ([]byte, error) {
 	version := keeper.protocolKeeper.GetCurrentVersion(ctx)
 
 	bz, err := codec.MarshalJSONIndent(keeper.cdc, types.NewQueryVersion(version))
@@ -54,7 +55,7 @@ func queryUpgradeVersion(ctx sdk.Context, req abci.RequestQuery, keeper Keeper) 
 	return bz, nil
 }
 
-func queryUpgradeLastFailedVersion(ctx sdk.Context, req abci.RequestQuery, keeper Keeper) ([]byte, sdk.Error) {
+func queryUpgradeLastFailedVersion(ctx sdk.Context, req abci.RequestQuery, keeper Keeper) ([]byte, error) {
 	version := keeper.protocolKeeper.GetLastFailedVersion(ctx)
 
 	bz, err := codec.MarshalJSONIndent(keeper.cdc, types.NewQueryVersion(version))

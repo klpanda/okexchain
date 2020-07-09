@@ -3,12 +3,11 @@ package gov
 import (
 	"bytes"
 	"fmt"
+	sdkGovtypes "github.com/cosmos/cosmos-sdk/x/gov/types"
 	"strconv"
 	"time"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	sdkGov "github.com/cosmos/cosmos-sdk/x/gov"
-
 	"github.com/okex/okchain/x/gov/keeper"
 	"github.com/okex/okchain/x/gov/types"
 )
@@ -30,7 +29,7 @@ func DefaultGenesisState() GenesisState {
 	var minDeposit = sdk.DecCoins{sdk.NewDecCoin(sdk.DefaultBondDenom, sdk.NewInt(100))}
 	return GenesisState{
 		StartingProposalID: 1,
-		Proposals:          []sdkGov.Proposal{},
+		Proposals:          []sdkGovtypes.Proposal{},
 		DepositParams: DepositParams{
 			MinDeposit:       minDeposit,
 			MaxDepositPeriod: time.Hour * 24,
@@ -49,8 +48,8 @@ func DefaultGenesisState() GenesisState {
 
 // Checks whether 2 GenesisState structs are equivalent.
 func (data GenesisState) equal(data2 GenesisState) bool {
-	b1 := types.ModuleCdc.MustMarshalBinaryBare(data)
-	b2 := types.ModuleCdc.MustMarshalBinaryBare(data2)
+	b1 := types.ModuleCdc.MustMarshalJSON(data)
+	b2 := types.ModuleCdc.MustMarshalJSON(data2)
 	return bytes.Equal(b1, b2)
 }
 
@@ -95,7 +94,9 @@ func ValidateGenesis(data GenesisState) error {
 }
 
 // InitGenesis - store genesis parameters
-func InitGenesis(ctx sdk.Context, k keeper.Keeper, supplyKeeper sdkGov.SupplyKeeper, data GenesisState) {
+func InitGenesis(ctx sdk.Context, k keeper.Keeper, accKeeper sdkGovtypes.AccountKeeper,
+	bankKeeper sdkGovtypes.BankKeeper, data GenesisState,
+) {
 	k.SetProposalID(ctx, data.StartingProposalID)
 	k.SetDepositParams(ctx, data.DepositParams)
 	k.SetVotingParams(ctx, data.VotingParams)
@@ -110,11 +111,11 @@ func InitGenesis(ctx sdk.Context, k keeper.Keeper, supplyKeeper sdkGov.SupplyKee
 	var totalDeposits sdk.DecCoins
 	for _, deposit := range data.Deposits {
 		k.SetDeposit(ctx, deposit)
-		totalDeposits = totalDeposits.Add(deposit.Amount)
+		totalDeposits = totalDeposits.Add(deposit.Amount...)
 	}
 
 	for _, vote := range data.Votes {
-		k.SetVote(ctx, vote.ProposalID, vote)
+		k.SetVote(ctx, vote)
 	}
 
 	for _, proposal := range data.Proposals {
@@ -136,11 +137,11 @@ func InitGenesis(ctx sdk.Context, k keeper.Keeper, supplyKeeper sdkGov.SupplyKee
 	}
 
 	// add coins if not provided on genesis
-	if moduleAcc.GetCoins().IsZero() {
-		if err := moduleAcc.SetCoins(totalDeposits); err != nil {
+	if bankKeeper.GetAllBalances(ctx, moduleAcc.GetAddress()).IsZero() {
+		if err := bankKeeper.SetBalances(ctx, moduleAcc.GetAddress(), totalDeposits); err != nil {
 			panic(err)
 		}
-		supplyKeeper.SetModuleAccount(ctx, moduleAcc)
+		accKeeper.SetModuleAccount(ctx, moduleAcc)
 	}
 }
 

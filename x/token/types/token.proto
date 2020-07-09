@@ -1,0 +1,71 @@
+syntax = "proto3";
+package okchain.token;
+
+import "gogoproto/gogo.proto";
+import "cosmos_proto/cosmos.proto";
+import "cosmos/cosmos.proto";
+
+option go_package = "github.com/okex/okchain/x/token/types";
+
+message MsgTokenIssue {
+    option (gogoproto.equal) = true;
+    string description = 1;
+    string symbol = 2;
+    string originalSymbol = 3;
+    string wholeName = 4;
+    string total_supply = 5;
+    bytes owner = 6 [(gogoproto.casttype) = "github.com/cosmos/cosmos-sdk/types.AccAddress"];
+    bool mintable = 7;
+}
+
+message MsgTokenBurn {
+    option (gogoproto.equal) = true;
+    cosmos.DecCoin amount = 1 [(gogoproto.nullable) = false];
+    bytes owner = 2 [(gogoproto.casttype) = "github.com/cosmos/cosmos-sdk/types.AccAddress"];
+}
+
+message MsgTokenMint {
+    option (gogoproto.equal) = true;
+    cosmos.DecCoin amount = 1 [(gogoproto.nullable) = false];
+    bytes owner = 2 [(gogoproto.casttype) = "github.com/cosmos/cosmos-sdk/types.AccAddress"];
+}
+
+message TransferUnit {
+    option (gogoproto.equal) = true;
+    bytes to = 1 [(gogoproto.casttype) = "github.com/cosmos/cosmos-sdk/types.AccAddress"];
+    repeated cosmos.DecCoin coins = 2 [(gogoproto.nullable) = false, (gogoproto.castrepeated) = "github.com/cosmos/cosmos-sdk/types.DecCoins"];
+}
+
+message MsgMultiSend {
+    option (gogoproto.equal) = true;
+    bytes from = 1 [(gogoproto.casttype) = "github.com/cosmos/cosmos-sdk/types.AccAddress"];
+    repeated TransferUnit transfers = 2 [(gogoproto.nullable) = false];
+}
+
+// MsgSend - high level transaction of the coin module
+message MsgSend {
+    option (gogoproto.equal) = true;
+
+    bytes from_address = 1 [(gogoproto.casttype) = "github.com/cosmos/cosmos-sdk/types.AccAddress", (gogoproto.moretags) = "yaml:\"from_address\""];
+    bytes to_address = 2 [(gogoproto.casttype) = "github.com/cosmos/cosmos-sdk/types.AccAddress", (gogoproto.moretags) = "yaml:\"to_address\""];
+    repeated cosmos.DecCoin amount = 3 [(gogoproto.nullable) = false, (gogoproto.castrepeated) = "github.com/cosmos/cosmos-sdk/types.DecCoins"];
+}
+
+message MsgTransferOwnership {
+    option (gogoproto.equal) = true;
+    bytes from_address = 1 [(gogoproto.casttype) = "github.com/cosmos/cosmos-sdk/types.AccAddress", (gogoproto.moretags) = "yaml:\"from_address\""];
+    bytes to_address = 2 [(gogoproto.casttype) = "github.com/cosmos/cosmos-sdk/types.AccAddress", (gogoproto.moretags) = "yaml:\"to_address\""];
+    string symbol = 3 [(gogoproto.moretags) = "yaml:\"symbol\""];
+    bytes pubkey = 4 [(gogoproto.moretags) = "yaml:\"pubkey\""];
+    bytes to_signature = 5 [(gogoproto.moretags) = "yaml:\"to_signature\""];
+}
+
+message MsgTokenModify {
+    option (gogoproto.equal) = true;
+    bytes owner = 1 [(gogoproto.casttype) = "github.com/cosmos/cosmos-sdk/types.AccAddress"];
+    string Symbol = 2;
+    string Description = 3;
+    string WholeName = 4;
+    bool IsDescriptionModified = 5;
+    bool IsWholeNameModified = 6;
+}

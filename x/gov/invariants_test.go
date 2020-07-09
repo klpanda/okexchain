@@ -16,16 +16,16 @@ func TestModuleAccountInvariant(t *testing.T) {
 
 	initialDeposit := sdk.DecCoins{sdk.NewInt64DecCoin(sdk.DefaultBondDenom, 50)}
 	content := types.NewTextProposal("Test", "description")
-	newProposalMsg := NewMsgSubmitProposal(content, initialDeposit, keeper.Addrs[0])
-	res := govHandler(ctx, newProposalMsg)
-	require.True(t, res.IsOK())
-	var proposalID uint64
-	gk.Cdc().MustUnmarshalBinaryLengthPrefixed(res.Data, &proposalID)
+	newProposalMsg, err := NewMsgSubmitProposal(content, initialDeposit, keeper.Addrs[0])
+	require.Nil(t, err)
+	res, err := govHandler(ctx, newProposalMsg)
+	require.Nil(t, err)
+	proposalID := types.GetProposalIDFromBytes(res.Data)
 
 	newDepositMsg := NewMsgDeposit(keeper.Addrs[0], proposalID,
 		sdk.DecCoins{sdk.NewInt64DecCoin(sdk.DefaultBondDenom, 100)})
-	res = govHandler(ctx, newDepositMsg)
-	require.True(t, res.IsOK())
+	res, err = govHandler(ctx, newDepositMsg)
+	require.Nil(t, err)
 
 	invariant := ModuleAccountInvariant(gk)
 	_, broken := invariant(ctx)

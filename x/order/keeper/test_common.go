@@ -2,6 +2,11 @@ package keeper
 
 import (
 	"fmt"
+	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
+	cryptocodec "github.com/cosmos/cosmos-sdk/crypto/codec"
+	authkeeper "github.com/cosmos/cosmos-sdk/x/auth/keeper"
+	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
+	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	"os"
 	"testing"
 	"time"
@@ -13,9 +18,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/codec"
 	"github.com/cosmos/cosmos-sdk/store"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/cosmos/cosmos-sdk/x/auth"
-	"github.com/cosmos/cosmos-sdk/x/bank"
-	"github.com/cosmos/cosmos-sdk/x/supply"
+	bankkeeper "github.com/cosmos/cosmos-sdk/x/bank/keeper"
 	"github.com/okex/okchain/x/params"
 	"github.com/stretchr/testify/require"
 	abci "github.com/tendermint/tendermint/abci/types"
@@ -38,20 +41,19 @@ type TestInput struct {
 
 	OrderKeeper   Keeper
 	TokenKeeper   token.Keeper
-	AccountKeeper auth.AccountKeeper
-	SupplyKeeper  supply.Keeper
+	AccountKeeper authkeeper.AccountKeeper
+	BankKeeper    bankkeeper.BaseKeeper
 	DexKeeper     dex.Keeper
 }
 
 // MakeTestCodec creates a codec used only for testing
 func MakeTestCodec() *codec.Codec {
 	var cdc = codec.New()
-	bank.RegisterCodec(cdc)
-	auth.RegisterCodec(cdc)
-	supply.RegisterCodec(cdc)
+	banktypes.RegisterCodec(cdc)
+	authtypes.RegisterCodec(cdc)
 	sdk.RegisterCodec(cdc)
 	dex.RegisterCodec(cdc)
-	codec.RegisterCrypto(cdc)
+	cryptocodec.RegisterCrypto(cdc)
 
 	types.RegisterCodec(cdc) // order
 	token.RegisterCodec(cdc) // token
@@ -63,8 +65,8 @@ func CreateTestInputWithBalance(t *testing.T, numAddrs, initQuantity int64) Test
 
 	db := dbm.NewMemDB()
 
-	keyAcc := sdk.NewKVStoreKey(auth.StoreKey)
-	keySupply := sdk.NewKVStoreKey(supply.StoreKey)
+	keyAcc := sdk.NewKVStoreKey(authtypes.StoreKey)
+	keyBank := sdk.NewKVStoreKey(banktypes.StoreKey)
 	keyParams := sdk.NewKVStoreKey(params.StoreKey)
 	tkeyParams := sdk.NewTransientStoreKey(params.TStoreKey)
 
@@ -82,7 +84,7 @@ func CreateTestInputWithBalance(t *testing.T, numAddrs, initQuantity int64) Test
 
 	ms := store.NewCommitMultiStore(db)
 	ms.MountStoreWithDB(keyAcc, sdk.StoreTypeIAVL, db)
-	ms.MountStoreWithDB(keySupply, sdk.StoreTypeIAVL, db)
+	ms.MountStoreWithDB(keyBank, sdk.StoreTypeIAVL, db)
 	ms.MountStoreWithDB(keyParams, sdk.StoreTypeIAVL, db)
 	ms.MountStoreWithDB(tkeyParams, sdk.StoreTypeTransient, db)
 
@@ -98,38 +100,39 @@ func CreateTestInputWithBalance(t *testing.T, numAddrs, initQuantity int64) Test
 
 	ctx := sdk.NewContext(ms, abci.Header{Time: time.Unix(0, 0)}, false, log.NewTMLogger(os.Stdout))
 	cdc := MakeTestCodec()
+	interfaceRegistry := codectypes.NewInterfaceRegistry()
+	appCodec := codec.NewHybridCodec(cdc, interfaceRegistry)
 
-	feeCollectorAcc := supply.NewEmptyModuleAccount(auth.FeeCollectorName)
+	feeCollectorAcc := authtypes.NewEmptyModuleAccount(authtypes.FeeCollectorName)
 
 	blacklistedAddrs := make(map[string]bool)
 	blacklistedAddrs[feeCollectorAcc.String()] = true
 
-	paramsKeeper := params.NewKeeper(cdc, keyParams, tkeyParams, params.DefaultCodespace)
-	accountKeeper := auth.NewAccountKeeper(cdc, keyAcc,
-		paramsKeeper.Subspace(auth.DefaultParamspace), auth.ProtoBaseAccount)
-	bankKeeper := bank.NewBaseKeeper(accountKeeper, paramsKeeper.Subspace(bank.DefaultParamspace),
-		bank.DefaultCodespace, blacklistedAddrs)
+	paramsKeeper := params.NewKeeper(appCodec, keyParams, tkeyParams)
 	maccPerms := map[string][]string{
-		auth.FeeCollectorName: nil,
-		token.ModuleName:      {supply.Minter, supply.Burner},
+		authtypes.FeeCollectorName: nil,
+		token.ModuleName:           {authtypes.Minter, authtypes.Burner},
 	}
-	supplyKeeper := supply.NewKeeper(cdc, keySupply, accountKeeper, bankKeeper, maccPerms)
-	supplyKeeper.SetSupply(ctx, supply.NewSupply(sdk.Coins{}))
+	accountKeeper := authkeeper.NewAccountKeeper(appCodec, keyAcc,
+		paramsKeeper.Subspace(authtypes.ModuleName), authtypes.ProtoBaseAccount, maccPerms)
+	bankKeeper := bankkeeper.NewBaseKeeper(appCodec, keyBank, accountKeeper, paramsKeeper.Subspace(banktypes.ModuleName), blacklistedAddrs)
+
+	bankKeeper.SetSupply(ctx, banktypes.NewSupply(sdk.Coins{}))
 
 	// set module accounts
-	supplyKeeper.SetModuleAccount(ctx, feeCollectorAcc)
+	accountKeeper.SetModuleAccount(ctx, feeCollectorAcc)
 
 	// token keeper
 	tokenKeepr := token.NewKeeper(bankKeeper, paramsKeeper.Subspace(token.DefaultParamspace),
-		auth.FeeCollectorName, supplyKeeper, keyToken, keyLock, cdc, true)
+		authtypes.FeeCollectorName, accountKeeper, keyToken, keyLock, cdc, true)
 
 	// dex keeper
 	paramsSubspace := paramsKeeper.Subspace(dex.DefaultParamspace)
-	dexKeeper := dex.NewKeeper(auth.FeeCollectorName, supplyKeeper, paramsSubspace, tokenKeepr, nil, bankKeeper, storeKey, keyTokenPair, cdc)
+	dexKeeper := dex.NewKeeper(authtypes.FeeCollectorName, accountKeeper, paramsSubspace, tokenKeepr, nil, bankKeeper, storeKey, keyTokenPair, cdc)
 
 	// order keeper
-	orderKeeper := NewKeeper(tokenKeepr, supplyKeeper, dexKeeper,
-		paramsKeeper.Subspace(types.DefaultParamspace), auth.FeeCollectorName, keyOrder,
+	orderKeeper := NewKeeper(tokenKeepr, accountKeeper, bankKeeper, dexKeeper,
+		paramsKeeper.Subspace(types.DefaultParamspace), authtypes.FeeCollectorName, keyOrder,
 		cdc, true, monitor.NopOrderMetrics())
 
 	defaultParams := types.DefaultTestParams()
@@ -148,13 +151,14 @@ func CreateTestInputWithBalance(t *testing.T, numAddrs, initQuantity int64) Test
 		addr := sdk.AccAddress(pk.Address())
 		testAddrs = append(testAddrs, addr)
 		//_, err := bankKeeper.AddCoins(ctx, addr, initCoins)
-		err := orderKeeper.supplyKeeper.MintCoins(ctx, token.ModuleName, initCoins)
+		err := orderKeeper.bankKeeper.MintCoins(ctx, token.ModuleName, initCoins)
 		require.Nil(t, err)
-		err = orderKeeper.supplyKeeper.SendCoinsFromModuleToAccount(ctx, token.ModuleName, addr, initCoins)
+		err = orderKeeper.bankKeeper.SendCoinsFromModuleToAccount(ctx, token.ModuleName, addr, initCoins)
 		require.Nil(t, err)
 	}
 
-	return TestInput{ctx, cdc, testAddrs, orderKeeper, tokenKeepr, accountKeeper, supplyKeeper, dexKeeper}
+	return TestInput{ctx, cdc, testAddrs, orderKeeper, tokenKeepr,
+		accountKeeper, bankKeeper, dexKeeper}
 }
 
 // CreateTestInput creates TestInput with default params

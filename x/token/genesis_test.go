@@ -51,7 +51,7 @@ func TestInitGenesis(t *testing.T) {
 
 	coins := sdk.NewDecCoinsFromDec(tokens[0].Symbol, tokens[0].OriginalTotalSupply)
 
-	err := keeper.supplyKeeper.MintCoins(ctx, types.ModuleName, coins)
+	err := keeper.bankKeeper.MintCoins(ctx, types.ModuleName, coins)
 	require.NoError(t, err)
 
 	initGenesis(ctx, keeper, initedGenesis)
@@ -89,7 +89,7 @@ func TestInitGenesis(t *testing.T) {
 	exportGenesis.LockedFees[0].Coins = sdk.DecCoins{decCoin}
 
 	coins = sdk.NewCoins(sdk.NewDecCoinFromDec(exportGenesis.Tokens[0].Symbol, exportGenesis.Tokens[0].OriginalTotalSupply))
-	err = newKeeper.supplyKeeper.MintCoins(newCtx, types.ModuleName, coins)
+	err = newKeeper.bankKeeper.MintCoins(newCtx, types.ModuleName, coins)
 	require.NoError(t, err)
 
 	initGenesis(newCtx, newKeeper, exportGenesis)
@@ -136,11 +136,11 @@ func TestIssueToken(t *testing.T) {
 
 	coins := sdk.NewCoins(sdk.NewDecCoinFromDec(genesisState.Tokens[0].Symbol,
 		genesisState.Tokens[0].OriginalTotalSupply))
-	err := keeper.supplyKeeper.MintCoins(ctx, types.ModuleName, coins)
+	err := keeper.bankKeeper.MintCoins(ctx, types.ModuleName, coins)
 	require.NoError(t, err)
 
-	acc, _ := CreateGenAccounts(1, nil)
-	err2 := IssueOKT(ctx, keeper, gs, acc[0].ToBaseAccount())
+	acc, _, _ := CreateGenAccounts(1, coins)
+	err2 := IssueOKT(ctx, keeper, gs, &acc[0])
 	require.NoError(t, err2)
 	token := keeper.GetTokenInfo(ctx, genesisState.Tokens[0].Symbol)
 	expectToken := types.Token{
@@ -168,12 +168,12 @@ func TestIssueToken(t *testing.T) {
 	}}
 
 	coins = sdk.NewCoins(sdk.NewDecCoinFromDec(coin[0].Symbol, coin[0].OriginalTotalSupply))
-	err = keeper.supplyKeeper.MintCoins(ctx, types.ModuleName, coins)
+	err = keeper.bankKeeper.MintCoins(ctx, types.ModuleName, coins)
 	require.NoError(t, err)
 
 	genesisState.Tokens = coin
 	gs = types.ModuleCdc.MustMarshalJSON(genesisState)
-	err2 = IssueOKT(ctx, keeper, gs, acc[0].ToBaseAccount())
+	err2 = IssueOKT(ctx, keeper, gs, &acc[0])
 	require.NoError(t, err2)
 
 	err2 = validateGenesis(genesisState)

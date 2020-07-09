@@ -1,15 +1,16 @@
 package cli
 
 import (
+	"bufio"
 	"fmt"
+	"github.com/cosmos/cosmos-sdk/client"
+	authclient "github.com/cosmos/cosmos-sdk/x/auth/client"
+	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	"io/ioutil"
 	"strings"
 
-	"github.com/cosmos/cosmos-sdk/client/context"
 	"github.com/cosmos/cosmos-sdk/codec"
 	"github.com/cosmos/cosmos-sdk/version"
-	"github.com/cosmos/cosmos-sdk/x/auth"
-	"github.com/cosmos/cosmos-sdk/x/auth/client/utils"
 	"github.com/okex/okchain/x/common/proto"
 	"github.com/okex/okchain/x/upgrade/types"
 	"github.com/spf13/cobra"
@@ -19,7 +20,7 @@ import (
 )
 
 // GetCmdSubmitProposal implements a command handler for submitting a dex list proposal transaction
-func GetCmdSubmitProposal(cdc *codec.Codec) *cobra.Command {
+func GetCmdSubmitProposal(cliCtx client.Context) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "upgrade [proposal-file]",
 		Args:  cobra.ExactArgs(1),
@@ -54,22 +55,27 @@ Where proposal.json contains:
 			),
 		),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			txBldr := auth.NewTxBuilderFromCLI().WithTxEncoder(utils.GetTxEncoder(cdc))
-			cliCtx := context.NewCLIContext().WithCodec(cdc)
+			inBuf := bufio.NewReader(cmd.InOrStdin())
+			txBldr := authtypes.NewTxBuilderFromCLI(inBuf).WithTxEncoder(authclient.GetTxEncoder(cliCtx.Codec))
+			cliCtx := client.NewContext().WithCodec(cliCtx.Codec)
 
-			proposal, err := parseDexListProposalJSON(cdc, args[0])
+			proposal, err := parseDexListProposalJSON(cliCtx.Codec, args[0])
 			if err != nil {
 				return err
 			}
 
 			from := cliCtx.GetFromAddress()
 			content := types.NewAppUpgradeProposal(proposal.Title, proposal.Description, proposal.ProtocolDefinition)
-			msg := gov.NewMsgSubmitProposal(content, proposal.Deposit, from)
+			msg, err := gov.NewMsgSubmitProposal(content, proposal.Deposit, from)
+			if err != nil {
+				return err
+			}
+
 			if err := msg.ValidateBasic(); err != nil {
 				return err
 			}
 
-			return utils.GenerateOrBroadcastMsgs(cliCtx, txBldr, []sdk.Msg{msg})
+			return authclient.GenerateOrBroadcastMsgs(cliCtx, txBldr, []sdk.Msg{msg})
 		},
 	}
 

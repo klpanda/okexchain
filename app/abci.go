@@ -2,11 +2,11 @@ package app
 
 import (
 	"fmt"
+	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 
 	"github.com/okex/okchain/x/common/perf"
 
 	"github.com/cosmos/cosmos-sdk/baseapp"
-	"github.com/cosmos/cosmos-sdk/x/auth"
 	"github.com/okex/okchain/app/protocol"
 	abci "github.com/tendermint/tendermint/abci/types"
 	"github.com/tendermint/tendermint/crypto/tmhash"
@@ -69,8 +69,8 @@ func (app *OKChainApp) Commit() abci.ResponseCommit {
 
 // sync txBytes to backend module
 func (app *OKChainApp) syncTx(txBytes []byte) {
-	if tx, err := auth.DefaultTxDecoder(protocol.GetEngine().GetCurrentProtocol().GetCodec())(txBytes); err == nil {
-		if stdTx, ok := tx.(auth.StdTx); ok {
+	if tx, err := authtypes.DefaultTxDecoder(protocol.GetEngine().GetCurrentProtocol().GetCodec())(txBytes); err == nil {
+		if stdTx, ok := tx.(authtypes.StdTx); ok {
 			txHash := fmt.Sprintf("%X", tmhash.Sum(txBytes))
 			app.Logger().Debug(fmt.Sprintf("[Sync Tx(%s) to backend module]", txHash))
 			ctx := app.GetState(baseapp.RunTxModeDeliver()).Context()

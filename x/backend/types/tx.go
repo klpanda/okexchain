@@ -2,7 +2,7 @@ package types
 
 import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/cosmos/cosmos-sdk/x/auth"
+	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	"github.com/okex/okchain/x/common"
 	orderTypes "github.com/okex/okchain/x/order/types"
 	tokenTypes "github.com/okex/okchain/x/token/types"
@@ -10,7 +10,7 @@ import (
 )
 
 // GenerateTx return transaction, called at DeliverTx
-func GenerateTx(tx *auth.StdTx, txHash string, ctx sdk.Context, orderKeeper OrderKeeper, timestamp int64) []*Transaction {
+func GenerateTx(tx *authtypes.StdTx, txHash string, ctx sdk.Context, orderKeeper OrderKeeper, timestamp int64) []*Transaction {
 	orderHandlerTxResult := orderKeeper.GetTxHandlerMsgResult()
 	idx := int(0)
 	var txs []*Transaction
@@ -18,15 +18,15 @@ func GenerateTx(tx *auth.StdTx, txHash string, ctx sdk.Context, orderKeeper Orde
 	for _, msg := range tx.GetMsgs() {
 		switch msg.Type() {
 		case "send": // token/send
-			txFrom, txTo := buildTransactionsTransfer(tx, msg.(tokenTypes.MsgSend), txHash, timestamp)
+			txFrom, txTo := buildTransactionsTransfer(tx, msg.(*tokenTypes.MsgSend), txHash, timestamp)
 			txs = append(txs, txFrom, txTo)
 		case "new": // order/new
-			transaction := buildTransactionNew(orderHandlerTxResult[idx], msg.(orderTypes.MsgNewOrders),
+			transaction := buildTransactionNew(orderHandlerTxResult[idx], *msg.(*orderTypes.MsgNewOrders),
 				txHash, ctx, timestamp)
 			txs = append(txs, transaction...)
 			idx++
 		case "cancel": // order/cancel
-			transaction := buildTransactionCancel(orderHandlerTxResult[idx], msg.(orderTypes.MsgCancelOrders),
+			transaction := buildTransactionCancel(orderHandlerTxResult[idx], *msg.(*orderTypes.MsgCancelOrders),
 				txHash, ctx, orderKeeper, timestamp)
 			txs = append(txs, transaction...)
 			idx++
@@ -37,7 +37,7 @@ func GenerateTx(tx *auth.StdTx, txHash string, ctx sdk.Context, orderKeeper Orde
 	return txs
 }
 
-func buildTransactionsTransfer(tx *auth.StdTx, msg tokenTypes.MsgSend, txHash string, timestamp int64) (*Transaction, *Transaction) {
+func buildTransactionsTransfer(tx *authtypes.StdTx, msg *tokenTypes.MsgSend, txHash string, timestamp int64) (*Transaction, *Transaction) {
 	decCoins := msg.Amount
 
 	txFrom := &Transaction{

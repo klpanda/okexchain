@@ -8,12 +8,6 @@ import (
 // Verify interface at compile time
 var _, _ sdk.Msg = &MsgSetWithdrawAddress{}, &MsgWithdrawValidatorCommission{}
 
-// msg struct for changing the withdraw address for a delegator (or validator self-delegation)
-type MsgSetWithdrawAddress struct {
-	DelegatorAddress sdk.AccAddress `json:"delegator_address" yaml:"delegator_address"`
-	WithdrawAddress  sdk.AccAddress `json:"withdraw_address" yaml:"withdraw_address"`
-}
-
 func NewMsgSetWithdrawAddress(delAddr, withdrawAddr sdk.AccAddress) MsgSetWithdrawAddress {
 	return MsgSetWithdrawAddress{
 		DelegatorAddress: delAddr,
@@ -36,7 +30,7 @@ func (msg MsgSetWithdrawAddress) GetSignBytes() []byte {
 }
 
 // quick validity check
-func (msg MsgSetWithdrawAddress) ValidateBasic() sdk.Error {
+func (msg MsgSetWithdrawAddress) ValidateBasic() error {
 	if msg.DelegatorAddress.Empty() {
 		return ErrNilDelegatorAddr(DefaultCodespace)
 	}
@@ -46,10 +40,6 @@ func (msg MsgSetWithdrawAddress) ValidateBasic() sdk.Error {
 	return nil
 }
 
-// msg struct for validator withdraw
-type MsgWithdrawValidatorCommission struct {
-	ValidatorAddress sdk.ValAddress `json:"validator_address" yaml:"validator_address"`
-}
 
 func NewMsgWithdrawValidatorCommission(valAddr sdk.ValAddress) MsgWithdrawValidatorCommission {
 	return MsgWithdrawValidatorCommission{
@@ -72,7 +62,7 @@ func (msg MsgWithdrawValidatorCommission) GetSignBytes() []byte {
 }
 
 // quick validity check
-func (msg MsgWithdrawValidatorCommission) ValidateBasic() sdk.Error {
+func (msg MsgWithdrawValidatorCommission) ValidateBasic() error {
 	if msg.ValidatorAddress.Empty() {
 		return ErrNilValidatorAddr(DefaultCodespace)
 	}

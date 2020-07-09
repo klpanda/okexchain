@@ -1,7 +1,10 @@
 package cli
 
 import (
+	"bufio"
 	"fmt"
+	"github.com/cosmos/cosmos-sdk/client/flags"
+	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	"strings"
 
 	"github.com/cosmos/cosmos-sdk/version"
@@ -9,15 +12,11 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/cosmos/cosmos-sdk/client/keys"
 
 	"github.com/cosmos/cosmos-sdk/client"
-	"github.com/cosmos/cosmos-sdk/client/context"
 	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/cosmos/cosmos-sdk/x/auth"
-	authTypes "github.com/cosmos/cosmos-sdk/x/auth"
-	"github.com/cosmos/cosmos-sdk/x/auth/client/utils"
+	authclient "github.com/cosmos/cosmos-sdk/x/auth/client"
 	"github.com/okex/okchain/x/common"
 	dexUtils "github.com/okex/okchain/x/dex/client/utils"
 	"github.com/okex/okchain/x/dex/types"
@@ -41,7 +40,7 @@ func GetTxCmd(cdc *codec.Codec) *cobra.Command {
 		Short: "Decentralized exchange management subcommands",
 	}
 
-	txCmd.AddCommand(client.PostCommands(
+	txCmd.AddCommand(flags.PostCommands(
 		getCmdList(cdc),
 		getCmdDeposit(cdc),
 		getCmdWithdraw(cdc),
@@ -63,10 +62,10 @@ func getCmdList(cdc *codec.Codec) *cobra.Command {
 $ okchaincli tx dex list --base-asset mytoken --quote-asset okt --from mykey
 `),
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			cliCtx := context.NewCLIContext().WithCodec(cdc)
-
-			txBldr := auth.NewTxBuilderFromCLI().WithTxEncoder(utils.GetTxEncoder(cdc))
-			if err := auth.NewAccountRetriever(cliCtx).EnsureExists(cliCtx.FromAddress); err != nil {
+			cliCtx := client.NewContext().WithCodec(cdc)
+			inBuf := bufio.NewReader(cmd.InOrStdin())
+			txBldr := authtypes.NewTxBuilderFromCLI(inBuf).WithTxEncoder(authclient.GetTxEncoder(cdc))
+			if err := authtypes.NewAccountRetriever(authclient.Codec).EnsureExists(cliCtx, cliCtx.FromAddress); err != nil {
 				return err
 			}
 
@@ -86,7 +85,7 @@ $ okchaincli tx dex list --base-asset mytoken --quote-asset okt --from mykey
 			initPrice := sdk.MustNewDecFromStr(strInitPrice)
 			owner := cliCtx.GetFromAddress()
 			listMsg := types.NewMsgList(owner, baseAsset, quoteAsset, initPrice)
-			return utils.CompleteAndBroadcastTxCLI(txBldr, cliCtx, []sdk.Msg{listMsg})
+			return authclient.CompleteAndBroadcastTxCLI(txBldr, cliCtx, []sdk.Msg{&listMsg})
 		},
 	}
 
@@ -109,9 +108,10 @@ $ okchaincli tx dex deposit mytoken_okt 1000okt --from mykey
 
 The 'product' is a trading pair in full name of the tokens: ${base-asset-symbol}_${quote-asset-symbol}, for example 'mytoken_okt'.
 `),
-		RunE: func(_ *cobra.Command, args []string) error {
-			txBldr := auth.NewTxBuilderFromCLI().WithTxEncoder(utils.GetTxEncoder(cdc))
-			cliCtx := context.NewCLIContext().WithCodec(cdc)
+		RunE: func(cmd *cobra.Command, args []string) error {
+			inBuf := bufio.NewReader(cmd.InOrStdin())
+			txBldr := authtypes.NewTxBuilderFromCLI(inBuf).WithTxEncoder(authclient.GetTxEncoder(cdc))
+			cliCtx := client.NewContext().WithCodec(cdc)
 
 			product := args[0]
 
@@ -125,7 +125,7 @@ The 'product' is a trading pair in full name of the tokens: ${base-asset-symbol}
 			}
 
 			msg := types.NewMsgDeposit(product, amount, from)
-			return utils.GenerateOrBroadcastMsgs(cliCtx, txBldr, []sdk.Msg{msg})
+			return authclient.GenerateOrBroadcastMsgs(cliCtx, txBldr, []sdk.Msg{&msg})
 		},
 	}
 }
@@ -142,9 +142,10 @@ $ okchaincli tx dex withdraw mytoken_okt 1000okt --from mykey
 
 The 'product' is a trading pair in full name of the tokens: ${base-asset-symbol}_${quote-asset-symbol}, for example 'mytoken_okt'.
 `),
-		RunE: func(_ *cobra.Command, args []string) error {
-			txBldr := auth.NewTxBuilderFromCLI().WithTxEncoder(utils.GetTxEncoder(cdc))
-			cliCtx := context.NewCLIContext().WithCodec(cdc)
+		RunE: func(cmd *cobra.Command, args []string) error {
+			inBuf := bufio.NewReader(cmd.InOrStdin())
+			txBldr := authtypes.NewTxBuilderFromCLI(inBuf).WithTxEncoder(authclient.GetTxEncoder(cdc))
+			cliCtx := client.NewContext().WithCodec(cdc)
 
 			product := args[0]
 
@@ -157,7 +158,7 @@ The 'product' is a trading pair in full name of the tokens: ${base-asset-symbol}
 				return err
 			}
 			msg := types.NewMsgWithdraw(product, amount, from)
-			return utils.GenerateOrBroadcastMsgs(cliCtx, txBldr, []sdk.Msg{msg})
+			return authclient.GenerateOrBroadcastMsgs(cliCtx, txBldr, []sdk.Msg{&msg})
 		},
 	}
 }
@@ -168,9 +169,10 @@ func getCmdTransferOwnership(cdc *codec.Codec) *cobra.Command {
 		Use:   "transfer-ownership",
 		Short: "change the owner of the product",
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			cliCtx := context.NewCLIContext().WithCodec(cdc)
-			txBldr := auth.NewTxBuilderFromCLI().WithTxEncoder(utils.GetTxEncoder(cdc))
-			if err := authTypes.NewAccountRetriever(cliCtx).EnsureExists(cliCtx.FromAddress); err != nil {
+			inBuf := bufio.NewReader(cmd.InOrStdin())
+			cliCtx := client.NewContext().WithCodec(cdc)
+			txBldr := authtypes.NewTxBuilderFromCLI(inBuf).WithTxEncoder(authclient.GetTxEncoder(cdc))
+			if err := authtypes.NewAccountRetriever(authclient.Codec).EnsureExists(cliCtx, cliCtx.FromAddress); err != nil {
 				return err
 			}
 			flags := cmd.Flags()
@@ -191,8 +193,8 @@ func getCmdTransferOwnership(cdc *codec.Codec) *cobra.Command {
 			}
 
 			from := cliCtx.GetFromAddress()
-			msg := types.NewMsgTransferOwnership(from, toAddr, product)
-			return utils.PrintUnsignedStdTx(txBldr, cliCtx, []sdk.Msg{msg})
+			msg := types.NewMsgTransferOwnership(from, toAddr, product,nil, nil)
+			return authclient.PrintUnsignedStdTx(txBldr, cliCtx, []sdk.Msg{&msg})
 		},
 	}
 	cmd.Flags().StringP(FlagProduct, "p", "", "product to be transferred")
@@ -206,19 +208,20 @@ func getMultiSignsCmd(cdc *codec.Codec) *cobra.Command {
 		Short: "append signature to the unsigned tx file of transfer-ownership",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cliCtx := context.NewCLIContext().WithCodec(cdc)
-			txBldr := auth.NewTxBuilderFromCLI().WithTxEncoder(utils.GetTxEncoder(cdc))
+			inBuf := bufio.NewReader(cmd.InOrStdin())
+			cliCtx := client.NewContext().WithCodec(cdc)
+			txBldr := authtypes.NewTxBuilderFromCLI(inBuf).WithTxEncoder(authclient.GetTxEncoder(cdc))
 
-			stdTx, err := utils.ReadStdTxFromFile(cdc, args[0])
+			stdTx, err := authclient.ReadTxFromFile(cliCtx, args[0])
 			if err != nil {
 				return err
 			}
 
-			if len(stdTx.Msgs) == 0 {
+			if len(stdTx.GetMsgs()) == 0 {
 				return errors.New("msg is empty")
 			}
 
-			msg, ok := stdTx.Msgs[0].(types.MsgTransferOwnership)
+			msg, ok := stdTx.GetMsgs()[0].(*types.MsgTransferOwnership)
 			if !ok {
 				return errors.New("invalid msg type")
 			}
@@ -229,31 +232,21 @@ func getMultiSignsCmd(cdc *codec.Codec) *cobra.Command {
 				return fmt.Errorf("invalid from:%s", err.Error())
 			}
 
-			passphrase, err := keys.GetPassphrase(cliCtx.GetFromName())
-			if err != nil {
-				return err
-			}
-			signature, _, err := txBldr.Keybase().Sign(cliCtx.GetFromName(), passphrase, msg.GetSignBytes())
+			signature, pub, err := txBldr.Keybase().Sign(cliCtx.GetFromName(), msg.GetSignBytes())
 			if err != nil {
 				return fmt.Errorf("sign failed:%s", err.Error())
 			}
-			info, err := txBldr.Keybase().Get(cliCtx.GetFromName())
-			if err != nil {
-				return err
-			}
-			stdSignature := auth.StdSignature{
-				PubKey:    info.GetPubKey(),
-				Signature: signature,
-			}
-			msg.ToSignature = stdSignature
-			return utils.PrintUnsignedStdTx(txBldr, cliCtx, []sdk.Msg{msg})
+
+			msg.Pubkey = pub.Bytes()
+			msg.ToSignature = signature
+			return authclient.PrintUnsignedStdTx(txBldr, cliCtx, []sdk.Msg{msg})
 		},
 	}
 	return cmd
 }
 
 // GetCmdSubmitDelistProposal implememts a command handler for submitting a dex delist proposal transaction
-func GetCmdSubmitDelistProposal(cdc *codec.Codec) *cobra.Command {
+func GetCmdSubmitDelistProposal(cliCtx client.Context) *cobra.Command {
 	return &cobra.Command{
 		Use:   "delist-proposal [proposal-file]",
 		Args:  cobra.ExactArgs(1),
@@ -281,19 +274,23 @@ Where proposal.json contains:
 }
 `, version.ClientName, sdk.DefaultBondDenom, sdk.DefaultBondDenom, sdk.DefaultBondDenom,
 			)),
-		RunE: func(_ *cobra.Command, args []string) error {
-			txBldr := auth.NewTxBuilderFromCLI().WithTxEncoder(utils.GetTxEncoder(cdc))
-			cliCtx := context.NewCLIContext().WithCodec(cdc)
+		RunE: func(cmd *cobra.Command, args []string) error {
+			inBuf := bufio.NewReader(cmd.InOrStdin())
+			txBldr := authtypes.NewTxBuilderFromCLI(inBuf).WithTxEncoder(authclient.GetTxEncoder(cliCtx.Codec))
+			cliCtx := client.NewContext().WithCodec(cliCtx.Codec)
 
-			proposal, err := dexUtils.ParseDelistProposalJSON(cdc, args[0])
+			proposal, err := dexUtils.ParseDelistProposalJSON(cliCtx.Codec, args[0])
 			if err != nil {
 				return err
 			}
 
 			from := cliCtx.GetFromAddress()
 			content := types.NewDelistProposal(proposal.Title, proposal.Description, from, proposal.BaseAsset, proposal.QuoteAsset)
-			msg := gov.NewMsgSubmitProposal(content, proposal.Deposit, from)
-			return utils.GenerateOrBroadcastMsgs(cliCtx, txBldr, []sdk.Msg{msg})
+			msg, err := gov.NewMsgSubmitProposal(content, proposal.Deposit, from)
+			if err != nil {
+				return err
+			}
+			return authclient.GenerateOrBroadcastMsgs(cliCtx, txBldr, []sdk.Msg{msg})
 		},
 	}
 

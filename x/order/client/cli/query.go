@@ -2,10 +2,10 @@ package cli
 
 import (
 	"fmt"
+	"github.com/cosmos/cosmos-sdk/client/flags"
 	"strings"
 
 	"github.com/cosmos/cosmos-sdk/client"
-	"github.com/cosmos/cosmos-sdk/client/context"
 	"github.com/cosmos/cosmos-sdk/codec"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -22,14 +22,14 @@ func GetQueryCmd(queryRoute string, cdc *codec.Codec) *cobra.Command {
 		Short: "Querying commands for the order module",
 	}
 
-	queryCmd.AddCommand(client.GetCommands(
+	queryCmd.AddCommand(flags.GetCommands(
 		GetCmdQueryOrder(queryRoute, cdc),
 		GetCmdDepthBook(queryRoute, cdc),
 		GetCmdQueryStore(queryRoute, cdc),
 		GetCmdQueryParams(queryRoute, cdc),
 	)...)
 
-	queryCmd.Flags().StringP(client.FlagNode, "n", "tcp://localhost:26657", "Node to connect to")
+	queryCmd.Flags().StringP(flags.FlagNode, "n", "tcp://localhost:26657", "Node to connect to")
 	return queryCmd
 }
 
@@ -40,7 +40,7 @@ func GetCmdQueryOrder(queryRoute string, cdc *codec.Codec) *cobra.Command {
 		Short: "Query an order",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cliCtx := context.NewCLIContext().WithCodec(cdc)
+			cliCtx := client.NewContext().WithCodec(cdc)
 			orderID := args[0]
 
 			res, _, err := cliCtx.QueryWithData(
@@ -69,7 +69,7 @@ The 'product' is a trading pair in full name of the tokens: ${base-asset-symbol}
 `),
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cliCtx := context.NewCLIContext().WithCodec(cdc)
+			cliCtx := client.NewContext().WithCodec(cdc)
 			product := args[0]
 			size := viper.GetInt("size")
 			params := keeper.NewQueryDepthBookParams(product, size)
@@ -126,7 +126,7 @@ func GetCmdQueryStore(queryRoute string, cdc *codec.Codec) *cobra.Command {
 				//}
 				//fmt.Println(string(res))
 			} else {
-				cliCtx := context.NewCLIContext().WithCodec(cdc)
+				cliCtx := client.NewContext().WithCodec(cdc)
 				res, _, err := cliCtx.QueryWithData(
 					fmt.Sprintf("custom/order/%s", types.QueryStore), nil)
 				if err != nil {
@@ -156,7 +156,7 @@ $ okchaincli query order params
 `),
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cliCtx := context.NewCLIContext().WithCodec(cdc)
+			cliCtx := client.NewContext().WithCodec(cdc)
 
 			route := fmt.Sprintf("custom/%s/%s", queryRoute, types.QueryParameters)
 			bz, _, err := cliCtx.QueryWithData(route, nil)

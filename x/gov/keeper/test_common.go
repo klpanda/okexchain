@@ -2,6 +2,14 @@ package keeper
 
 import (
 	"bytes"
+	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
+	cryptocodec "github.com/cosmos/cosmos-sdk/crypto/codec"
+	authkeeper "github.com/cosmos/cosmos-sdk/x/auth/keeper"
+	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
+	bankkeeper "github.com/cosmos/cosmos-sdk/x/bank/keeper"
+	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
+	crisiskeeper "github.com/cosmos/cosmos-sdk/x/crisis/keeper"
+	crisistypes "github.com/cosmos/cosmos-sdk/x/crisis/types"
 	"strconv"
 	"testing"
 	"time"
@@ -9,10 +17,6 @@ import (
 	"github.com/cosmos/cosmos-sdk/codec"
 	"github.com/cosmos/cosmos-sdk/store"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/cosmos/cosmos-sdk/x/auth"
-	"github.com/cosmos/cosmos-sdk/x/bank"
-	"github.com/cosmos/cosmos-sdk/x/crisis"
-	"github.com/cosmos/cosmos-sdk/x/supply"
 	"github.com/stretchr/testify/require"
 	abci "github.com/tendermint/tendermint/abci/types"
 	"github.com/tendermint/tendermint/crypto"
@@ -82,23 +86,23 @@ func CreateValidators(
 			sdk.NewDecCoinFromDec(sdk.DefaultBondDenom, DefaultMSD),
 		)
 
-		res := stakingHandler(ctx, valCreateMsg)
-		require.True(t, res.IsOK())
+		_, err := stakingHandler(ctx, &valCreateMsg)
+		require.Nil(t, err)
 	}
 }
 
 // CreateTestInput returns keepers for test
 func CreateTestInput(
 	t *testing.T, isCheckTx bool, initBalance int64,
-) (sdk.Context, auth.AccountKeeper, Keeper, staking.Keeper, crisis.Keeper) {
+) (sdk.Context, authkeeper.AccountKeeper, Keeper, staking.Keeper, crisiskeeper.Keeper) {
 	stakingSk := sdk.NewKVStoreKey(staking.StoreKey)
 
 	stakingTkSk := sdk.NewTransientStoreKey(staking.TStoreKey)
 
-	keyAcc := sdk.NewKVStoreKey(auth.StoreKey)
+	keyAcc := sdk.NewKVStoreKey(authtypes.StoreKey)
 	keyParams := sdk.NewKVStoreKey(params.StoreKey)
 	tkeyParams := sdk.NewTransientStoreKey(params.TStoreKey)
-	keySupply := sdk.NewKVStoreKey(supply.StoreKey)
+	keyBank := sdk.NewKVStoreKey(banktypes.StoreKey)
 	keyGov := sdk.NewKVStoreKey(types.StoreKey)
 
 	db := dbm.NewMemDB()
@@ -109,7 +113,7 @@ func CreateTestInput(
 	ms.MountStoreWithDB(keyAcc, sdk.StoreTypeIAVL, db)
 	ms.MountStoreWithDB(keyParams, sdk.StoreTypeIAVL, db)
 	ms.MountStoreWithDB(tkeyParams, sdk.StoreTypeTransient, db)
-	ms.MountStoreWithDB(keySupply, sdk.StoreTypeIAVL, db)
+	ms.MountStoreWithDB(keyBank, sdk.StoreTypeIAVL, db)
 	ms.MountStoreWithDB(keyGov, sdk.StoreTypeIAVL, db)
 	err := ms.LoadLatestVersion()
 	require.Nil(t, err)
@@ -123,63 +127,65 @@ func CreateTestInput(
 		},
 	)
 	cdc := MakeTestCodec()
+	interfaceRegistry := codectypes.NewInterfaceRegistry()
+	appCodec := codec.NewHybridCodec(cdc, interfaceRegistry)
 
-	feeCollectorAcc := supply.NewEmptyModuleAccount(auth.FeeCollectorName)
-	notBondedPool := supply.NewEmptyModuleAccount(staking.NotBondedPoolName, supply.Staking)
-	bondPool := supply.NewEmptyModuleAccount(staking.BondedPoolName, supply.Staking)
-	govAcc := supply.NewEmptyModuleAccount(types.ModuleName, supply.Staking)
+	feeCollectorAcc := authtypes.NewEmptyModuleAccount(authtypes.FeeCollectorName)
+	notBondedPool := authtypes.NewEmptyModuleAccount(staking.NotBondedPoolName, authtypes.Staking)
+	bondPool := authtypes.NewEmptyModuleAccount(staking.BondedPoolName, authtypes.Staking)
+	govAcc := authtypes.NewEmptyModuleAccount(types.ModuleName, authtypes.Staking)
 
 	blacklistedAddrs := make(map[string]bool)
 	blacklistedAddrs[feeCollectorAcc.String()] = true
 	blacklistedAddrs[notBondedPool.String()] = true
 	blacklistedAddrs[bondPool.String()] = true
 
-	pk := params.NewKeeper(cdc, keyParams, tkeyParams, params.DefaultCodespace)
+	pk := params.NewKeeper(appCodec, keyParams, tkeyParams)
 	pk.SetParams(ctx, params.DefaultParams())
 
-	accountKeeper := auth.NewAccountKeeper(
-		cdc,    // amino codec
+	maccPerms := map[string][]string{
+		authtypes.FeeCollectorName:     nil,
+		staking.NotBondedPoolName: {authtypes.Staking},
+		staking.BondedPoolName:    {authtypes.Staking},
+		types.ModuleName:          nil,
+	}
+
+	accountKeeper := authkeeper.NewAccountKeeper(
+		appCodec,    // amino codec
 		keyAcc, // target store
-		pk.Subspace(auth.DefaultParamspace),
-		auth.ProtoBaseAccount, // prototype
+		pk.Subspace(authtypes.ModuleName),
+		authtypes.ProtoBaseAccount, // prototype
+		maccPerms,
 	)
 
-	bk := bank.NewBaseKeeper(
+	bk := bankkeeper.NewBaseKeeper( appCodec, keyBank,
 		accountKeeper,
-		pk.Subspace(bank.DefaultParamspace),
-		bank.DefaultCodespace,
+		pk.Subspace(banktypes.ModuleName),
 		blacklistedAddrs,
 	)
 	pk.SetBankKeeper(bk)
 
-	maccPerms := map[string][]string{
-		auth.FeeCollectorName:     nil,
-		staking.NotBondedPoolName: {supply.Staking},
-		staking.BondedPoolName:    {supply.Staking},
-		types.ModuleName:          nil,
-	}
-	supplyKeeper := supply.NewKeeper(cdc, keySupply, accountKeeper, bk, maccPerms)
 
 	initCoins := sdk.NewCoins(sdk.NewInt64DecCoin(sdk.DefaultBondDenom, initBalance))
 	totalSupply := sdk.NewCoins(sdk.NewInt64DecCoin(sdk.DefaultBondDenom, initBalance*(int64(len(Addrs)))))
 
-	supplyKeeper.SetSupply(ctx, supply.NewSupply(totalSupply))
+	bk.SetSupply(ctx, banktypes.NewSupply(totalSupply))
 
 	// for staking/distr rollback to cosmos-sdk
-	stakingKeeper := staking.NewKeeper(cdc, stakingSk, stakingTkSk, supplyKeeper,
+	stakingKeeper := staking.NewKeeper(appCodec, stakingSk, stakingTkSk, accountKeeper, bk,
 		pk.Subspace(staking.DefaultParamspace), staking.DefaultCodespace)
 
 	stakingKeeper.SetParams(ctx, staking.DefaultParams())
 	pk.SetStakingKeeper(stakingKeeper)
 
 	// set module accounts
-	err = notBondedPool.SetCoins(totalSupply)
+	err = bk.SetBalances(ctx, notBondedPool.GetAddress(), totalSupply)
 	require.NoError(t, err)
 
-	supplyKeeper.SetModuleAccount(ctx, feeCollectorAcc)
-	supplyKeeper.SetModuleAccount(ctx, bondPool)
-	supplyKeeper.SetModuleAccount(ctx, notBondedPool)
-	supplyKeeper.SetModuleAccount(ctx, govAcc)
+	accountKeeper.SetModuleAccount(ctx, feeCollectorAcc)
+	accountKeeper.SetModuleAccount(ctx, bondPool)
+	accountKeeper.SetModuleAccount(ctx, notBondedPool)
+	accountKeeper.SetModuleAccount(ctx, govAcc)
 
 	// fill all the addresses with some coins, set the loose pool tokens simultaneously
 	for _, addr := range Addrs {
@@ -195,8 +201,8 @@ func CreateTestInput(
 		AddRoute(params.RouterKey, params.NewParamChangeProposalHandler(&pk))
 	govProposalHandlerRouter := NewProposalHandlerRouter()
 	govProposalHandlerRouter.AddRoute(params.RouterKey, pk)
-	keeper := NewKeeper(cdc, keyGov, pk, govSubspace, supplyKeeper, stakingKeeper,
-		types.DefaultCodespace, govRouter, bk, govProposalHandlerRouter, auth.FeeCollectorName)
+	keeper := NewKeeper(appCodec, keyGov, govSubspace, accountKeeper, bk, stakingKeeper,
+			govRouter, govProposalHandlerRouter, authtypes.FeeCollectorName)
 	pk.SetGovKeeper(keeper)
 
 	minDeposit := sdk.NewDecCoinsFromDec(sdk.DefaultBondDenom, sdk.NewDec(100))
@@ -218,8 +224,8 @@ func CreateTestInput(
 	keeper.SetVotingParams(ctx, votingParams)
 	keeper.SetTallyParams(ctx, tallyParams)
 
-	crisisKeeper := crisis.NewKeeper(pk.Subspace(crisis.DefaultParamspace), 0,
-		supplyKeeper, auth.FeeCollectorName)
+	crisisKeeper := crisiskeeper.NewKeeper(pk.Subspace(crisistypes.ModuleName), 0,
+		bk, authtypes.FeeCollectorName)
 	return ctx, accountKeeper, keeper, stakingKeeper, crisisKeeper
 }
 
@@ -239,10 +245,10 @@ func MakeTestCodec() *codec.Codec {
 	cdc.RegisterConcrete(types.Proposal{}, "test/gov/Proposal", nil)
 
 	// Register AppAccount
-	cdc.RegisterInterface((*auth.Account)(nil), nil)
-	cdc.RegisterConcrete(&auth.BaseAccount{}, "test/gov/BaseAccount", nil)
-	supply.RegisterCodec(cdc)
-	codec.RegisterCrypto(cdc)
+	cdc.RegisterInterface((*authtypes.AccountI)(nil), nil)
+	cdc.RegisterConcrete(&authtypes.BaseAccount{}, "test/gov/BaseAccount", nil)
+	banktypes.RegisterCodec(cdc)
+	cryptocodec.RegisterCrypto(cdc)
 
 	return cdc
 }

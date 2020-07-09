@@ -5,7 +5,6 @@ import (
 	"time"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/cosmos/cosmos-sdk/x/params/subspace"
 	"github.com/okex/okchain/x/common"
 	"github.com/okex/okchain/x/params"
 )
@@ -35,15 +34,19 @@ type Params struct {
 	WithdrawPeriod time.Duration `json:"withdraw_period"`
 }
 
+func tmpValidate(value interface{}) error {
+	return nil
+}
+
 // ParamSetPairs implements the ParamSet interface and returns all the key/value pairs
-func (p *Params) ParamSetPairs() subspace.ParamSetPairs {
+func (p *Params) ParamSetPairs() params.ParamSetPairs {
 	return params.ParamSetPairs{
-		{Key: keyDexListFee, Value: &p.ListFee},
-		{Key: keyTransferOwnershipFee, Value: &p.TransferOwnershipFee},
-		{Key: keyDelistMaxDepositPeriod, Value: &p.DelistMaxDepositPeriod},
-		{Key: keyDelistMinDeposit, Value: &p.DelistMinDeposit},
-		{Key: keyDelistVotingPeriod, Value: &p.DelistVotingPeriod},
-		{Key: keyWithdrawPeriod, Value: &p.WithdrawPeriod},
+		{keyDexListFee, &p.ListFee, tmpValidate},
+		{keyTransferOwnershipFee, &p.TransferOwnershipFee, tmpValidate},
+		{keyDelistMaxDepositPeriod, &p.DelistMaxDepositPeriod, tmpValidate},
+		{keyDelistMinDeposit, &p.DelistMinDeposit, tmpValidate},
+		{keyDelistVotingPeriod, &p.DelistVotingPeriod, tmpValidate},
+		{keyWithdrawPeriod, &p.WithdrawPeriod, tmpValidate},
 	}
 }
 

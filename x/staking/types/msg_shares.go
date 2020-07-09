@@ -9,12 +9,12 @@ import (
 var (
 	_ sdk.Msg = (*MsgAddShares)(nil)
 	_ sdk.Msg = (*MsgDestroyValidator)(nil)
+	_ sdk.Msg = (*MsgUnbindProxy)(nil)
+	_ sdk.Msg = (*MsgRegProxy)(nil)
+	_ sdk.Msg = (*MsgBindProxy)(nil)
+	_ sdk.Msg = (*MsgDeposit)(nil)
+	_ sdk.Msg = (*MsgWithdraw)(nil)
 )
-
-// MsgDestroyValidator - struct for transactions to deregister a validator
-type MsgDestroyValidator struct {
-	DelAddr sdk.AccAddress `json:"delegator_address" yaml:"delegator_address"`
-}
 
 // NewMsgDestroyValidator creates a msg of destroy-validator
 func NewMsgDestroyValidator(delAddr sdk.AccAddress) MsgDestroyValidator {
@@ -31,7 +31,7 @@ func (msg MsgDestroyValidator) GetSigners() []sdk.AccAddress {
 }
 
 // ValidateBasic gives a quick validity check
-func (msg MsgDestroyValidator) ValidateBasic() sdk.Error {
+func (msg MsgDestroyValidator) ValidateBasic() error {
 	if msg.DelAddr.Empty() {
 		return ErrNilDelegatorAddr(DefaultCodespace)
 	}
@@ -43,11 +43,6 @@ func (msg MsgDestroyValidator) ValidateBasic() sdk.Error {
 func (msg MsgDestroyValidator) GetSignBytes() []byte {
 	bytes := ModuleCdc.MustMarshalJSON(msg)
 	return sdk.MustSortJSON(bytes)
-}
-
-// MsgUnbindProxy - structure for unbinding proxy relationship between the delegator and the proxy
-type MsgUnbindProxy struct {
-	DelAddr sdk.AccAddress `json:"delegator_address" yaml:"delegator_address"`
 }
 
 // NewMsgUnbindProxy creates a msg of unbinding proxy
@@ -65,7 +60,7 @@ func (msg MsgUnbindProxy) GetSigners() []sdk.AccAddress {
 }
 
 // ValidateBasic gives a quick validity check
-func (msg MsgUnbindProxy) ValidateBasic() sdk.Error {
+func (msg MsgUnbindProxy) ValidateBasic() error {
 	if msg.DelAddr.Empty() {
 		return ErrNilDelegatorAddr(DefaultCodespace)
 	}
@@ -76,13 +71,6 @@ func (msg MsgUnbindProxy) ValidateBasic() sdk.Error {
 func (msg MsgUnbindProxy) GetSignBytes() []byte {
 	bytes := ModuleCdc.MustMarshalJSON(msg)
 	return sdk.MustSortJSON(bytes)
-}
-
-// MsgRegProxy - register delegator as proxy or unregister proxy to delegator
-// if Reg == true, action is reg, otherwise action is unreg
-type MsgRegProxy struct {
-	ProxyAddress sdk.AccAddress `json:"proxy_address" yaml:"proxy_address"`
-	Reg          bool           `json:"reg" yaml:"reg"`
 }
 
 // NewMsgRegProxy creates a msg of registering proxy
@@ -101,7 +89,7 @@ func (msg MsgRegProxy) GetSigners() []sdk.AccAddress {
 }
 
 // ValidateBasic gives a quick validity check
-func (msg MsgRegProxy) ValidateBasic() sdk.Error {
+func (msg MsgRegProxy) ValidateBasic() error {
 	if msg.ProxyAddress.Empty() {
 		return ErrNilDelegatorAddr(DefaultCodespace)
 	}
@@ -112,12 +100,6 @@ func (msg MsgRegProxy) ValidateBasic() sdk.Error {
 func (msg MsgRegProxy) GetSignBytes() []byte {
 	bytes := ModuleCdc.MustMarshalJSON(msg)
 	return sdk.MustSortJSON(bytes)
-}
-
-// MsgBindProxy - structure for bind proxy relationship between the delegator and the proxy
-type MsgBindProxy struct {
-	DelAddr      sdk.AccAddress `json:"delegator_address" yaml:"delegator_address"`
-	ProxyAddress sdk.AccAddress `json:"proxy_address" yaml:"proxy_address"`
 }
 
 // NewMsgBindProxy creates a msg of binding proxy
@@ -136,7 +118,7 @@ func (msg MsgBindProxy) GetSigners() []sdk.AccAddress {
 }
 
 // ValidateBasic gives a quick validity check
-func (msg MsgBindProxy) ValidateBasic() sdk.Error {
+func (msg MsgBindProxy) ValidateBasic() error {
 	if msg.DelAddr.Empty() || msg.ProxyAddress.Empty() {
 		return ErrNilDelegatorAddr(DefaultCodespace)
 	}
@@ -156,12 +138,6 @@ func (msg MsgBindProxy) GetSignBytes() []byte {
 	return sdk.MustSortJSON(bytes)
 }
 
-// MsgAddShares - struct for adding-shares transaction
-type MsgAddShares struct {
-	DelAddr  sdk.AccAddress   `json:"delegator_address" yaml:"delegator_address"`
-	ValAddrs []sdk.ValAddress `json:"validator_addresses" yaml:"validator_addresses"`
-}
-
 // NewMsgAddShares creates a msg of adding shares to vals
 func NewMsgAddShares(delAddr sdk.AccAddress, valAddrs []sdk.ValAddress) MsgAddShares {
 	return MsgAddShares{
@@ -178,7 +154,7 @@ func (msg MsgAddShares) GetSigners() []sdk.AccAddress {
 }
 
 // ValidateBasic gives a quick validity check
-func (msg MsgAddShares) ValidateBasic() sdk.Error {
+func (msg MsgAddShares) ValidateBasic() error {
 	if msg.DelAddr.Empty() {
 		return ErrNilDelegatorAddr(DefaultCodespace)
 	}
@@ -214,12 +190,6 @@ func isValsDuplicate(valAddrs []sdk.ValAddress) bool {
 	return false
 }
 
-// MsgDeposit - structure for depositing to the delegator account
-type MsgDeposit struct {
-	DelegatorAddress sdk.AccAddress `json:"delegator_address" yaml:"delegator_address"`
-	Amount           sdk.DecCoin    `json:"quantity" yaml:"quantity"`
-}
-
 // NewMsgDeposit creates a new instance of MsgDeposit
 func NewMsgDeposit(delAddr sdk.AccAddress, amount sdk.DecCoin) MsgDeposit {
 	return MsgDeposit{
@@ -236,7 +206,7 @@ func (msg MsgDeposit) GetSigners() []sdk.AccAddress {
 }
 
 // ValidateBasic gives a quick validity check
-func (msg MsgDeposit) ValidateBasic() sdk.Error {
+func (msg MsgDeposit) ValidateBasic() error {
 	if msg.DelegatorAddress.Empty() {
 		return ErrNilDelegatorAddr(DefaultCodespace)
 	}
@@ -250,12 +220,6 @@ func (msg MsgDeposit) ValidateBasic() sdk.Error {
 func (msg MsgDeposit) GetSignBytes() []byte {
 	bz := ModuleCdc.MustMarshalJSON(msg)
 	return sdk.MustSortJSON(bz)
-}
-
-// MsgWithdraw - structure for withdrawing okt and the corresponding shares from all validators
-type MsgWithdraw struct {
-	DelegatorAddress sdk.AccAddress `json:"delegator_address" yaml:"delegator_address"`
-	Amount           sdk.DecCoin    `json:"quantity" yaml:"quantity"`
 }
 
 // NewMsgWithdraw creates a new instance of MsgWithdraw
@@ -274,7 +238,7 @@ func (msg MsgWithdraw) GetSigners() []sdk.AccAddress {
 }
 
 // ValidateBasic gives a quick validity check
-func (msg MsgWithdraw) ValidateBasic() sdk.Error {
+func (msg MsgWithdraw) ValidateBasic() error {
 	if msg.DelegatorAddress.Empty() {
 		return ErrNilDelegatorAddr(DefaultCodespace)
 	}

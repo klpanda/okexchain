@@ -5,7 +5,6 @@ package v0_36
 import (
 	"time"
 
-	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	v034staking "github.com/okex/okchain/x/staking/legacy/v0_34"
 	"github.com/okex/okchain/x/staking/types"
@@ -91,9 +90,9 @@ type (
 
 	Params struct {
 		UnbondingTime time.Duration `json:"unbonding_time" yaml:"unbonding_time"`
-		MaxValidators uint16        `json:"max_bonded_validators" yaml:"max_bonded_validators"`
-		Epoch         uint16        `json:"epoch" yaml:"epoch"`
-		MaxValsToVote uint16        `json:"max_validators_to_vote" yaml:"max_validators_to_vote"`
+		MaxValidators uint32        `json:"max_bonded_validators" yaml:"max_bonded_validators"`
+		Epoch         uint32        `json:"epoch" yaml:"epoch"`
+		MaxValsToVote uint32        `json:"max_validators_to_vote" yaml:"max_validators_to_vote"`
 		BondDenom     string        `json:"bond_denom" yaml:"bond_denom"`
 		MinDelegation sdk.Dec       `json:"min_delegation" yaml:"min_delegation"`
 	}
@@ -146,7 +145,7 @@ func (v ValidatorExported) MarshalJSON() ([]byte, error) {
 	//if err != nil {
 	//	return nil, err
 	//}
-	return codec.Cdc.MarshalJSON(bechValidator{
+	return types.ModuleCdc.MarshalJSON(bechValidator{
 		OperatorAddress:         v.OperatorAddress,
 		ConsPubKey:              v.ConsPubKey,
 		Jailed:                  v.Jailed,
@@ -161,7 +160,7 @@ func (v ValidatorExported) MarshalJSON() ([]byte, error) {
 
 func (v *ValidatorExported) UnmarshalJSON(data []byte) error {
 	bv := &bechValidator{}
-	if err := codec.Cdc.UnmarshalJSON(data, bv); err != nil {
+	if err := types.ModuleCdc.UnmarshalJSON(data, bv); err != nil {
 		return err
 	}
 	//consPubKey, err := sdk.GetConsPubKeyBech32(bv.ConsPubKey)

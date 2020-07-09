@@ -8,13 +8,6 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 )
 
-// UndelegationInfo is the struct of the undelegation info
-type UndelegationInfo struct {
-	DelegatorAddress sdk.AccAddress `json:"delegator_address" yaml:"delegator_address"`
-	Quantity         sdk.Dec        `json:"quantity" yaml:"quantity"`
-	CompletionTime   time.Time      `json:"completion_time"`
-}
-
 // NewUndelegationInfo creates a new delegation object
 func NewUndelegationInfo(delegatorAddr sdk.AccAddress, sharesQuantity Shares, completionTime time.Time) UndelegationInfo {
 	return UndelegationInfo{
@@ -25,7 +18,7 @@ func NewUndelegationInfo(delegatorAddr sdk.AccAddress, sharesQuantity Shares, co
 }
 
 // MustUnMarshalUndelegationInfo must return the UndelegationInfo object by unmarshaling
-func MustUnMarshalUndelegationInfo(cdc *codec.Codec, value []byte) UndelegationInfo {
+func MustUnMarshalUndelegationInfo(cdc codec.Marshaler, value []byte) UndelegationInfo {
 	undelegationInfo, err := UnmarshalUndelegationInfo(cdc, value)
 	if err != nil {
 		panic(err)
@@ -34,8 +27,8 @@ func MustUnMarshalUndelegationInfo(cdc *codec.Codec, value []byte) UndelegationI
 }
 
 // UnmarshalUndelegationInfo returns the UndelegationInfo object by unmarshaling
-func UnmarshalUndelegationInfo(cdc *codec.Codec, value []byte) (undelegationInfo UndelegationInfo, err error) {
-	err = cdc.UnmarshalBinaryLengthPrefixed(value, &undelegationInfo)
+func UnmarshalUndelegationInfo(cdc codec.Marshaler, value []byte) (undelegationInfo UndelegationInfo, err error) {
+	err = cdc.UnmarshalBinaryBare(value, &undelegationInfo)
 	return undelegationInfo, err
 }
 

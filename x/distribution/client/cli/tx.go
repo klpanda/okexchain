@@ -2,16 +2,17 @@
 package cli
 
 import (
+	"bufio"
 	"fmt"
+	"github.com/cosmos/cosmos-sdk/client/flags"
+	authclient "github.com/cosmos/cosmos-sdk/x/auth/client"
+	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	"strings"
 
 	"github.com/cosmos/cosmos-sdk/client"
-	"github.com/cosmos/cosmos-sdk/client/context"
 	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/version"
-	"github.com/cosmos/cosmos-sdk/x/auth"
-	"github.com/cosmos/cosmos-sdk/x/auth/client/utils"
 	"github.com/okex/okchain/x/distribution/types"
 	"github.com/okex/okchain/x/gov"
 	"github.com/spf13/cobra"
@@ -27,7 +28,7 @@ func GetTxCmd(storeKey string, cdc *codec.Codec) *cobra.Command {
 		RunE:                       client.ValidateCmd,
 	}
 
-	distTxCmd.AddCommand(client.PostCommands(
+	distTxCmd.AddCommand(flags.PostCommands(
 		GetCmdWithdrawRewards(cdc),
 		GetCmdSetWithdrawAddr(cdc),
 	)...)
@@ -51,9 +52,9 @@ $ %s tx distr set-withdraw-addr okchain1hw4r48aww06ldrfeuq2v438ujnl6alszzzqpph -
 		),
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-
-			txBldr := auth.NewTxBuilderFromCLI().WithTxEncoder(utils.GetTxEncoder(cdc))
-			cliCtx := context.NewCLIContext().WithCodec(cdc)
+			inBuf := bufio.NewReader(cmd.InOrStdin())
+			txBldr := authtypes.NewTxBuilderFromCLI(inBuf).WithTxEncoder(authclient.GetTxEncoder(cdc))
+			cliCtx := client.NewContext().WithCodec(cdc)
 
 			delAddr := cliCtx.GetFromAddress()
 			withdrawAddr, err := sdk.AccAddressFromBech32(args[0])
@@ -62,7 +63,7 @@ $ %s tx distr set-withdraw-addr okchain1hw4r48aww06ldrfeuq2v438ujnl6alszzzqpph -
 			}
 
 			msg := types.NewMsgSetWithdrawAddress(delAddr, withdrawAddr)
-			return utils.GenerateOrBroadcastMsgs(cliCtx, txBldr, []sdk.Msg{msg})
+			return authclient.GenerateOrBroadcastMsgs(cliCtx, txBldr, []sdk.Msg{&msg})
 		},
 	}
 }
@@ -82,8 +83,9 @@ $ %s tx distr withdraw-rewards okchainvaloper1alq9na49n9yycysh889rl90g9nhe58lcs5
 		),
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			txBldr := auth.NewTxBuilderFromCLI().WithTxEncoder(utils.GetTxEncoder(cdc))
-			cliCtx := context.NewCLIContext().WithCodec(cdc)
+			inBuf := bufio.NewReader(cmd.InOrStdin())
+			txBldr := authtypes.NewTxBuilderFromCLI(inBuf).WithTxEncoder(authclient.GetTxEncoder(cdc))
+			cliCtx := client.NewContext().WithCodec(cdc)
 
 			valAddr, err := sdk.ValAddressFromBech32(args[0])
 			if err != nil {
@@ -93,14 +95,14 @@ $ %s tx distr withdraw-rewards okchainvaloper1alq9na49n9yycysh889rl90g9nhe58lcs5
 			// only withdraw commission of validator
 			msg := types.NewMsgWithdrawValidatorCommission(valAddr)
 
-			return utils.GenerateOrBroadcastMsgs(cliCtx, txBldr, []sdk.Msg{msg})
+			return authclient.GenerateOrBroadcastMsgs(cliCtx, txBldr, []sdk.Msg{&msg})
 		},
 	}
 	return cmd
 }
 
 // GetCmdSubmitProposal implements the command to submit a community-pool-spend proposal
-func GetCmdSubmitProposal(cdc *codec.Codec) *cobra.Command {
+func GetCmdSubmitProposal(ctx client.Context) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "community-pool-spend [proposal-file]",
 		Args:  cobra.ExactArgs(1),
@@ -136,10 +138,11 @@ Where proposal.json contains:
 			),
 		),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			txBldr := auth.NewTxBuilderFromCLI().WithTxEncoder(utils.GetTxEncoder(cdc))
-			cliCtx := context.NewCLIContext().WithCodec(cdc)
+			inBuf := bufio.NewReader(cmd.InOrStdin())
+			txBldr := authtypes.NewTxBuilderFromCLI(inBuf).WithTxEncoder(authclient.GetTxEncoder(ctx.Codec))
+			cliCtx := client.NewContext().WithCodec(ctx.Codec)
 
-			proposal, err := ParseCommunityPoolSpendProposalJSON(cdc, args[0])
+			proposal, err := ParseCommunityPoolSpendProposalJSON(ctx.Codec, args[0])
 			if err != nil {
 				return err
 			}
@@ -147,12 +150,15 @@ Where proposal.json contains:
 			from := cliCtx.GetFromAddress()
 			content := types.NewCommunityPoolSpendProposal(proposal.Title, proposal.Description, proposal.Recipient, proposal.Amount)
 
-			msg := gov.NewMsgSubmitProposal(content, proposal.Deposit, from)
+			msg, err := gov.NewMsgSubmitProposal(content, proposal.Deposit, from)
+			if err != nil {
+				return err
+			}
 			if err := msg.ValidateBasic(); err != nil {
 				return err
 			}
 
-			return utils.GenerateOrBroadcastMsgs(cliCtx, txBldr, []sdk.Msg{msg})
+			return authclient.GenerateOrBroadcastMsgs(cliCtx, txBldr, []sdk.Msg{msg})
 		},
 	}
 

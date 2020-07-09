@@ -2,12 +2,12 @@ package token
 
 import (
 	"fmt"
+	bankkeeper "github.com/cosmos/cosmos-sdk/x/bank/keeper"
 	"sort"
 	"strings"
 
 	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/cosmos/cosmos-sdk/x/bank"
 	"github.com/okex/okchain/x/params"
 	"github.com/okex/okchain/x/token/types"
 	"github.com/pkg/errors"
@@ -16,8 +16,8 @@ import (
 
 // Keeper maintains the link to data storage and exposes getter/setter methods for the various parts of the state machine
 type Keeper struct {
-	bankKeeper       bank.Keeper
-	supplyKeeper     SupplyKeeper
+	bankKeeper       bankkeeper.BaseKeeper
+	accKeeper        AccountKeeper
 	feeCollectorName string // name of the FeeCollector ModuleAccount
 
 	// The reference to the Paramstore to get and set gov specific params
@@ -36,14 +36,14 @@ type Keeper struct {
 }
 
 // NewKeeper creates a new token keeper
-func NewKeeper(bankKeeper bank.Keeper, paramSpace params.Subspace,
-	feeCollectorName string, supplyKeeper SupplyKeeper, tokenStoreKey, lockStoreKey sdk.StoreKey, cdc *codec.Codec, enableBackend bool) Keeper {
+func NewKeeper(bankKeeper bankkeeper.BaseKeeper, paramSpace params.Subspace,
+	feeCollectorName string, accKeeper AccountKeeper, tokenStoreKey, lockStoreKey sdk.StoreKey, cdc *codec.Codec, enableBackend bool) Keeper {
 
 	k := Keeper{
 		bankKeeper:       bankKeeper,
 		paramSpace:       paramSpace.WithKeyTable(types.ParamKeyTable()),
 		feeCollectorName: feeCollectorName,
-		supplyKeeper:     supplyKeeper,
+		accKeeper:        accKeeper,
 		tokenStoreKey:    tokenStoreKey,
 		lockStoreKey:     lockStoreKey,
 		cdc:              cdc,
@@ -68,7 +68,7 @@ func (k Keeper) GetTokenInfo(ctx sdk.Context, symbol string) types.Token {
 	}
 	k.cdc.MustUnmarshalBinaryBare(bz, &token)
 
-	supply := k.supplyKeeper.GetSupply(ctx).GetTotal().AmountOf(token.Symbol)
+	supply := k.bankKeeper.GetSupply(ctx).GetTotal().AmountOf(token.Symbol)
 	token.TotalSupply = supply
 
 	return token
@@ -91,7 +91,7 @@ func (k Keeper) GetTokensInfo(ctx sdk.Context) (tokens []types.Token) {
 		tokenBytes := iter.Value()
 		k.cdc.MustUnmarshalBinaryBare(tokenBytes, &token)
 
-		supply := k.supplyKeeper.GetSupply(ctx).GetTotal().AmountOf(token.Symbol)
+		supply := k.bankKeeper.GetSupply(ctx).GetTotal().AmountOf(token.Symbol)
 		token.TotalSupply = supply
 
 		tokens = append(tokens, token)
@@ -129,7 +129,7 @@ func (k Keeper) GetCurrenciesInfo(ctx sdk.Context) (currencies []types.Currency)
 		tokenBytes := iter.Value()
 		k.cdc.MustUnmarshalBinaryBare(tokenBytes, &token)
 
-		supply := k.supplyKeeper.GetSupply(ctx).GetTotal().AmountOf(token.Symbol)
+		supply := k.bankKeeper.GetSupply(ctx).GetTotal().AmountOf(token.Symbol)
 		token.TotalSupply = supply
 
 		currencies = append(currencies,
@@ -174,7 +174,7 @@ func (k Keeper) SendCoinsFromAccountToAccount(ctx sdk.Context, from, to sdk.AccA
 
 // nolint
 func (k Keeper) LockCoins(ctx sdk.Context, addr sdk.AccAddress, coins sdk.DecCoins, lockCoinsType int) error {
-	if err := k.supplyKeeper.SendCoinsFromAccountToModule(ctx, addr, types.ModuleName, coins); err != nil {
+	if err := k.bankKeeper.SendCoinsFromAccountToModule(ctx, addr, types.ModuleName, coins); err != nil {
 		return err
 	}
 	// update lock coins
@@ -205,7 +205,7 @@ func (k Keeper) updateLockedCoins(ctx sdk.Context, addr sdk.AccAddress, coins sd
 			newCoins = coins
 		} else {
 			k.cdc.MustUnmarshalBinaryBare(coinsBytes, &oldCoins)
-			newCoins = oldCoins.Add(coins)
+			newCoins = oldCoins.Add(coins...)
 		}
 	} else {
 		// unlock coins
@@ -238,7 +238,7 @@ func (k Keeper) UnlockCoins(ctx sdk.Context, addr sdk.AccAddress, coins sdk.DecC
 	}
 
 	// update account
-	if err := k.supplyKeeper.SendCoinsFromModuleToAccount(ctx, types.ModuleName, addr, coins); err != nil {
+	if err := k.bankKeeper.SendCoinsFromModuleToAccount(ctx, types.ModuleName, addr, coins); err != nil {
 		return errors.New(err.Error())
 	}
 
@@ -303,7 +303,7 @@ func (k Keeper) BalanceAccount(ctx sdk.Context, addr sdk.AccAddress, outputCoins
 	}
 
 	if !inputCoins.IsZero() {
-		return k.supplyKeeper.SendCoinsFromModuleToAccount(ctx, types.ModuleName, addr, inputCoins)
+		return k.bankKeeper.SendCoinsFromModuleToAccount(ctx, types.ModuleName, addr, inputCoins)
 	}
 
 	return nil
@@ -311,7 +311,7 @@ func (k Keeper) BalanceAccount(ctx sdk.Context, addr sdk.AccAddress, outputCoins
 
 // nolint
 func (k Keeper) GetCoins(ctx sdk.Context, addr sdk.AccAddress) sdk.DecCoins {
-	return k.bankKeeper.GetCoins(ctx, addr)
+	return k.bankKeeper.GetAllBalances(ctx, addr)
 }
 
 // GetParams gets inflation params from the global param store

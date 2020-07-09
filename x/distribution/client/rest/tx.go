@@ -2,12 +2,12 @@ package rest
 
 import (
 	"fmt"
+	"github.com/cosmos/cosmos-sdk/client"
+	authclient "github.com/cosmos/cosmos-sdk/x/auth/client"
 	"net/http"
 
 	"github.com/gorilla/mux"
 
-	"github.com/cosmos/cosmos-sdk/client/context"
-	"github.com/cosmos/cosmos-sdk/x/auth/client/utils"
 	"github.com/okex/okchain/x/distribution/client/common"
 	"github.com/okex/okchain/x/distribution/types"
 
@@ -15,7 +15,7 @@ import (
 	"github.com/cosmos/cosmos-sdk/types/rest"
 )
 
-func registerTxRoutes(cliCtx context.CLIContext, r *mux.Router, _ string) {
+func registerTxRoutes(cliCtx client.Context, r *mux.Router, _ string) {
 	// Replace the rewards withdrawal address
 	r.HandleFunc(
 		"/distribution/delegators/{delegatorAddr}/withdraw_address",
@@ -42,7 +42,7 @@ type (
 )
 
 // Replace the rewards withdrawal address
-func setDelegatorWithdrawalAddrHandlerFn(cliCtx context.CLIContext) http.HandlerFunc {
+func setDelegatorWithdrawalAddrHandlerFn(cliCtx client.Context) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req setWithdrawalAddrReq
 
@@ -67,12 +67,12 @@ func setDelegatorWithdrawalAddrHandlerFn(cliCtx context.CLIContext) http.Handler
 			return
 		}
 
-		utils.WriteGenerateStdTxResponse(w, cliCtx, req.BaseReq, []sdk.Msg{msg})
+		authclient.WriteGenerateStdTxResponse(w, cliCtx, req.BaseReq, []sdk.Msg{&msg})
 	}
 }
 
 // Withdraw validator rewards and commission
-func withdrawValidatorRewardsHandlerFn(cliCtx context.CLIContext) http.HandlerFunc {
+func withdrawValidatorRewardsHandlerFn(cliCtx client.Context) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req withdrawRewardsReq
 
@@ -98,7 +98,7 @@ func withdrawValidatorRewardsHandlerFn(cliCtx context.CLIContext) http.HandlerFu
 			return
 		}
 
-		utils.WriteGenerateStdTxResponse(w, cliCtx, req.BaseReq, msgs)
+		authclient.WriteGenerateStdTxResponse(w, cliCtx, req.BaseReq, msgs)
 	}
 }
 

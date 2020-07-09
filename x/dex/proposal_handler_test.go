@@ -15,7 +15,7 @@ import (
 func TestProposal_NewProposalHandler(t *testing.T) {
 
 	fakeTokenKeeper := newMockTokenKeeper()
-	fakeSupplyKeeper := newMockSupplyKeeper()
+	fakeSupplyKeeper := newMockBankKeeper()
 
 	mApp, mDexKeeper, err := newMockApp(fakeTokenKeeper, fakeSupplyKeeper, 10)
 	require.True(t, err == nil)
@@ -33,7 +33,9 @@ func TestProposal_NewProposalHandler(t *testing.T) {
 	content := types.NewDelistProposal("delist xxb_okb", "delist asset from dex",
 		tokenPair.Owner, tokenPair.BaseAssetSymbol, tokenPair.QuoteAssetSymbol)
 	content.Proposer = tokenPair.Owner
-	proposal := govTypes.Proposal{Content: content}
+	any, err := govTypes.ContentToAny(content)
+	require.Nil(t, err)
+	proposal := govTypes.Proposal{Content: any}
 
 	// error case : fail to handle proposal because product(token pair) not exist
 	err = proposalHandler(ctx, &proposal)

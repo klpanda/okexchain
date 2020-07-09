@@ -5,7 +5,7 @@
 package dex
 
 import (
-	"github.com/cosmos/cosmos-sdk/x/auth"
+	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	"github.com/okex/okchain/x/common/version"
 	"github.com/okex/okchain/x/dex/keeper"
 	"github.com/okex/okchain/x/dex/types"
@@ -23,17 +23,17 @@ const (
 	DefaultMaxPriceDigitSize    = types.DefaultMaxPriceDigitSize
 	DefaultMaxQuantityDigitSize = types.DefaultMaxQuantityDigitSize
 
-	AuthFeeCollector = auth.FeeCollectorName
+	AuthFeeCollector = authtypes.FeeCollectorName
 )
 
 type (
 	// Keepers
 	Keeper              = keeper.Keeper
 	IKeeper             = keeper.IKeeper
-	SupplyKeeper        = keeper.SupplyKeeper
 	TokenKeeper         = keeper.TokenKeeper
 	StakingKeeper       = keeper.StakingKeeper
 	BankKeeper          = keeper.BankKeeper
+	AccountKeeper       = keeper.AccountKeeper
 	ProtocolVersionType = version.ProtocolVersionType
 
 	// Messages

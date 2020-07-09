@@ -1,15 +1,15 @@
 package types
 
 import (
-	sdk "github.com/cosmos/cosmos-sdk/types"
+	sdkerror "github.com/cosmos/cosmos-sdk/types/errors"
 )
 
 // const
 const (
-	CodeInvalidMaxProposalNum sdk.CodeType = 4
+	CodeInvalidMaxProposalNum uint32 = 4
 )
 
 // ErrInvalidMaxProposalNum returns error when the number of params to change are out of limit
-func ErrInvalidMaxProposalNum(codespace sdk.CodespaceType, msg string) sdk.Error {
-	return sdk.NewError(codespace, CodeInvalidMaxProposalNum, msg)
+func ErrInvalidMaxProposalNum(codespace string, msg string) error {
+	return sdkerror.New(codespace, CodeInvalidMaxProposalNum, msg)
 }

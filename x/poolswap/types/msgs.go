@@ -2,6 +2,7 @@ package types
 
 import (
 	"fmt"
+	sdkerror "github.com/cosmos/cosmos-sdk/types/errors"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/okex/okchain/x/common"
@@ -14,13 +15,7 @@ const (
 )
 
 // MsgAddLiquidity Deposit quote_amount and base_amount at current ratio to mint pool tokens.
-type MsgAddLiquidity struct {
-	MinLiquidity  sdk.Dec        `json:"min_liquidity"`   // Minimum number of sender will mint if total pool token supply is greater than 0.
-	MaxBaseAmount sdk.DecCoin    `json:"max_base_amount"` // Maximum number of tokens deposited. Deposits max amount if total pool token supply is 0.
-	QuoteAmount   sdk.DecCoin    `json:"quote_amount"`    // Quote token amount
-	Deadline      int64          `json:"deadline"`        // Time after which this transaction can no longer be executed.
-	Sender        sdk.AccAddress `json:"sender"`          // Sender
-}
+var _ sdk.Msg = &MsgAddLiquidity{}
 
 // NewMsgAddLiquidity is a constructor function for MsgAddLiquidity
 func NewMsgAddLiquidity(minLiquidity sdk.Dec, maxBaseAmount, quoteAmount sdk.DecCoin, deadline int64, sender sdk.AccAddress) MsgAddLiquidity {
@@ -40,21 +35,21 @@ func (msg MsgAddLiquidity) Route() string { return RouterKey }
 func (msg MsgAddLiquidity) Type() string { return "add_liquidity" }
 
 // ValidateBasic runs stateless checks on the message
-func (msg MsgAddLiquidity) ValidateBasic() sdk.Error {
+func (msg MsgAddLiquidity) ValidateBasic() error {
 	if msg.Sender.Empty() {
-		return sdk.ErrInvalidAddress(msg.Sender.String())
+		return sdkerror.Wrap(sdkerror.ErrInvalidAddress, msg.Sender.String())
 	}
 	if !(msg.MaxBaseAmount.IsPositive() && msg.QuoteAmount.IsPositive()) {
-		return sdk.ErrUnknownRequest("token amount must be positive")
+		return sdkerror.Wrap(sdkerror.ErrUnknownRequest, "token amount must be positive")
 	}
 	if !msg.MaxBaseAmount.IsValid() {
-		return sdk.ErrUnknownRequest("invalid MaxBaseAmount")
+		return sdkerror.Wrap(sdkerror.ErrUnknownRequest, "invalid MaxBaseAmount")
 	}
 	if !msg.QuoteAmount.IsValid() {
-		return sdk.ErrUnknownRequest("invalid QuoteAmount")
+		return sdkerror.Wrap(sdkerror.ErrUnknownRequest, "invalid QuoteAmount")
 	}
 	if msg.QuoteAmount.Denom != common.NativeToken {
-		return sdk.ErrUnknownRequest("quote token only supports " + common.NativeToken)
+		return sdkerror.Wrap(sdkerror.ErrUnknownRequest, "quote token only supports " + common.NativeToken)
 	}
 	return nil
 }
@@ -75,13 +70,7 @@ func (msg MsgAddLiquidity) GetSwapTokenPair() string {
 }
 
 // MsgRemoveLiquidity burns pool tokens to withdraw okt and Tokens at current ratio.
-type MsgRemoveLiquidity struct {
-	Liquidity      sdk.Dec        `json:"liquidity"`        // Amount of pool token burned.
-	MinBaseAmount  sdk.DecCoin    `json:"min_base_amount"`  // Minimum base amount.
-	MinQuoteAmount sdk.DecCoin    `json:"min_quote_amount"` // Minimum quote amount.
-	Deadline       int64          `json:"deadline"`         // Time after which this transaction can no longer be executed.
-	Sender         sdk.AccAddress `json:"sender"`           // Sender
-}
+var _ sdk.Msg = &MsgRemoveLiquidity{}
 
 // NewMsgRemoveLiquidity is a constructor function for MsgAddLiquidity
 func NewMsgRemoveLiquidity(liquidity sdk.Dec, minBaseAmount, minQuoteAmount sdk.DecCoin, deadline int64, sender sdk.AccAddress) MsgRemoveLiquidity {
@@ -101,21 +90,21 @@ func (msg MsgRemoveLiquidity) Route() string { return RouterKey }
 func (msg MsgRemoveLiquidity) Type() string { return "remove_liquidity" }
 
 // ValidateBasic runs stateless checks on the message
-func (msg MsgRemoveLiquidity) ValidateBasic() sdk.Error {
+func (msg MsgRemoveLiquidity) ValidateBasic() error {
 	if msg.Sender.Empty() {
-		return sdk.ErrInvalidAddress(msg.Sender.String())
+		return sdkerror.Wrap(sdkerror.ErrInvalidAddress, msg.Sender.String())
 	}
 	if !(msg.Liquidity.IsPositive()) {
-		return sdk.ErrUnknownRequest("token amount must be positive")
+		return sdkerror.Wrap(sdkerror.ErrUnknownRequest, "token amount must be positive")
 	}
 	if !msg.MinBaseAmount.IsValid() {
-		return sdk.ErrUnknownRequest("invalid MinBaseAmount")
+		return sdkerror.Wrap(sdkerror.ErrUnknownRequest, "invalid MinBaseAmount")
 	}
 	if !msg.MinQuoteAmount.IsValid() {
-		return sdk.ErrUnknownRequest("invalid MinQuoteAmount")
+		return sdkerror.Wrap(sdkerror.ErrUnknownRequest, "invalid MinQuoteAmount")
 	}
 	if msg.MinQuoteAmount.Denom != common.NativeToken {
-		return sdk.ErrUnknownRequest("quote token only supports " + common.NativeToken)
+		return sdkerror.Wrap(sdkerror.ErrUnknownRequest, "quote token only supports " + common.NativeToken)
 	}
 	return nil
 }
@@ -136,10 +125,7 @@ func (msg MsgRemoveLiquidity) GetSwapTokenPair() string {
 }
 
 // MsgCreateExchange creates a new exchange with token
-type MsgCreateExchange struct {
-	Token  string         `json:"token"`  // Token
-	Sender sdk.AccAddress `json:"sender"` // Sender
-}
+var _ sdk.Msg = &MsgCreateExchange{}
 
 // NewMsgCreateExchange create a new exchange with token
 func NewMsgCreateExchange(token string, sender sdk.AccAddress) MsgCreateExchange {
@@ -156,12 +142,12 @@ func (msg MsgCreateExchange) Route() string { return RouterKey }
 func (msg MsgCreateExchange) Type() string { return "create_exchange" }
 
 // ValidateBasic runs stateless checks on the message
-func (msg MsgCreateExchange) ValidateBasic() sdk.Error {
+func (msg MsgCreateExchange) ValidateBasic() error {
 	if msg.Sender.Empty() {
-		return sdk.ErrInvalidAddress(msg.Sender.String())
+		return sdkerror.Wrap(sdkerror.ErrInvalidAddress, msg.Sender.String())
 	}
 	if sdk.ValidateDenom(msg.Token) != nil || ValidatePoolTokenName(msg.Token) {
-		return sdk.ErrUnknownRequest("invalid Token")
+		return sdkerror.Wrap(sdkerror.ErrUnknownRequest, "invalid Token")
 	}
 	return nil
 }
@@ -177,13 +163,7 @@ func (msg MsgCreateExchange) GetSigners() []sdk.AccAddress {
 }
 
 // MsgTokenToNativeToken define the message for swap between token and DefaultBondDenom
-type MsgTokenToNativeToken struct {
-	SoldTokenAmount      sdk.DecCoin    `json:"sold_token_amount"`       // Amount of Tokens sold.
-	MinBoughtTokenAmount sdk.DecCoin    `json:"min_bought_token_amount"` // Minimum token purchased.
-	Deadline             int64          `json:"deadline"`                // Time after which this transaction can no longer be executed.
-	Recipient            sdk.AccAddress `json:"recipient"`               // Recipient address,transfer Tokens to recipient.default recipient is sender.
-	Sender               sdk.AccAddress `json:"sender"`                  // Sender
-}
+var _ sdk.Msg = &MsgTokenToNativeToken{}
 
 // NewMsgTokenToNativeToken is a constructor function for MsgTokenOKTSwap
 func NewMsgTokenToNativeToken(
@@ -205,28 +185,28 @@ func (msg MsgTokenToNativeToken) Route() string { return RouterKey }
 func (msg MsgTokenToNativeToken) Type() string { return TypeMsgTokenSwap }
 
 // ValidateBasic runs stateless checks on the message
-func (msg MsgTokenToNativeToken) ValidateBasic() sdk.Error {
+func (msg MsgTokenToNativeToken) ValidateBasic() error {
 	if msg.Sender.Empty() {
-		return sdk.ErrInvalidAddress(msg.Sender.String())
+		return sdkerror.Wrap(sdkerror.ErrInvalidAddress, msg.Sender.String())
 	}
 
 	if msg.Recipient.Empty() {
-		return sdk.ErrInvalidAddress(msg.Recipient.String())
+		return sdkerror.Wrap(sdkerror.ErrInvalidAddress, msg.Recipient.String())
 	}
 
 	if msg.SoldTokenAmount.Denom != sdk.DefaultBondDenom && msg.MinBoughtTokenAmount.Denom != sdk.DefaultBondDenom {
-		return sdk.ErrUnknownRequest(fmt.Sprintf("both token to sell and token to buy do not contain %s,"+
+		return sdkerror.Wrap(sdkerror.ErrUnknownRequest, fmt.Sprintf("both token to sell and token to buy do not contain %s,"+
 			" quote token only supports %s", sdk.DefaultBondDenom, sdk.DefaultBondDenom))
 	}
 	if !(msg.SoldTokenAmount.IsPositive()) {
-		return sdk.ErrUnknownRequest("token amount must be positive")
+		return sdkerror.Wrap(sdkerror.ErrUnknownRequest, "token amount must be positive")
 	}
 	if !msg.SoldTokenAmount.IsValid() {
-		return sdk.ErrUnknownRequest("invalid SoldTokenAmount")
+		return sdkerror.Wrap(sdkerror.ErrUnknownRequest, "invalid SoldTokenAmount")
 	}
 
 	if !msg.MinBoughtTokenAmount.IsValid() {
-		return sdk.ErrUnknownRequest("invalid MinBoughtTokenAmount")
+		return sdkerror.Wrap(sdkerror.ErrUnknownRequest, "invalid MinBoughtTokenAmount")
 	}
 	return nil
 }

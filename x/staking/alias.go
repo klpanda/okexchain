@@ -16,7 +16,6 @@ const (
 	DefaultParamspace  = keeper.DefaultParamspace
 	DefaultCodespace   = types.DefaultCodespace
 	CodeInvalidInput   = types.CodeInvalidInput
-	CodeUnknownRequest = types.CodeUnknownRequest
 	ModuleName         = types.ModuleName
 	StoreKey           = types.StoreKey
 	TStoreKey          = types.TStoreKey

@@ -2,6 +2,12 @@ package keeper
 
 import (
 	"encoding/hex"
+	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
+	cryptocodec "github.com/cosmos/cosmos-sdk/crypto/codec"
+	authkeeper "github.com/cosmos/cosmos-sdk/x/auth/keeper"
+	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
+	bankkeeper "github.com/cosmos/cosmos-sdk/x/bank/keeper"
+	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	"os"
 	"testing"
 
@@ -13,9 +19,6 @@ import (
 	"github.com/cosmos/cosmos-sdk/codec"
 	"github.com/cosmos/cosmos-sdk/store"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/cosmos/cosmos-sdk/x/auth"
-	"github.com/cosmos/cosmos-sdk/x/bank"
-	"github.com/cosmos/cosmos-sdk/x/supply"
 	"github.com/okex/okchain/x/common/proto"
 	"github.com/okex/okchain/x/params"
 
@@ -40,16 +43,16 @@ var (
 	}
 
 	maccPerms = map[string][]string{
-		staking.BondedPoolName:    {supply.Staking},
-		staking.NotBondedPoolName: {supply.Staking},
+		staking.BondedPoolName:    {authtypes.Staking},
+		staking.NotBondedPoolName: {authtypes.Staking},
 	}
 )
 
 func testPrepare(t *testing.T) (ctx sdk.Context, keeper Keeper) {
 	skMap := sdk.NewKVStoreKeys(
 		"main",
-		auth.StoreKey,
-		supply.StoreKey,
+		authtypes.StoreKey,
+		banktypes.StoreKey,
 		staking.StoreKey,
 		params.StoreKey,
 		types.StoreKey,
@@ -71,14 +74,16 @@ func testPrepare(t *testing.T) (ctx sdk.Context, keeper Keeper) {
 
 	ctx = sdk.NewContext(ms, abci.Header{}, false, log.NewTMLogger(os.Stdout))
 	cdc := getTestCodec()
-	paramsKeeper := params.NewKeeper(cdc, skMap[params.StoreKey], tskMap[params.TStoreKey], params.DefaultCodespace)
-	accountKeeper := auth.NewAccountKeeper(cdc, skMap[auth.StoreKey], paramsKeeper.Subspace(auth.DefaultParamspace), auth.ProtoBaseAccount)
-	bankKeeper := bank.NewBaseKeeper(accountKeeper, paramsKeeper.Subspace(bank.DefaultParamspace), bank.DefaultCodespace, nil)
-	supplyKeeper := supply.NewKeeper(cdc, skMap[supply.StoreKey], accountKeeper, bankKeeper, maccPerms)
+	interfaceRegistry := codectypes.NewInterfaceRegistry()
+	appCodec := codec.NewHybridCodec(cdc, interfaceRegistry)
+	paramsKeeper := params.NewKeeper(appCodec, skMap[params.StoreKey], tskMap[params.TStoreKey])
+	accountKeeper := authkeeper.NewAccountKeeper(appCodec, skMap[authtypes.StoreKey],
+		paramsKeeper.Subspace(authtypes.ModuleName), authtypes.ProtoBaseAccount, maccPerms)
+	bankKeeper := bankkeeper.NewBaseKeeper(appCodec, skMap[banktypes.StoreKey], accountKeeper, paramsKeeper.Subspace(banktypes.ModuleName), nil)
 
 	stakingKeeper := staking.NewKeeper(
-		cdc, skMap[staking.StoreKey], tskMap[staking.TStoreKey],
-		supplyKeeper, paramsKeeper.Subspace(staking.DefaultParamspace), staking.DefaultCodespace)
+		appCodec, skMap[staking.StoreKey], tskMap[staking.TStoreKey],
+		accountKeeper, bankKeeper, paramsKeeper.Subspace(staking.DefaultParamspace), staking.DefaultCodespace)
 	stakingKeeper.SetParams(ctx, staking.DefaultParams())
 	protocolKeeper := proto.NewProtocolKeeper(skMap["main"])
 	keeper = NewKeeper(cdc, skMap[types.StoreKey], protocolKeeper, stakingKeeper, bankKeeper, paramsKeeper.Subspace(types.DefaultParamspace))
@@ -88,10 +93,10 @@ func testPrepare(t *testing.T) (ctx sdk.Context, keeper Keeper) {
 func getTestCodec() *codec.Codec {
 	cdc := codec.New()
 	sdk.RegisterCodec(cdc)
-	auth.RegisterCodec(cdc)
-	bank.RegisterCodec(cdc)
+	authtypes.RegisterCodec(cdc)
+	banktypes.RegisterCodec(cdc)
 	staking.RegisterCodec(cdc)
-	codec.RegisterCrypto(cdc)
+	cryptocodec.RegisterCrypto(cdc)
 	cdc.Seal()
 	return cdc
 }

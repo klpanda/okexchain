@@ -2,11 +2,11 @@ package rest
 
 import (
 	"fmt"
+	"github.com/cosmos/cosmos-sdk/client"
 	"net/http"
 	"strconv"
 	"strings"
 
-	"github.com/cosmos/cosmos-sdk/client/context"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/gorilla/mux"
 	"github.com/okex/okchain/x/backend/types"
@@ -18,7 +18,7 @@ const (
 )
 
 // RegisterRoutesV2 - Central function to define routes for interface version 2
-func RegisterRoutesV2(cliCtx context.CLIContext, r *mux.Router) {
+func RegisterRoutesV2(cliCtx client.Context, r *mux.Router) {
 	r.HandleFunc("/block_tx_hashes/{blockHeight}", blockTxHashesHandler(cliCtx)).Methods("GET")
 
 	r.HandleFunc("/instruments", instrumentsHandlerV2(cliCtx)).Methods("GET")
@@ -35,7 +35,7 @@ func RegisterRoutesV2(cliCtx context.CLIContext, r *mux.Router) {
 	r.HandleFunc("/transactions", txListHandlerV2(cliCtx)).Methods("GET")
 }
 
-func txListHandlerV2(cliCtx context.CLIContext) http.HandlerFunc {
+func txListHandlerV2(cliCtx client.Context) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		address := r.URL.Query().Get("address")
 		txType := r.URL.Query().Get("type")
@@ -87,7 +87,7 @@ func txListHandlerV2(cliCtx context.CLIContext) http.HandlerFunc {
 	}
 }
 
-func dealsHandlerV2(cliCtx context.CLIContext) http.HandlerFunc {
+func dealsHandlerV2(cliCtx client.Context) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		address := r.URL.Query().Get("address")
 		product := r.URL.Query().Get("instrument_id")
@@ -138,7 +138,7 @@ func dealsHandlerV2(cliCtx context.CLIContext) http.HandlerFunc {
 	}
 }
 
-func feesHandlerV2(cliCtx context.CLIContext) http.HandlerFunc {
+func feesHandlerV2(cliCtx client.Context) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		address := r.URL.Query().Get("address")
 		after := r.URL.Query().Get("after")
@@ -185,7 +185,7 @@ func feesHandlerV2(cliCtx context.CLIContext) http.HandlerFunc {
 	}
 }
 
-func matchHandlerV2(cliCtx context.CLIContext) http.HandlerFunc {
+func matchHandlerV2(cliCtx client.Context) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		vars := mux.Vars(r)
 		product := vars["instrument_id"]
@@ -230,7 +230,7 @@ func matchHandlerV2(cliCtx context.CLIContext) http.HandlerFunc {
 	}
 }
 
-func candleHandlerV2(cliCtx context.CLIContext) http.HandlerFunc {
+func candleHandlerV2(cliCtx client.Context) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		vars := mux.Vars(r)
 		product := vars["instrument_id"]
@@ -265,7 +265,7 @@ func candleHandlerV2(cliCtx context.CLIContext) http.HandlerFunc {
 	}
 }
 
-func tickerListHandlerV2(cliCtx context.CLIContext) http.HandlerFunc {
+func tickerListHandlerV2(cliCtx client.Context) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		res, _, err := cliCtx.QueryWithData(fmt.Sprintf("custom/backend/%s", types.QueryTickerListV2), nil)
 
@@ -279,7 +279,7 @@ func tickerListHandlerV2(cliCtx context.CLIContext) http.HandlerFunc {
 	}
 }
 
-func tickerHandlerV2(cliCtx context.CLIContext) http.HandlerFunc {
+func tickerHandlerV2(cliCtx client.Context) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		vars := mux.Vars(r)
 		product := vars["instrument_id"]
@@ -302,7 +302,7 @@ func tickerHandlerV2(cliCtx context.CLIContext) http.HandlerFunc {
 	}
 }
 
-func instrumentsHandlerV2(cliCtx context.CLIContext) http.HandlerFunc {
+func instrumentsHandlerV2(cliCtx client.Context) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		res, _, err := cliCtx.QueryWithData(fmt.Sprintf("custom/backend/%s", types.QueryInstrumentsV2), nil)
 
@@ -315,7 +315,7 @@ func instrumentsHandlerV2(cliCtx context.CLIContext) http.HandlerFunc {
 	}
 }
 
-func orderOpenListHandlerV2(cliCtx context.CLIContext) http.HandlerFunc {
+func orderOpenListHandlerV2(cliCtx client.Context) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		product := r.URL.Query().Get("instrument_id")
 		address := r.URL.Query().Get("address")
@@ -361,7 +361,7 @@ func orderOpenListHandlerV2(cliCtx context.CLIContext) http.HandlerFunc {
 	}
 }
 
-func orderClosedListHandlerV2(cliCtx context.CLIContext) http.HandlerFunc {
+func orderClosedListHandlerV2(cliCtx client.Context) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		product := r.URL.Query().Get("instrument_id")
 		address := r.URL.Query().Get("address")
@@ -407,7 +407,7 @@ func orderClosedListHandlerV2(cliCtx context.CLIContext) http.HandlerFunc {
 	}
 }
 
-func orderHandlerV2(cliCtx context.CLIContext) http.HandlerFunc {
+func orderHandlerV2(cliCtx client.Context) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		vars := mux.Vars(r)
 		orderID := vars["order_id"]

@@ -1,6 +1,7 @@
 package token
 
 import (
+	sdkerror "github.com/cosmos/cosmos-sdk/types/errors"
 	"testing"
 
 	"github.com/okex/okchain/x/token/types"
@@ -17,7 +18,7 @@ func TestQueryOrder(t *testing.T) {
 	mapp.BeginBlock(abci.RequestBeginBlock{Header: abci.Header{Height: 2}})
 	ctx := mapp.BaseApp.NewContext(false, abci.Header{})
 
-	_, testAccounts := CreateGenAccounts(2,
+	_, _, testAccounts := CreateGenAccounts(2,
 		sdk.DecCoins{
 			sdk.NewDecCoinFromDec(common.NativeToken, sdk.NewDec(1000000000)),
 		})
@@ -33,7 +34,7 @@ func TestQueryOrder(t *testing.T) {
 	}
 
 	coins := sdk.NewCoins(sdk.NewDecCoinFromDec(token.Symbol, token.TotalSupply))
-	err := keeper.supplyKeeper.MintCoins(ctx, types.ModuleName, coins)
+	err := keeper.bankKeeper.MintCoins(ctx, types.ModuleName, coins)
 	require.NoError(t, err)
 
 	keeper.NewToken(ctx, token)
@@ -57,7 +58,7 @@ func TestQueryTokens(t *testing.T) {
 	mapp.BeginBlock(abci.RequestBeginBlock{Header: abci.Header{Height: 2}})
 	ctx := mapp.BaseApp.NewContext(false, abci.Header{})
 
-	_, testAccounts := CreateGenAccounts(2,
+	_, _, testAccounts := CreateGenAccounts(2,
 		sdk.DecCoins{
 			sdk.NewDecCoinFromDec(common.NativeToken, sdk.NewDec(1000000000)),
 		})
@@ -73,7 +74,7 @@ func TestQueryTokens(t *testing.T) {
 	}
 
 	coins := sdk.NewCoins(sdk.NewDecCoinFromDec(token.Symbol, token.TotalSupply))
-	err := keeper.supplyKeeper.MintCoins(ctx, types.ModuleName, coins)
+	err := keeper.bankKeeper.MintCoins(ctx, types.ModuleName, coins)
 	require.NoError(t, err)
 
 	keeper.NewToken(ctx, token)
@@ -100,7 +101,8 @@ func TestQueryTokens(t *testing.T) {
 	//no symbol
 	path = []string{types.QueryTokenV2, ""}
 	res, err = querier(ctx, path, abci.RequestQuery{})
-	require.EqualValues(t, sdk.CodeInvalidCoins, err.Code())
+	require.NotNil(t, err)
+	require.Contains(t, err.Error(), sdkerror.ErrInvalidCoins.Error())
 	require.Equal(t, []byte(nil), res)
 
 	//tokens V2
@@ -133,7 +135,8 @@ func TestQueryTokens(t *testing.T) {
 	keeper.NewToken(ctx, token)
 	path = []string{types.QueryTokens, "abc"}
 	res, err = querier(ctx, path, abci.RequestQuery{})
-	require.EqualValues(t, sdk.CodeInvalidAddress, err.Code())
+	require.NotNil(t, err)
+	require.Contains(t, err.Error(), sdkerror.ErrInvalidAddress.Error())
 	require.Equal(t, []byte(nil), res)
 }
 
@@ -142,7 +145,7 @@ func TestQueryUserTokens(t *testing.T) {
 	mapp.BeginBlock(abci.RequestBeginBlock{Header: abci.Header{Height: 2}})
 	ctx := mapp.BaseApp.NewContext(false, abci.Header{})
 
-	_, testAccounts := CreateGenAccounts(2,
+	_, _, testAccounts := CreateGenAccounts(2,
 		sdk.DecCoins{
 			sdk.NewDecCoinFromDec(common.NativeToken, sdk.NewDec(1000000000)),
 		})
@@ -158,7 +161,7 @@ func TestQueryUserTokens(t *testing.T) {
 	}
 
 	coins := sdk.NewCoins(sdk.NewDecCoinFromDec(token.Symbol, token.TotalSupply))
-	err := keeper.supplyKeeper.MintCoins(ctx, types.ModuleName, coins)
+	err := keeper.bankKeeper.MintCoins(ctx, types.ModuleName, coins)
 	require.NoError(t, err)
 
 	keeper.NewToken(ctx, token)
@@ -182,7 +185,7 @@ func TestQueryCurrency(t *testing.T) {
 	mapp.BeginBlock(abci.RequestBeginBlock{Header: abci.Header{Height: 2}})
 	ctx := mapp.BaseApp.NewContext(false, abci.Header{})
 
-	_, testAccounts := CreateGenAccounts(2,
+	_, _, testAccounts := CreateGenAccounts(2,
 		sdk.DecCoins{
 			sdk.NewDecCoinFromDec(common.NativeToken, sdk.NewDec(1000000000)),
 		})
@@ -223,11 +226,11 @@ func TestQueryAccount(t *testing.T) {
 	mapp.BeginBlock(abci.RequestBeginBlock{Header: abci.Header{Height: 2}})
 	ctx := mapp.BaseApp.NewContext(false, abci.Header{})
 
-	genAccs, testAccounts := CreateGenAccounts(1,
+	genAccs, genBals, testAccounts := CreateGenAccounts(1,
 		sdk.DecCoins{
 			sdk.NewDecCoinFromDec(common.NativeToken, sdk.NewDec(1000000000)),
 		})
-	mock.SetGenesis(mapp.App, types.DecAccountArrToBaseAccountArr(genAccs))
+	mock.SetGenesis(mapp.App, genAccs, genBals)
 
 	token := types.Token{
 		Description:         "okblockchain coin",
@@ -313,11 +316,11 @@ func TestQueryAccount_ShowAll(t *testing.T) {
 	mapp.BeginBlock(abci.RequestBeginBlock{Header: abci.Header{Height: 2}})
 	ctx := mapp.BaseApp.NewContext(false, abci.Header{})
 
-	genAccs, testAccounts := CreateGenAccounts(1,
+	genAccs, genBals, testAccounts := CreateGenAccounts(1,
 		sdk.DecCoins{
 			sdk.NewDecCoinFromDec(common.NativeToken, sdk.NewDec(1000000000)),
 		})
-	mock.SetGenesis(mapp.App, types.DecAccountArrToBaseAccountArr(genAccs))
+	mock.SetGenesis(mapp.App, genAccs, genBals)
 
 	tokens := []types.Token{
 		{
@@ -377,11 +380,11 @@ func TestQueryParameters(t *testing.T) {
 	mapp.BeginBlock(abci.RequestBeginBlock{Header: abci.Header{Height: 2}})
 	ctx := mapp.BaseApp.NewContext(false, abci.Header{})
 
-	genAccs, _ := CreateGenAccounts(1,
+	genAccs, genBals, _ := CreateGenAccounts(1,
 		sdk.DecCoins{
 			sdk.NewDecCoinFromDec(common.NativeToken, sdk.NewDec(1000000000)),
 		})
-	mock.SetGenesis(mapp.App, types.DecAccountArrToBaseAccountArr(genAccs))
+	mock.SetGenesis(mapp.App, genAccs, genBals)
 
 	params := types.DefaultParams()
 	keeper.SetParams(ctx, params)
@@ -405,11 +408,11 @@ func TestQueryKeysNum(t *testing.T) {
 	mapp.BeginBlock(abci.RequestBeginBlock{Header: abci.Header{Height: 2}})
 	ctx := mapp.BaseApp.NewContext(false, abci.Header{})
 
-	genAccs, _ := CreateGenAccounts(1,
+	genAccs, genBals, _ := CreateGenAccounts(1,
 		sdk.DecCoins{
 			sdk.NewDecCoinFromDec(common.NativeToken, sdk.NewDec(1000000000)),
 		})
-	mock.SetGenesis(mapp.App, types.DecAccountArrToBaseAccountArr(genAccs))
+	mock.SetGenesis(mapp.App, genAccs, genBals)
 
 	path := []string{types.QueryKeysNum}
 	querier := NewQuerier(keeper)

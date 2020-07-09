@@ -2,8 +2,8 @@ package types
 
 import (
 	"fmt"
-
-	"github.com/cosmos/cosmos-sdk/x/auth"
+	sdkerror "github.com/cosmos/cosmos-sdk/types/errors"
+	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 )
@@ -15,12 +15,7 @@ const (
 )
 
 // MsgList - high level transaction of the dex module
-type MsgList struct {
-	Owner      sdk.AccAddress `json:"owner"`
-	ListAsset  string         `json:"list_asset"`  //  Symbol of asset listed on Dex.
-	QuoteAsset string         `json:"quote_asset"` //  Symbol of asset quoted by asset listed on Dex.
-	InitPrice  sdk.Dec        `json:"init_price"`
-}
+var _ sdk.Msg = &MsgList{}
 
 // NewMsgList creates a new MsgList
 func NewMsgList(owner sdk.AccAddress, listAsset, quoteAsset string, initPrice sdk.Dec) MsgList {
@@ -39,17 +34,17 @@ func (msg MsgList) Route() string { return RouterKey }
 func (msg MsgList) Type() string { return "list" }
 
 // ValidateBasic Implements Msg
-func (msg MsgList) ValidateBasic() sdk.Error {
+func (msg MsgList) ValidateBasic() error {
 	if msg.ListAsset == msg.QuoteAsset {
-		return sdk.ErrInvalidCoins(fmt.Sprintf("failed to list product because base asset is same as quote asset"))
+		return sdkerror.Wrap(sdkerror.ErrInvalidCoins, fmt.Sprintf("failed to list product because base asset is same as quote asset"))
 	}
 
 	if !msg.InitPrice.IsPositive() {
-		return sdk.ErrUnknownRequest("invalid init price")
+		return sdkerror.Wrapf(sdkerror.ErrUnknownRequest, "invalid init price")
 	}
 
 	if msg.Owner.Empty() {
-		return sdk.ErrInvalidAddress("missing owner address")
+		return sdkerror.Wrapf(sdkerror.ErrInvalidAddress, "missing owner address")
 	}
 	return nil
 }
@@ -66,11 +61,7 @@ func (msg MsgList) GetSigners() []sdk.AccAddress {
 }
 
 // MsgDeposit - high level transaction of the dex module
-type MsgDeposit struct {
-	Product   string         `json:"product"`   // product for trading pair in full name of the tokens
-	Amount    sdk.DecCoin    `json:"amount"`    // Coins to add to the deposit
-	Depositor sdk.AccAddress `json:"depositor"` // Address of the depositor
-}
+var _ sdk.Msg = &MsgDeposit{}
 
 // NewMsgDeposit creates a new MsgDeposit
 func NewMsgDeposit(product string, amount sdk.DecCoin, depositor sdk.AccAddress) MsgDeposit {
@@ -84,12 +75,12 @@ func (msg MsgDeposit) Route() string { return RouterKey }
 func (msg MsgDeposit) Type() string { return typeMsgDeposit }
 
 // ValidateBasic Implements Msg
-func (msg MsgDeposit) ValidateBasic() sdk.Error {
+func (msg MsgDeposit) ValidateBasic() error {
 	if msg.Depositor.Empty() {
-		return sdk.ErrInvalidAddress(msg.Depositor.String())
+		return sdkerror.Wrapf(sdkerror.ErrInvalidAddress, msg.Depositor.String())
 	}
 	if !msg.Amount.IsValid() || !msg.Amount.IsPositive() {
-		return sdk.ErrInvalidCoins(msg.Amount.String())
+		return sdkerror.Wrapf(sdkerror.ErrInvalidCoins, msg.Amount.String())
 	}
 
 	return nil
@@ -107,11 +98,7 @@ func (msg MsgDeposit) GetSigners() []sdk.AccAddress {
 }
 
 // MsgWithdraw - high level transaction of the dex module
-type MsgWithdraw struct {
-	Product   string         `json:"product"`   // product for trading pair in full name of the tokens
-	Amount    sdk.DecCoin    `json:"amount"`    // Coins to add to the deposit
-	Depositor sdk.AccAddress `json:"depositor"` // Address of the depositor
-}
+var _ sdk.Msg = &MsgWithdraw{}
 
 // NewMsgWithdraw creates a new MsgWithdraw
 func NewMsgWithdraw(product string, amount sdk.DecCoin, depositor sdk.AccAddress) MsgWithdraw {
@@ -125,12 +112,12 @@ func (msg MsgWithdraw) Route() string { return RouterKey }
 func (msg MsgWithdraw) Type() string { return typeMsgWithdraw }
 
 // ValidateBasic Implements Msg
-func (msg MsgWithdraw) ValidateBasic() sdk.Error {
+func (msg MsgWithdraw) ValidateBasic() error {
 	if msg.Depositor.Empty() {
-		return sdk.ErrInvalidAddress(msg.Depositor.String())
+		return sdkerror.Wrapf(sdkerror.ErrInvalidAddress, msg.Depositor.String())
 	}
 	if !msg.Amount.IsValid() || !msg.Amount.IsPositive() {
-		return sdk.ErrInvalidCoins(msg.Amount.String())
+		return sdkerror.Wrapf(sdkerror.ErrInvalidCoins, msg.Amount.String())
 	}
 
 	return nil
@@ -148,20 +135,16 @@ func (msg MsgWithdraw) GetSigners() []sdk.AccAddress {
 }
 
 // MsgTransferOwnership - high level transaction of the dex module
-type MsgTransferOwnership struct {
-	FromAddress sdk.AccAddress    `json:"from_address"`
-	ToAddress   sdk.AccAddress    `json:"to_address"`
-	Product     string            `json:"product"`
-	ToSignature auth.StdSignature `json:"to_signature"`
-}
+var _ sdk.Msg = &MsgTransferOwnership{}
 
 // NewMsgTransferOwnership create a new MsgTransferOwnership
-func NewMsgTransferOwnership(from, to sdk.AccAddress, product string) MsgTransferOwnership {
+func NewMsgTransferOwnership(from, to sdk.AccAddress, product string, pub, sig []byte) MsgTransferOwnership {
 	return MsgTransferOwnership{
 		FromAddress: from,
 		ToAddress:   to,
 		Product:     product,
-		ToSignature: auth.StdSignature{},
+		Pubkey:      pub,
+		ToSignature: sig,
 	}
 }
 
@@ -172,21 +155,21 @@ func (msg MsgTransferOwnership) Route() string { return RouterKey }
 func (msg MsgTransferOwnership) Type() string { return typeMsgTransferOwnership }
 
 // ValidateBasic Implements Msg
-func (msg MsgTransferOwnership) ValidateBasic() sdk.Error {
+func (msg MsgTransferOwnership) ValidateBasic() error {
 	if msg.FromAddress.Empty() {
-		return sdk.ErrInvalidAddress("missing sender address")
+		return sdkerror.Wrapf(sdkerror.ErrInvalidAddress, "missing sender address")
 	}
 
 	if msg.ToAddress.Empty() {
-		return sdk.ErrInvalidAddress("missing recipient address")
+		return sdkerror.Wrapf(sdkerror.ErrInvalidAddress, "missing recipient address")
 	}
 
 	if msg.Product == "" {
-		return sdk.ErrUnknownRequest("product cannot be empty")
+		return sdkerror.Wrapf(sdkerror.ErrUnknownRequest, "product cannot be empty")
 	}
 
 	if !msg.checkMultiSign() {
-		return sdk.ErrUnauthorized("invalid multi signature")
+		return sdkerror.Wrapf(sdkerror.ErrUnauthorized, "invalid multi signature")
 	}
 	return nil
 }
@@ -204,17 +187,20 @@ func (msg MsgTransferOwnership) GetSigners() []sdk.AccAddress {
 
 func (msg MsgTransferOwnership) checkMultiSign() bool {
 	// check pubkey
-	if msg.ToSignature.PubKey == nil {
+	if msg.Pubkey == nil {
 		return false
 	}
 
-	if !sdk.AccAddress(msg.ToSignature.PubKey.Address()).Equals(msg.ToAddress) {
+	stdSign := authtypes.StdSignature {
+		msg.Pubkey,
+		msg.ToSignature,
+	}
+
+	if !sdk.AccAddress(stdSign.GetPubKey().Address()).Equals(msg.ToAddress) {
 		return false
 	}
 
 	// check multisign
-	toSignature := msg.ToSignature
-	msg.ToSignature = auth.StdSignature{}
-	toValid := toSignature.VerifyBytes(msg.GetSignBytes(), toSignature.Signature)
+	toValid := stdSign.GetPubKey().VerifyBytes(msg.GetSignBytes(), msg.ToSignature)
 	return toValid
 }

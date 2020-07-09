@@ -2,11 +2,11 @@ package keeper
 
 import (
 	"fmt"
+	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	"time"
 
 	"github.com/pkg/errors"
 
-	"github.com/cosmos/cosmos-sdk/x/auth"
 
 	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -86,7 +86,7 @@ func (k Keeper) Flush() {
 }
 
 // SyncTx generate transaction and add it to cache, called at DeliverTx
-func (k Keeper) SyncTx(ctx sdk.Context, tx *auth.StdTx, txHash string, timestamp int64) {
+func (k Keeper) SyncTx(ctx sdk.Context, tx *authtypes.StdTx, txHash string, timestamp int64) {
 	if k.Config.EnableBackend && k.Config.EnableMktCompute {
 		k.Logger.Debug(fmt.Sprintf("[backend] get new tx, txHash: %s", txHash))
 		txs := types.GenerateTx(tx, txHash, ctx, k.OrderKeeper, timestamp)

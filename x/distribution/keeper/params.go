@@ -2,15 +2,20 @@ package keeper
 
 import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/cosmos/cosmos-sdk/x/params"
+	"github.com/okex/okchain/x/params"
 )
+
+func tmpValidate(value interface{}) error {
+	return nil
+}
 
 // ParamKeyTable is the type declaration for parameters
 func ParamKeyTable() params.KeyTable {
-	return params.NewKeyTable(
-		ParamStoreKeyCommunityTax, sdk.Dec{},
-		ParamStoreKeyWithdrawAddrEnabled, true,
-	)
+	pairs := params.ParamSetPairs{
+		{ParamStoreKeyCommunityTax, sdk.Dec{}, tmpValidate},
+		{ParamStoreKeyWithdrawAddrEnabled, true, tmpValidate},
+	}
+	return params.NewKeyTable(pairs...)
 }
 
 // GetCommunityTax returns the current CommunityTax rate from the global param store

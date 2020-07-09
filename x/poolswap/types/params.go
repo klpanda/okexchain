@@ -5,7 +5,7 @@ import (
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 
-	"github.com/cosmos/cosmos-sdk/x/params"
+	"github.com/okex/okchain/x/params"
 )
 
 // FeeRate defines swap fee rate
@@ -48,10 +48,13 @@ func (p Params) String() string {
   TradeFeeRate: %s`, p.FeeRate)
 }
 
+func tmpValidate(value interface{}) error {
+	return nil
+}
 // ParamSetPairs implements params.ParamSet
 func (p *Params) ParamSetPairs() params.ParamSetPairs {
 	return params.ParamSetPairs{
-		{Key: KeyFeeRate, Value: &p.FeeRate},
+		{KeyFeeRate, &p.FeeRate, tmpValidate},
 	}
 }
 

@@ -40,17 +40,19 @@ type Params struct {
 func ParamKeyTable() params.KeyTable {
 	return params.NewKeyTable().RegisterParamSet(&Params{})
 }
-
+func tmpValidate(value interface{}) error {
+	return nil
+}
 // ParamSetPairs implements the ParamSet interface and returns all the key/value pairs
 // pairs of auth module's parameters.
 // nolint
 func (p *Params) ParamSetPairs() params.ParamSetPairs {
 	return params.ParamSetPairs{
-		{KeyFeeIssue, &p.FeeIssue},
-		{KeyFeeMint, &p.FeeMint},
-		{KeyFeeBurn, &p.FeeBurn},
-		{KeyFeeModify, &p.FeeModify},
-		{KeyFeeChown, &p.FeeChown},
+		{KeyFeeIssue, &p.FeeIssue, tmpValidate},
+		{KeyFeeMint, &p.FeeMint, tmpValidate},
+		{KeyFeeBurn, &p.FeeBurn, tmpValidate},
+		{KeyFeeModify, &p.FeeModify, tmpValidate},
+		{KeyFeeChown, &p.FeeChown, tmpValidate},
 	}
 }
 

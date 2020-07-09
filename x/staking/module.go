@@ -2,6 +2,8 @@ package staking
 
 import (
 	"encoding/json"
+	"github.com/cosmos/cosmos-sdk/client"
+	"github.com/gogo/protobuf/grpc"
 
 	"github.com/okex/okchain/x/staking/keeper"
 
@@ -13,7 +15,6 @@ import (
 	cfg "github.com/tendermint/tendermint/config"
 	"github.com/tendermint/tendermint/crypto"
 
-	"github.com/cosmos/cosmos-sdk/client/context"
 	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/module"
@@ -42,14 +43,14 @@ func (AppModuleBasic) RegisterCodec(cdc *codec.Codec) {
 }
 
 // DefaultGenesis returns default genesis state
-func (AppModuleBasic) DefaultGenesis() json.RawMessage {
-	return ModuleCdc.MustMarshalJSON(DefaultGenesisState())
+func (AppModuleBasic) DefaultGenesis(cdc codec.JSONMarshaler) json.RawMessage {
+	return cdc.MustMarshalJSON(DefaultGenesisState())
 }
 
 // ValidateGenesis give a validity check to module genesis
-func (AppModuleBasic) ValidateGenesis(bz json.RawMessage) error {
+func (AppModuleBasic) ValidateGenesis(cdc codec.JSONMarshaler, bz json.RawMessage) error {
 	var data GenesisState
-	err := ModuleCdc.UnmarshalJSON(bz, &data)
+	err := cdc.UnmarshalJSON(bz, &data)
 	if err != nil {
 		return err
 	}
@@ -57,18 +58,18 @@ func (AppModuleBasic) ValidateGenesis(bz json.RawMessage) error {
 }
 
 // RegisterRESTRoutes registers rest routes
-func (AppModuleBasic) RegisterRESTRoutes(ctx context.CLIContext, rtr *mux.Router) {
+func (AppModuleBasic) RegisterRESTRoutes(ctx client.Context, rtr *mux.Router) {
 	rest.RegisterRoutes(ctx, rtr)
 }
 
 // GetTxCmd gets the root tx command of this module
-func (AppModuleBasic) GetTxCmd(cdc *codec.Codec) *cobra.Command {
-	return cli.GetTxCmd(StoreKey, cdc)
+func (AppModuleBasic) GetTxCmd(ctx client.Context) *cobra.Command {
+	return cli.GetTxCmd(ctx)
 }
 
 // GetQueryCmd gets the root query command of this module
-func (AppModuleBasic) GetQueryCmd(cdc *codec.Codec) *cobra.Command {
-	return cli.GetQueryCmd(StoreKey, cdc)
+func (AppModuleBasic) GetQueryCmd(ctx client.Context) *cobra.Command {
+	return cli.GetQueryCmd(StoreKey, ctx.Codec)
 }
 
 //_____________________________________
@@ -87,7 +88,7 @@ func (AppModuleBasic) PrepareFlagsForTxCreateValidator(config *cfg.Config, nodeI
 }
 
 // BuildCreateValidatorMsg is used for gen-tx
-func (AppModuleBasic) BuildCreateValidatorMsg(cliCtx context.CLIContext,
+func (AppModuleBasic) BuildCreateValidatorMsg(cliCtx client.Context,
 	txBldr authtypes.TxBuilder) (authtypes.TxBuilder, sdk.Msg, error) {
 	return cli.BuildCreateValidatorMsg(cliCtx, txBldr)
 }
@@ -95,20 +96,20 @@ func (AppModuleBasic) BuildCreateValidatorMsg(cliCtx context.CLIContext,
 // AppModule is a struct of app module
 type AppModule struct {
 	AppModuleBasic
-	keeper       Keeper
-	accKeeper    types.AccountKeeper
-	supplyKeeper types.SupplyKeeper
+	keeper     Keeper
+	accKeeper  types.AccountKeeper
+	bankKeeper types.BankKeeper
 }
 
 // NewAppModule creates a new AppModule object
 func NewAppModule(keeper Keeper, accKeeper types.AccountKeeper,
-	supplyKeeper types.SupplyKeeper) AppModule {
+	bankKeeper types.BankKeeper) AppModule {
 
 	return AppModule{
 		AppModuleBasic: AppModuleBasic{},
 		keeper:         keeper,
 		accKeeper:      accKeeper,
-		supplyKeeper:   supplyKeeper,
+		bankKeeper:     bankKeeper,
 	}
 }
 
@@ -119,8 +120,8 @@ func (am AppModule) RegisterInvariants(ir sdk.InvariantRegistry) {
 }
 
 // Route returns module message route name
-func (AppModule) Route() string {
-	return RouterKey
+func (am AppModule) Route() sdk.Route {
+	return sdk.NewRoute(types.RouterKey, NewHandler(am.keeper))
 }
 
 // NewHandler returns module handler
@@ -139,16 +140,16 @@ func (am AppModule) NewQuerierHandler() sdk.Querier {
 }
 
 // InitGenesis initializes module genesis
-func (am AppModule) InitGenesis(ctx sdk.Context, data json.RawMessage) []abci.ValidatorUpdate {
+func (am AppModule) InitGenesis(ctx sdk.Context, cdc codec.JSONMarshaler, data json.RawMessage) []abci.ValidatorUpdate {
 	var genesisState GenesisState
-	ModuleCdc.MustUnmarshalJSON(data, &genesisState)
-	return InitGenesis(ctx, am.keeper, am.accKeeper, am.supplyKeeper, genesisState)
+	cdc.MustUnmarshalJSON(data, &genesisState)
+	return InitGenesis(ctx, am.keeper, am.accKeeper, am.bankKeeper, genesisState)
 }
 
 // ExportGenesis exports module genesis
-func (am AppModule) ExportGenesis(ctx sdk.Context) json.RawMessage {
+func (am AppModule) ExportGenesis(ctx sdk.Context, cdc codec.JSONMarshaler) json.RawMessage {
 	gs := ExportGenesis(ctx, am.keeper)
-	return ModuleCdc.MustMarshalJSON(gs)
+	return cdc.MustMarshalJSON(gs)
 }
 
 // BeginBlock is invoked on the beginning of each block
@@ -158,3 +159,5 @@ func (AppModule) BeginBlock(_ sdk.Context, _ abci.RequestBeginBlock) {}
 func (am AppModule) EndBlock(ctx sdk.Context, _ abci.RequestEndBlock) []abci.ValidatorUpdate {
 	return EndBlocker(ctx, am.keeper)
 }
+
+func (am AppModule) RegisterQueryService(grpc.Server) {}

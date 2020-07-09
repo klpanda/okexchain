@@ -2,6 +2,8 @@ package backend
 
 import (
 	"encoding/json"
+	"github.com/cosmos/cosmos-sdk/client"
+	"github.com/gogo/protobuf/grpc"
 
 	"github.com/okex/okchain/x/backend/client/cli"
 	"github.com/okex/okchain/x/backend/client/rest"
@@ -12,7 +14,6 @@ import (
 	"github.com/cosmos/cosmos-sdk/codec"
 	"github.com/cosmos/cosmos-sdk/types/module"
 
-	"github.com/cosmos/cosmos-sdk/client/context"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	abci "github.com/tendermint/tendermint/abci/types"
 )
@@ -36,29 +37,29 @@ func (AppModuleBasic) RegisterCodec(cdc *codec.Codec) {
 }
 
 // DefaultGenesis returns nil
-func (AppModuleBasic) DefaultGenesis() json.RawMessage {
+func (AppModuleBasic) DefaultGenesis(cdc codec.JSONMarshaler) json.RawMessage {
 	return nil
 }
 
 // ValidateGenesis  Validation check of the Genesis
-func (AppModuleBasic) ValidateGenesis(bz json.RawMessage) error {
+func (AppModuleBasic) ValidateGenesis(cdc codec.JSONMarshaler, bz json.RawMessage) error {
 	return nil
 }
 
 // RegisterRESTRoutes register rest routes
-func (AppModuleBasic) RegisterRESTRoutes(ctx context.CLIContext, rtr *mux.Router) {
+func (AppModuleBasic) RegisterRESTRoutes(ctx client.Context, rtr *mux.Router) {
 
 	rest.RegisterRoutes(ctx, rtr)
 	rest.RegisterRoutesV2(ctx, rtr)
 }
 
 // GetQueryCmd return the root query command of this module
-func (AppModuleBasic) GetQueryCmd(cdc *codec.Codec) *cobra.Command {
-	return cli.GetQueryCmd(QuerierRoute, cdc)
+func (AppModuleBasic) GetQueryCmd(ctx client.Context) *cobra.Command {
+	return cli.GetQueryCmd(QuerierRoute, ctx.Codec)
 }
 
 // GetTxCmd return the root tx command of this module
-func (AppModuleBasic) GetTxCmd(cdc *codec.Codec) *cobra.Command {
+func (AppModuleBasic) GetTxCmd(ctx client.Context) *cobra.Command {
 	return nil
 }
 
@@ -85,8 +86,8 @@ func (AppModule) Name() string {
 func (am AppModule) RegisterInvariants(ir sdk.InvariantRegistry) {}
 
 // Route returns module message route name
-func (am AppModule) Route() string {
-	return RouterKey
+func (am AppModule) Route() sdk.Route {
+	return sdk.NewRoute(RouterKey, am.NewHandler())
 }
 
 // NewHandler returns module handler
@@ -114,12 +115,14 @@ func (am AppModule) EndBlock(ctx sdk.Context, _ abci.RequestEndBlock) []abci.Val
 	return nil
 }
 
+func (am AppModule) RegisterQueryService(grpc.Server) {}
+
 // InitGenesis initialize module genesis
-func (am AppModule) InitGenesis(ctx sdk.Context, data json.RawMessage) []abci.ValidatorUpdate {
+func (am AppModule) InitGenesis(ctx sdk.Context, cdc codec.JSONMarshaler, data json.RawMessage) []abci.ValidatorUpdate {
 	return nil
 }
 
 // ExportGenesis exports module genesis
-func (am AppModule) ExportGenesis(ctx sdk.Context) json.RawMessage {
+func (am AppModule) ExportGenesis(ctx sdk.Context, cdc codec.JSONMarshaler) json.RawMessage {
 	return nil
 }

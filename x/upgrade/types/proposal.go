@@ -54,8 +54,8 @@ func (apu AppUpgradeProposal) ProposalRoute() string { return RouterKey }
 func (apu AppUpgradeProposal) ProposalType() string { return ProposalAppUpgrade }
 
 // ValidateBasic validates the parameter change proposal
-func (apu AppUpgradeProposal) ValidateBasic() sdk.Error {
-	if err := govTypes.ValidateAbstract(DefaultCodespace, apu); err != nil {
+func (apu AppUpgradeProposal) ValidateBasic() error {
+	if err := govTypes.ValidateAbstract(apu); err != nil {
 		return err
 	}
 

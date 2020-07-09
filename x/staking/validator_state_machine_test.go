@@ -54,7 +54,7 @@ func TestValidatorSMCreateValidatorWithValidatorSet(t *testing.T) {
 	_, _, mk := CreateTestInput(t, false, SufficientInitPower)
 
 	params := DefaultParams()
-	params.MaxValidators = uint16(len(addrVals)) - 1
+	params.MaxValidators = uint32(len(addrVals)) - 1
 	params.Epoch = 3
 	params.UnbondingTime = time.Millisecond * 300
 
@@ -89,7 +89,7 @@ func TestValidatorSMNormalFullLifeCircle(t *testing.T) {
 	_, _, mk := CreateTestInput(t, false, SufficientInitPower)
 
 	params := DefaultParams()
-	params.MaxValidators = uint16(len(addrVals)) - 1
+	params.MaxValidators = uint32(len(addrVals)) - 1
 	params.Epoch = 2
 	params.UnbondingTime = time.Millisecond * 300
 
@@ -148,7 +148,7 @@ func TestValidatorSMEvilFullLifeCircle(t *testing.T) {
 	_, _, mk := CreateTestInput(t, false, SufficientInitPower)
 
 	params := DefaultParams()
-	params.MaxValidators = uint16(len(addrVals)) - 1
+	params.MaxValidators = uint32(len(addrVals)) - 1
 	params.Epoch = 2
 	params.UnbondingTime = time.Millisecond * 300
 
@@ -199,7 +199,7 @@ func TestValidatorSMEvilFullLifeCircleWithUnjail(t *testing.T) {
 	_, _, mk := CreateTestInput(t, false, SufficientInitPower)
 
 	params := DefaultParams()
-	params.MaxValidators = uint16(len(addrVals)) - 1
+	params.MaxValidators = uint32(len(addrVals)) - 1
 	params.Epoch = 2
 	params.UnbondingTime = time.Millisecond * 300
 
@@ -260,7 +260,7 @@ func TestValidatorSMEvilFullLifeCircleWithUnjail2(t *testing.T) {
 	_, _, mk := CreateTestInput(t, false, SufficientInitPower)
 
 	params := DefaultParams()
-	params.MaxValidators = uint16(len(addrVals)) - 1
+	params.MaxValidators = uint32(len(addrVals)) - 1
 	params.Epoch = 2
 	params.UnbondingTime = time.Millisecond * 300
 
@@ -361,7 +361,7 @@ func TestValidatorSMReRankPowerIndex(t *testing.T) {
 	_, _, mk := CreateTestInput(t, false, SufficientInitPower)
 
 	params := DefaultParams()
-	params.MaxValidators = uint16(len(addrVals)) - 1
+	params.MaxValidators = uint32(len(addrVals)) - 1
 	params.Epoch = 2
 	params.UnbondingTime = time.Millisecond * 300
 
@@ -428,7 +428,7 @@ func TestValidatorSMMultiVoting(t *testing.T) {
 	params := DefaultParams()
 
 	originVaSet := addrVals[1:]
-	params.MaxValidators = uint16(len(originVaSet))
+	params.MaxValidators = uint32(len(originVaSet))
 	params.Epoch = 2
 	params.UnbondingTime = time.Millisecond * 300
 
@@ -541,7 +541,7 @@ func TestValidatorSMDestroyValidatorUnbonding2UnBonded2Removed(t *testing.T) {
 	params := DefaultParams()
 
 	originVaSet := addrVals[1:]
-	params.MaxValidators = uint16(len(originVaSet))
+	params.MaxValidators = uint32(len(originVaSet))
 	params.Epoch = 1
 	params.UnbondingTime = time.Millisecond * 300
 
@@ -619,7 +619,7 @@ func TestValidatorSMDestroyValidatorUnbonding2Removed(t *testing.T) {
 	params := DefaultParams()
 
 	originVaSet := addrVals[1:]
-	params.MaxValidators = uint16(len(originVaSet))
+	params.MaxValidators = uint32(len(originVaSet))
 	params.Epoch = 1
 	params.UnbondingTime = time.Millisecond * 300
 

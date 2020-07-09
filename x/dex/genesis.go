@@ -43,7 +43,7 @@ func ValidateGenesis(data GenesisState) error {
 // and the keeper's address to pubkey map
 func InitGenesis(ctx sdk.Context, keeper IKeeper, data GenesisState) {
 	// if module account dosen't exist, it will create automatically
-	moduleAcc := keeper.GetSupplyKeeper().GetModuleAccount(ctx, types.ModuleName)
+	moduleAcc := keeper.GetAccountKeeper().GetModuleAccount(ctx, types.ModuleName)
 	if moduleAcc == nil {
 		panic(fmt.Sprintf("%s module account has not been set", types.ModuleName))
 	}

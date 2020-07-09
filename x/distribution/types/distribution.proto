@@ -1,0 +1,19 @@
+syntax = "proto3";
+package okchain.distribution;
+
+import "gogoproto/gogo.proto";
+import "cosmos_proto/cosmos.proto";
+import "cosmos/cosmos.proto";
+
+option go_package = "github.com/okex/okchain/x/distribution/types";
+
+message MsgSetWithdrawAddress {
+    option (gogoproto.equal) = true;
+    bytes delegator_address = 1 [(gogoproto.casttype) = "github.com/cosmos/cosmos-sdk/types.AccAddress", (gogoproto.moretags) = "yaml:\"delegator_address\""];
+    bytes withdraw_address = 2 [(gogoproto.casttype) = "github.com/cosmos/cosmos-sdk/types.AccAddress", (gogoproto.moretags) = "yaml:\"withdraw_address\""];
+}
+
+message MsgWithdrawValidatorCommission {
+    option (gogoproto.equal) = true;
+    bytes validator_address = 1 [(gogoproto.casttype) = "github.com/cosmos/cosmos-sdk/types.ValAddress", (gogoproto.moretags) = "yaml:\"validator_address\""];
+}

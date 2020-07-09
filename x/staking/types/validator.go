@@ -28,38 +28,6 @@ const (
 // Implements Validator interface
 var _ exported.ValidatorI = Validator{}
 
-// Validator defines the total amount of bond shares and their exchange rate to
-// coins. Slashing results in a decrease in the exchange rate, allowing correct
-// calculation of future undelegations without iterating over delegators.
-// When coins are delegated to this validator, the validator is credited with a
-// delegation whose number of bond shares is based on the amount of coins delegated
-// divided by the current exchange rate. Voting power can be calculated as total
-// bonded shares multiplied by exchange rate.
-type Validator struct {
-	// address of the validator's operator; bech encoded in JSON
-	OperatorAddress sdk.ValAddress `json:"operator_address" yaml:"operator_address"`
-	// the consensus public key of the validator; bech encoded in JSON
-	ConsPubKey crypto.PubKey `json:"consensus_pubkey" yaml:"consensus_pubkey"`
-	// has the validator been jailed from bonded status?
-	Jailed bool `json:"jailed" yaml:"jailed"`
-	// validator status (bonded/unbonding/unbonded)
-	Status sdk.BondStatus `json:"status" yaml:"status"`
-	// delegated tokens (incl. self-delegation)
-	Tokens sdk.Int `json:"tokens" yaml:"tokens"`
-	// total shares added to a validator
-	DelegatorShares sdk.Dec `json:"delegator_shares" yaml:"delegator_shares"`
-	// description terms for the validator
-	Description Description `json:"description" yaml:"description"`
-	// if unbonding, height at which this validator has begun unbonding
-	UnbondingHeight int64 `json:"unbonding_height" yaml:"unbonding_height"`
-	// if unbonding, min time for the validator to complete unbonding
-	UnbondingCompletionTime time.Time `json:"unbonding_time" yaml:"unbonding_time"`
-	// commission parameters
-	Commission Commission `json:"commission" yaml:"commission"`
-	// validator's self declared minimum self delegation
-	MinSelfDelegation sdk.Dec `json:"min_self_delegation" yaml:"min_self_delegation"`
-}
-
 // MarshalYAML implements the text format for yaml marshaling due to consensus pubkey
 func (v Validator) MarshalYAML() (interface{}, error) {
 	bs, err := yaml.Marshal(struct {
@@ -76,7 +44,7 @@ func (v Validator) MarshalYAML() (interface{}, error) {
 		MinSelfDelegation       sdk.Dec
 	}{
 		OperatorAddress:         v.OperatorAddress,
-		ConsPubKey:              sdk.MustBech32ifyConsPub(v.ConsPubKey),
+		ConsPubKey:              v.ConsPubKey,
 		Jailed:                  v.Jailed,
 		Status:                  v.Status,
 		Tokens:                  v.Tokens,
@@ -117,7 +85,7 @@ func (v Validators) ToSDKValidators() (validators []exported.ValidatorI) {
 func NewValidator(operator sdk.ValAddress, pubKey crypto.PubKey, description Description, minSelfDelegation sdk.Dec) Validator {
 	return Validator{
 		OperatorAddress:         operator,
-		ConsPubKey:              pubKey,
+		ConsPubKey:              sdk.MustBech32ifyPubKey(sdk.Bech32PubKeyTypeConsPub, pubKey),
 		Jailed:                  false,
 		Status:                  sdk.Unbonded,
 		Tokens:                  sdk.ZeroInt(),
@@ -131,12 +99,12 @@ func NewValidator(operator sdk.ValAddress, pubKey crypto.PubKey, description Des
 }
 
 // MustMarshalValidator must return the marshaling bytes of a validator
-func MustMarshalValidator(cdc *codec.Codec, validator Validator) []byte {
-	return cdc.MustMarshalBinaryLengthPrefixed(validator)
+func MustMarshalValidator(cdc codec.Marshaler, validator Validator) []byte {
+	return cdc.MustMarshalBinaryBare(&validator)
 }
 
 // MustUnmarshalValidator must return the validator entity by unmarshaling
-func MustUnmarshalValidator(cdc *codec.Codec, value []byte) Validator {
+func MustUnmarshalValidator(cdc codec.Marshaler, value []byte) Validator {
 	validator, err := UnmarshalValidator(cdc, value)
 	if err != nil {
 		panic(err)
@@ -145,17 +113,13 @@ func MustUnmarshalValidator(cdc *codec.Codec, value []byte) Validator {
 }
 
 // UnmarshalValidator unmarshals a validator from a store value
-func UnmarshalValidator(cdc *codec.Codec, value []byte) (validator Validator, err error) {
-	err = cdc.UnmarshalBinaryLengthPrefixed(value, &validator)
+func UnmarshalValidator(cdc codec.Marshaler, value []byte) (validator Validator, err error) {
+	err = cdc.UnmarshalBinaryBare(value, &validator)
 	return validator, err
 }
 
 // String returns a human readable string representation of a validator.
 func (v Validator) String() string {
-	bechConsPubKey, err := sdk.Bech32ifyConsPub(v.ConsPubKey)
-	if err != nil {
-		panic(err)
-	}
 	return fmt.Sprintf(`Validator
   Operator Address:           %s
   Validator Consensus Pubkey: %s
@@ -168,7 +132,7 @@ func (v Validator) String() string {
   Unbonding Completion Time:  %v
   Minimum Self Delegation:    %v
   Commission:                 %s`,
-		v.OperatorAddress, bechConsPubKey,
+		v.OperatorAddress, v.ConsPubKey,
 		v.Jailed, v.Status, v.Tokens,
 		v.DelegatorShares, v.Description,
 		v.UnbondingHeight, v.UnbondingCompletionTime, v.MinSelfDelegation,
@@ -176,82 +140,82 @@ func (v Validator) String() string {
 }
 
 // this is a helper struct used for JSON de- and encoding only
-type bechValidator struct {
-	// the bech32 address of the validator's operator
-	OperatorAddress sdk.ValAddress `json:"operator_address" yaml:"operator_address"`
-	// the bech32 consensus public key of the validator
-	ConsPubKey string `json:"consensus_pubkey" yaml:"consensus_pubkey"`
-	// has the validator been jailed from bonded status?
-	Jailed bool `json:"jailed" yaml:"jailed"`
-	// validator status (bonded/unbonding/unbonded)
-	Status sdk.BondStatus `json:"status" yaml:"status"`
-	// delegated tokens (incl. self-delegation)
-	Tokens sdk.Int `json:"tokens" yaml:"tokens"`
-	// total shares on a validator
-	DelegatorShares sdk.Dec `json:"delegator_shares" yaml:"delegator_shares"`
-	// description terms for the validator
-	Description Description `json:"description" yaml:"description"`
-	// if unbonding, height at which this validator has begun unbonding
-	UnbondingHeight int64 `json:"unbonding_height" yaml:"unbonding_height"`
-	// if unbonding, min time for the validator to complete unbonding
-	UnbondingCompletionTime time.Time `json:"unbonding_time" yaml:"unbonding_time"`
-	// commission parameters
-	Commission Commission `json:"commission" yaml:"commission"`
-	// minimum self delegation
-	MinSelfDelegation sdk.Dec `json:"min_self_delegation" yaml:"min_self_delegation"`
-}
-
-// MarshalJSON marshals the validator to JSON using Bech32
-func (v Validator) MarshalJSON() ([]byte, error) {
-	bechConsPubKey, err := sdk.Bech32ifyConsPub(v.ConsPubKey)
-	if err != nil {
-		return nil, err
-	}
-
-	return codec.Cdc.MarshalJSON(bechValidator{
-		OperatorAddress:         v.OperatorAddress,
-		ConsPubKey:              bechConsPubKey,
-		Jailed:                  v.Jailed,
-		Status:                  v.Status,
-		Tokens:                  v.Tokens,
-		DelegatorShares:         v.DelegatorShares,
-		Description:             v.Description,
-		UnbondingHeight:         v.UnbondingHeight,
-		UnbondingCompletionTime: v.UnbondingCompletionTime,
-		MinSelfDelegation:       v.MinSelfDelegation,
-		Commission:              v.Commission,
-	})
-}
-
-// UnmarshalJSON unmarshals the validator from JSON using Bech32
-func (v *Validator) UnmarshalJSON(data []byte) error {
-	bv := &bechValidator{}
-	if err := codec.Cdc.UnmarshalJSON(data, bv); err != nil {
-		return err
-	}
-	consPubKey, err := sdk.GetConsPubKeyBech32(bv.ConsPubKey)
-	if err != nil {
-		return err
-	}
-	*v = Validator{
-		OperatorAddress:         bv.OperatorAddress,
-		ConsPubKey:              consPubKey,
-		Jailed:                  bv.Jailed,
-		Tokens:                  bv.Tokens,
-		Status:                  bv.Status,
-		DelegatorShares:         bv.DelegatorShares,
-		Description:             bv.Description,
-		UnbondingHeight:         bv.UnbondingHeight,
-		UnbondingCompletionTime: bv.UnbondingCompletionTime,
-		Commission:              bv.Commission,
-		MinSelfDelegation:       bv.MinSelfDelegation,
-	}
-	return nil
-}
+//type bechValidator struct {
+//	// the bech32 address of the validator's operator
+//	OperatorAddress sdk.ValAddress `json:"operator_address" yaml:"operator_address"`
+//	// the bech32 consensus public key of the validator
+//	ConsPubKey string `json:"consensus_pubkey" yaml:"consensus_pubkey"`
+//	// has the validator been jailed from bonded status?
+//	Jailed bool `json:"jailed" yaml:"jailed"`
+//	// validator status (bonded/unbonding/unbonded)
+//	Status sdk.BondStatus `json:"status" yaml:"status"`
+//	// delegated tokens (incl. self-delegation)
+//	Tokens sdk.Int `json:"tokens" yaml:"tokens"`
+//	// total shares on a validator
+//	DelegatorShares sdk.Dec `json:"delegator_shares" yaml:"delegator_shares"`
+//	// description terms for the validator
+//	Description Description `json:"description" yaml:"description"`
+//	// if unbonding, height at which this validator has begun unbonding
+//	UnbondingHeight int64 `json:"unbonding_height" yaml:"unbonding_height"`
+//	// if unbonding, min time for the validator to complete unbonding
+//	UnbondingCompletionTime time.Time `json:"unbonding_time" yaml:"unbonding_time"`
+//	// commission parameters
+//	Commission Commission `json:"commission" yaml:"commission"`
+//	// minimum self delegation
+//	MinSelfDelegation sdk.Dec `json:"min_self_delegation" yaml:"min_self_delegation"`
+//}
+//
+//// MarshalJSON marshals the validator to JSON using Bech32
+//func (v Validator) MarshalJSON() ([]byte, error) {
+//	bechConsPubKey, err := sdk.Bech32ifyPubKey(sdk.Bech32PubKeyTypeConsPub, v.ConsPubKey)
+//	if err != nil {
+//		return nil, err
+//	}
+//
+//	return codec..MarshalJSON(bechValidator{
+//		OperatorAddress:         v.OperatorAddress,
+//		ConsPubKey:              bechConsPubKey,
+//		Jailed:                  v.Jailed,
+//		Status:                  v.Status,
+//		Tokens:                  v.Tokens,
+//		DelegatorShares:         v.DelegatorShares,
+//		Description:             v.Description,
+//		UnbondingHeight:         v.UnbondingHeight,
+//		UnbondingCompletionTime: v.UnbondingCompletionTime,
+//		MinSelfDelegation:       v.MinSelfDelegation,
+//		Commission:              v.Commission,
+//	})
+//}
+//
+//// UnmarshalJSON unmarshals the validator from JSON using Bech32
+//func (v *Validator) UnmarshalJSON(data []byte) error {
+//	bv := &bechValidator{}
+//	if err := codec.Cdc.UnmarshalJSON(data, bv); err != nil {
+//		return err
+//	}
+//	consPubKey, err := sdk.GetConsPubKeyBech32(bv.ConsPubKey)
+//	if err != nil {
+//		return err
+//	}
+//	*v = Validator{
+//		OperatorAddress:         bv.OperatorAddress,
+//		ConsPubKey:              consPubKey,
+//		Jailed:                  bv.Jailed,
+//		Tokens:                  bv.Tokens,
+//		Status:                  bv.Status,
+//		DelegatorShares:         bv.DelegatorShares,
+//		Description:             bv.Description,
+//		UnbondingHeight:         bv.UnbondingHeight,
+//		UnbondingCompletionTime: bv.UnbondingCompletionTime,
+//		Commission:              bv.Commission,
+//		MinSelfDelegation:       bv.MinSelfDelegation,
+//	}
+//	return nil
+//}
 
 // TestEquivalent is only for the ut
 func (v Validator) TestEquivalent(v2 Validator) bool {
-	return v.ConsPubKey.Equals(v2.ConsPubKey) &&
+	return v.ConsPubKey == v2.ConsPubKey &&
 		bytes.Equal(v.OperatorAddress, v2.OperatorAddress) &&
 		v.Status.Equal(v2.Status) &&
 		v.Tokens.Equal(v2.Tokens) &&
@@ -262,7 +226,8 @@ func (v Validator) TestEquivalent(v2 Validator) bool {
 
 // ConsAddress returns the TM validator address
 func (v Validator) ConsAddress() sdk.ConsAddress {
-	return sdk.ConsAddress(v.ConsPubKey.Address())
+	pub := sdk.MustGetPubKeyFromBech32(sdk.Bech32PubKeyTypeConsPub, v.ConsPubKey)
+	return sdk.ConsAddress(pub.Address())
 }
 
 // IsBonded checks if the validator status equals Bonded
@@ -283,14 +248,6 @@ func (v Validator) IsUnbonding() bool {
 // DoNotModifyDesc is the constant used in flags to indicate that description field should not be updated
 const DoNotModifyDesc = "[do-not-modify]"
 
-// Description - description fields for a validator
-type Description struct {
-	Moniker  string `json:"moniker" yaml:"moniker"`   // name
-	Identity string `json:"identity" yaml:"identity"` // optional identity signature (ex. UPort or Keybase)
-	Website  string `json:"website" yaml:"website"`   // optional website link
-	Details  string `json:"details" yaml:"details"`   // optional details
-}
-
 // NewDescription returns a new Description with the provided values.
 func NewDescription(moniker, identity, website, details string) Description {
 	return Description{
@@ -303,7 +260,7 @@ func NewDescription(moniker, identity, website, details string) Description {
 
 // UpdateDescription updates the fields of a given description. An error is
 // returned if the resulting description contains an invalid length.
-func (d Description) UpdateDescription(d2 Description) (Description, sdk.Error) {
+func (d Description) UpdateDescription(d2 Description) (Description, error) {
 	if d2.Moniker == DoNotModifyDesc {
 		d2.Moniker = d.Moniker
 	}
@@ -326,7 +283,7 @@ func (d Description) UpdateDescription(d2 Description) (Description, sdk.Error) 
 }
 
 // EnsureLength ensures the length of a validator's description.
-func (d Description) EnsureLength() (Description, sdk.Error) {
+func (d Description) EnsureLength() (Description, error) {
 	if len(d.Moniker) > MaxMonikerLength {
 		return d, ErrDescriptionLength(DefaultCodespace, "moniker", len(d.Moniker), MaxMonikerLength)
 	}
@@ -346,8 +303,9 @@ func (d Description) EnsureLength() (Description, sdk.Error) {
 // ABCIValidatorUpdate returns an abci.ValidatorUpdate from a staking validator type
 // with the full validator power
 func (v Validator) ABCIValidatorUpdate() abci.ValidatorUpdate {
+	pub := sdk.MustGetPubKeyFromBech32(sdk.Bech32PubKeyTypeConsPub, v.ConsPubKey)
 	return abci.ValidatorUpdate{
-		PubKey: tmtypes.TM2PB.PubKey(v.ConsPubKey),
+		PubKey: tmtypes.TM2PB.PubKey(pub),
 		Power:  v.ConsensusPower(),
 	}
 }
@@ -355,15 +313,16 @@ func (v Validator) ABCIValidatorUpdate() abci.ValidatorUpdate {
 // ABCIValidatorUpdateZero returns an abci.ValidatorUpdate from a staking validator type
 // with zero power used for validator updates.
 func (v Validator) ABCIValidatorUpdateZero() abci.ValidatorUpdate {
+	pub := sdk.MustGetPubKeyFromBech32(sdk.Bech32PubKeyTypeConsPub, v.ConsPubKey)
 	return abci.ValidatorUpdate{
-		PubKey: tmtypes.TM2PB.PubKey(v.ConsPubKey),
+		PubKey: tmtypes.TM2PB.PubKey(pub),
 		Power:  0,
 	}
 }
 
 // SetInitialCommission attempts to set a validator's initial commission. An
 // error is returned if the commission is invalid.
-func (v Validator) SetInitialCommission(commission Commission) (Validator, sdk.Error) {
+func (v Validator) SetInitialCommission(commission Commission) (Validator, error) {
 	if err := commission.Validate(); err != nil {
 		return v, err
 	}
@@ -394,7 +353,7 @@ func (v Validator) TokensFromSharesRoundUp(shares sdk.Dec) sdk.Dec {
 // SharesFromTokens returns the shares of a delegation given a bond amount
 // It returns an error if the validator has no tokens
 // No usage found in All Places
-func (v Validator) SharesFromTokens(amt sdk.Int) (sdk.Dec, sdk.Error) {
+func (v Validator) SharesFromTokens(amt sdk.Int) (sdk.Dec, error) {
 	return sdk.ZeroDec(), nil
 	//if v.Tokens.IsZero() {
 	//	return sdk.ZeroDec(), ErrInsufficientShares(DefaultCodespace)
@@ -406,7 +365,7 @@ func (v Validator) SharesFromTokens(amt sdk.Int) (sdk.Dec, sdk.Error) {
 // SharesFromTokensTruncated returns the truncated shares of a delegation given a bond amount
 // It returns an error if the validator has no tokens
 // No usage found in All Places
-func (v Validator) SharesFromTokensTruncated(amt sdk.Int) (sdk.Dec, sdk.Error) {
+func (v Validator) SharesFromTokensTruncated(amt sdk.Int) (sdk.Dec, error) {
 	return sdk.ZeroDec(), nil
 	//if v.Tokens.IsZero() {
 	//	return sdk.ZeroDec(), ErrInsufficientShares(DefaultCodespace)
@@ -443,8 +402,8 @@ func (v Validator) IsJailed() bool                { return v.Jailed }
 func (v Validator) GetMoniker() string            { return v.Description.Moniker }
 func (v Validator) GetStatus() sdk.BondStatus     { return v.Status }
 func (v Validator) GetOperator() sdk.ValAddress   { return v.OperatorAddress }
-func (v Validator) GetConsPubKey() crypto.PubKey  { return v.ConsPubKey }
-func (v Validator) GetConsAddr() sdk.ConsAddress  { return sdk.ConsAddress(v.ConsPubKey.Address()) }
+func (v Validator) GetConsPubKey() crypto.PubKey  { return sdk.MustGetPubKeyFromBech32(sdk.Bech32PubKeyTypeConsPub, v.ConsPubKey) }
+func (v Validator) GetConsAddr() sdk.ConsAddress  { return sdk.ConsAddress(sdk.MustGetPubKeyFromBech32(sdk.Bech32PubKeyTypeConsPub, v.ConsPubKey).Address()) }
 func (v Validator) GetTokens() sdk.Int            { return v.Tokens }
 func (v Validator) GetBondedTokens() sdk.Int      { return sdk.ZeroInt() }
 func (v Validator) GetConsensusPower() int64      { return v.ConsensusPower() }

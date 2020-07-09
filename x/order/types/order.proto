@@ -1,0 +1,43 @@
+syntax = "proto3";
+package okchain.order;
+
+import "gogoproto/gogo.proto";
+import "cosmos_proto/cosmos.proto";
+import "cosmos/cosmos.proto";
+
+option go_package = "github.com/okex/okchain/x/order/types";
+
+message MsgNewOrder {
+    option (gogoproto.equal) = true;
+    bytes sender = 1 [(gogoproto.casttype) = "github.com/cosmos/cosmos-sdk/types.AccAddress"];
+    string product = 2;
+    string side = 3;
+    string price = 4 [(gogoproto.customtype) = "github.com/cosmos/cosmos-sdk/types.Dec", (gogoproto.nullable) = false];
+    string quantity = 5 [(gogoproto.customtype) = "github.com/cosmos/cosmos-sdk/types.Dec", (gogoproto.nullable) = false];
+}
+
+message MsgCancelOrder {
+    option (gogoproto.equal) = true;
+    bytes sender = 1 [(gogoproto.casttype) = "github.com/cosmos/cosmos-sdk/types.AccAddress"];
+    string order_iD = 2;
+}
+
+message OrderItem {
+    option (gogoproto.equal) = true;
+    string product = 1;
+    string side = 2;
+    string price = 3 [(gogoproto.customtype) = "github.com/cosmos/cosmos-sdk/types.Dec", (gogoproto.nullable) = false];
+    string quantity = 4 [(gogoproto.customtype) = "github.com/cosmos/cosmos-sdk/types.Dec", (gogoproto.nullable) = false];
+}
+
+message MsgNewOrders {
+    option (gogoproto.equal) = true;
+    bytes sender = 1 [(gogoproto.casttype) = "github.com/cosmos/cosmos-sdk/types.AccAddress"];
+    repeated OrderItem order_items = 2 [(gogoproto.nullable) = false];
+}
+
+message MsgCancelOrders {
+    option (gogoproto.equal) = true;
+    bytes sender = 1 [(gogoproto.casttype) = "github.com/cosmos/cosmos-sdk/types.AccAddress"];
+    repeated string order_iDs = 2;
+}

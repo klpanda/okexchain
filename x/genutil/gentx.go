@@ -5,12 +5,12 @@ package genutil
 import (
 	"encoding/json"
 	"fmt"
+	bankexported "github.com/cosmos/cosmos-sdk/x/bank/exported"
 
 	abci "github.com/tendermint/tendermint/abci/types"
 
 	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	authexported "github.com/cosmos/cosmos-sdk/x/auth/exported"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	"github.com/cosmos/cosmos-sdk/x/genutil/types"
 	stakingtypes "github.com/okex/okchain/x/staking/types"
@@ -18,7 +18,7 @@ import (
 
 // ValidateAccountInGenesis checks that the provided key has sufficient coins in the genesis accounts
 func ValidateAccountInGenesis(appGenesisState map[string]json.RawMessage,
-	genAccIterator types.GenesisAccountsIterator,
+	genBalsIterator types.GenesisBalancesIterator,
 	key sdk.AccAddress, coins sdk.Coins, cdc *codec.Codec) error {
 
 	accountIsInGenesis := false
@@ -34,10 +34,10 @@ func ValidateAccountInGenesis(appGenesisState map[string]json.RawMessage,
 	cdc.MustUnmarshalJSON(genUtilDataBz, &genesisState)
 
 	var err error
-	genAccIterator.IterateGenesisAccounts(cdc, appGenesisState,
-		func(acc authexported.Account) (stop bool) {
-			accAddress := acc.GetAddress()
-			accCoins := acc.GetCoins()
+	genBalsIterator.IterateGenesisBalances(cdc, appGenesisState,
+		func(bal bankexported.GenesisBalance) (stop bool) {
+			accAddress := bal.GetAddress()
+			accCoins := bal.GetCoins()
 
 			// Ensure that account is in genesis
 			if accAddress.Equals(key) {
@@ -76,7 +76,7 @@ func DeliverGenTxs(ctx sdk.Context, cdc *codec.Codec, genTxs []json.RawMessage,
 	for _, genTx := range genTxs {
 		var tx authtypes.StdTx
 		cdc.MustUnmarshalJSON(genTx, &tx)
-		bz := cdc.MustMarshalBinaryLengthPrefixed(tx)
+		bz := cdc.MustMarshalBinaryBare(tx)
 		res := deliverTx(abci.RequestDeliverTx{Tx: bz})
 		if !res.IsOK() {
 			panic(res.Log)

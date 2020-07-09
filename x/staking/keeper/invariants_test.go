@@ -20,7 +20,8 @@ func TestDelegatorAddSharesInvariant(t *testing.T) {
 
 	// create validator
 	msgCreateValidator1 := NewTestMsgCreateValidator(vAddr1, vPk1, types.DefaultMinSelfDelegation)
-	validator1 := types.NewValidator(msgCreateValidator1.ValidatorAddress, msgCreateValidator1.PubKey,
+	validator1 := types.NewValidator(msgCreateValidator1.ValidatorAddress,
+		sdk.MustGetPubKeyFromBech32(sdk.Bech32PubKeyTypeConsPub, msgCreateValidator1.PubKey),
 		msgCreateValidator1.Description, msgCreateValidator1.MinSelfDelegation.Amount)
 	k.SetValidator(ctx, validator1)
 	k.SetValidatorByConsAddr(ctx, validator1)
@@ -31,7 +32,8 @@ func TestDelegatorAddSharesInvariant(t *testing.T) {
 	require.Nil(t, err)
 
 	msgCreateValidator2 := NewTestMsgCreateValidator(vAddr2, vPk2, types.DefaultMinSelfDelegation)
-	validator2 := types.NewValidator(msgCreateValidator2.ValidatorAddress, msgCreateValidator2.PubKey,
+	validator2 := types.NewValidator(msgCreateValidator2.ValidatorAddress,
+		sdk.MustGetPubKeyFromBech32(sdk.Bech32PubKeyTypeConsPub, msgCreateValidator2.PubKey),
 		msgCreateValidator2.Description, msgCreateValidator2.MinSelfDelegation.Amount)
 	k.SetValidator(ctx, validator2)
 	k.SetValidatorByConsAddr(ctx, validator2)

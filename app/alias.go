@@ -6,7 +6,7 @@ import (
 
 var (
 	// MakeCodec is the function alias for codec maker
-	MakeCodec = protocol.MakeCodec
+	MakeEncodingConfig = protocol.MakeEncodingConfig
 	// ModuleBasics is the variable alias for NewBasicManager
 	ModuleBasics = protocol.ModuleBasics
 	// DefaultCLIHome is the directory for okchaincli

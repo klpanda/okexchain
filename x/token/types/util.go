@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/cosmos/cosmos-sdk/x/auth"
 	"github.com/tendermint/tendermint/crypto"
 )
 
@@ -42,31 +41,31 @@ type BaseAccount struct {
 	Sequence      uint64         `json:"sequence"`
 }
 
-type DecAccount struct {
-	Address       sdk.AccAddress `json:"address"`
-	Coins         sdk.DecCoins   `json:"coins"`
-	PubKey        crypto.PubKey  `json:"public_key"`
-	AccountNumber uint64         `json:"account_number"`
-	Sequence      uint64         `json:"sequence"`
-}
+//type DecAccount struct {
+//	Address       sdk.AccAddress `json:"address"`
+//	Coins         sdk.DecCoins   `json:"coins"`
+//	PubKey        crypto.PubKey  `json:"public_key"`
+//	AccountNumber uint64         `json:"account_number"`
+//	Sequence      uint64         `json:"sequence"`
+//}
 
 // String implements fmt.Stringer
-func (acc DecAccount) String() string {
-	var pubkey string
-
-	if acc.PubKey != nil {
-		pubkey = sdk.MustBech32ifyAccPub(acc.PubKey)
-	}
-
-	return fmt.Sprintf(`Account:
- Address:       %s
- Pubkey:        %s
- Coins:         %v
- AccountNumber: %d
- Sequence:      %d`,
-		acc.Address, pubkey, acc.Coins, acc.AccountNumber, acc.Sequence,
-	)
-}
+//func (acc DecAccount) String() string {
+//	var pubkey string
+//
+//	if acc.PubKey != nil {
+//		pubkey = sdk.MustBech32ifyPubKey(sdk.Bech32PubKeyTypeAccPub, acc.PubKey)
+//	}
+//
+//	return fmt.Sprintf(`Account:
+// Address:       %s
+// Pubkey:        %s
+// Coins:         %v
+// AccountNumber: %d
+// Sequence:      %d`,
+//		acc.Address, pubkey, acc.Coins, acc.AccountNumber, acc.Sequence,
+//	)
+//}
 
 func ValidOriginalSymbol(name string) bool {
 	if notAllowedOriginSymbol.MatchString(name) {
@@ -98,41 +97,6 @@ func StrToTransfers(str string) (transfers []TransferUnit, err error) {
 		transfers = append(transfers, t)
 	}
 	return transfers, nil
-}
-
-func BaseAccountToDecAccount(account auth.BaseAccount) DecAccount {
-	var decCoins sdk.DecCoins
-	for _, coin := range account.Coins {
-		dec := coin.Amount
-		decCoin := sdk.NewDecCoinFromDec(coin.Denom, dec)
-		decCoins = append(decCoins, decCoin)
-	}
-	decAccount := DecAccount{
-		Address:       account.Address,
-		PubKey:        account.PubKey,
-		Coins:         decCoins,
-		AccountNumber: account.AccountNumber,
-		Sequence:      account.Sequence,
-	}
-	return decAccount
-}
-
-func (acc *DecAccount) ToBaseAccount() *auth.BaseAccount {
-	decAccount := auth.BaseAccount{
-		Address:       acc.Address,
-		PubKey:        acc.PubKey,
-		Coins:         acc.Coins,
-		AccountNumber: acc.AccountNumber,
-		Sequence:      acc.Sequence,
-	}
-	return &decAccount
-}
-
-func DecAccountArrToBaseAccountArr(decAccounts []DecAccount) (baseAccountArr []auth.Account) {
-	for _, decAccount := range decAccounts {
-		baseAccountArr = append(baseAccountArr, decAccount.ToBaseAccount())
-	}
-	return baseAccountArr
 }
 
 func MergeCoinInfo(availableCoins, lockedCoins sdk.DecCoins) (coinsInfo CoinsInfo) {

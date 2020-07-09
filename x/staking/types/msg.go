@@ -2,6 +2,7 @@ package types
 
 import (
 	"encoding/json"
+	sdkerror "github.com/cosmos/cosmos-sdk/types/errors"
 
 	"github.com/tendermint/tendermint/crypto"
 
@@ -15,16 +16,6 @@ var (
 )
 
 //______________________________________________________________________
-
-// MsgCreateValidator - struct for bonding transactions
-type MsgCreateValidator struct {
-	Description Description `json:"description" yaml:"description"`
-	//Commission        CommissionRates `json:"commission" yaml:"commission"`
-	MinSelfDelegation sdk.DecCoin    `json:"min_self_delegation" yaml:"min_self_delegation"`
-	DelegatorAddress  sdk.AccAddress `json:"delegator_address" yaml:"delegator_address"`
-	ValidatorAddress  sdk.ValAddress `json:"validator_address" yaml:"validator_address"`
-	PubKey            crypto.PubKey  `json:"pubkey" yaml:"pubkey"`
-}
 
 type msgCreateValidatorJSON struct {
 	Description Description `json:"description" yaml:"description"`
@@ -41,12 +32,15 @@ func NewMsgCreateValidator(
 	valAddr sdk.ValAddress, pubKey crypto.PubKey,
 	description Description, minSelfDelegation sdk.DecCoin,
 ) MsgCreateValidator {
-
+	var pkStr string
+	if pubKey != nil {
+		pkStr = sdk.MustBech32ifyPubKey(sdk.Bech32PubKeyTypeConsPub, pubKey)
+	}
 	return MsgCreateValidator{
 		Description:       description,
 		DelegatorAddress:  sdk.AccAddress(valAddr),
 		ValidatorAddress:  valAddr,
-		PubKey:            pubKey,
+		PubKey:            pkStr,
 		MinSelfDelegation: minSelfDelegation,
 	}
 }
@@ -75,7 +69,7 @@ func (msg MsgCreateValidator) MarshalJSON() ([]byte, error) {
 		Description:       msg.Description,
 		DelegatorAddress:  msg.DelegatorAddress,
 		ValidatorAddress:  msg.ValidatorAddress,
-		PubKey:            sdk.MustBech32ifyConsPub(msg.PubKey),
+		PubKey:            msg.PubKey,
 		MinSelfDelegation: msg.MinSelfDelegation,
 	})
 }
@@ -90,11 +84,7 @@ func (msg *MsgCreateValidator) UnmarshalJSON(bz []byte) error {
 	msg.Description = msgCreateValJSON.Description
 	msg.DelegatorAddress = msgCreateValJSON.DelegatorAddress
 	msg.ValidatorAddress = msgCreateValJSON.ValidatorAddress
-	var err error
-	msg.PubKey, err = sdk.GetConsPubKeyBech32(msgCreateValJSON.PubKey)
-	if err != nil {
-		return err
-	}
+	msg.PubKey = msgCreateValJSON.PubKey
 	msg.MinSelfDelegation = msgCreateValJSON.MinSelfDelegation
 
 	return nil
@@ -107,7 +97,7 @@ func (msg MsgCreateValidator) GetSignBytes() []byte {
 }
 
 // ValidateBasic gives a quick validity check
-func (msg MsgCreateValidator) ValidateBasic() sdk.Error {
+func (msg MsgCreateValidator) ValidateBasic() error {
 	// note that unmarshaling from bech32 ensures either empty or valid
 	if msg.DelegatorAddress.Empty() {
 		return ErrNilDelegatorAddr(DefaultCodespace)
@@ -116,22 +106,16 @@ func (msg MsgCreateValidator) ValidateBasic() sdk.Error {
 		return ErrNilValidatorAddr(DefaultCodespace)
 	}
 	if !sdk.AccAddress(msg.ValidatorAddress).Equals(msg.DelegatorAddress) {
-		return ErrBadValidatorAddr(DefaultCodespace)
+		return sdkerror.ErrInvalidAddress
 	}
 	if msg.MinSelfDelegation.Amount.LTE(sdk.ZeroDec()) || !msg.MinSelfDelegation.IsValid() {
 		return ErrMinSelfDelegationInvalid(DefaultCodespace)
 	}
 	if msg.Description == (Description{}) {
-		return sdk.NewError(DefaultCodespace, CodeInvalidInput, "description must be included")
+		return sdkerror.New(DefaultCodespace, CodeInvalidInput, "description must be included")
 	}
 
 	return nil
-}
-
-// MsgEditValidator - struct for editing a validator
-type MsgEditValidator struct {
-	Description
-	ValidatorAddress sdk.ValAddress `json:"address" yaml:"address"`
 }
 
 // NewMsgEditValidator creates a msg of edit-validator
@@ -156,13 +140,13 @@ func (msg MsgEditValidator) GetSignBytes() []byte {
 }
 
 // ValidateBasic gives a quick validity check
-func (msg MsgEditValidator) ValidateBasic() sdk.Error {
+func (msg MsgEditValidator) ValidateBasic() error {
 	if msg.ValidatorAddress.Empty() {
-		return sdk.NewError(DefaultCodespace, CodeInvalidInput, "nil validator address")
+		return sdkerror.New(DefaultCodespace, CodeInvalidInput, "nil validator address")
 	}
 
 	if msg.Description == (Description{}) {
-		return sdk.NewError(DefaultCodespace, CodeInvalidInput, "transaction must include some information to modify")
+		return sdkerror.New(DefaultCodespace, CodeInvalidInput, "transaction must include some information to modify")
 	}
 
 	return nil

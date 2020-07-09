@@ -1,7 +1,7 @@
 package dex
 
 import (
-	cliLcd "github.com/cosmos/cosmos-sdk/client/lcd"
+	"github.com/cosmos/cosmos-sdk/server/api"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 
 	"testing"
@@ -14,41 +14,41 @@ import (
 )
 
 func TestAppModule_Smoke(t *testing.T) {
-	_, _, spKeeper, dexKeeper, ctx := getMockTestCaseEvn(t)
+	_, _, spKeeper, dexKeeper, ctx, cliCtx := getMockTestCaseEvn(t)
 
-	//func NewAppModule(version ProtocolVersionType, keeper Keeper, supplyKeeper SupplyKeeper) AppModule {
-	appModule := NewAppModule(version.CurrentProtocolVersion, dexKeeper, spKeeper)
+	//func NewAppModule(version ProtocolVersionType, keeper Keeper, supplyKeeper BankKeeper) AppModule {
+	appModule := NewAppModule(version.CurrentProtocolVersion, dexKeeper, spKeeper, spKeeper)
 
 	// Const Info
 	require.True(t, appModule.Name() == ModuleName)
-	require.True(t, appModule.Route() == RouterKey)
+	require.True(t, appModule.Route().Path() == RouterKey)
 	require.True(t, appModule.QuerierRoute() == QuerierRoute)
-	require.True(t, appModule.GetQueryCmd(types.ModuleCdc) != nil)
-	require.True(t, appModule.GetTxCmd(types.ModuleCdc) != nil)
+	require.True(t, appModule.GetQueryCmd(cliCtx) != nil)
+	require.True(t, appModule.GetTxCmd(cliCtx) != nil)
 
 	// RegisterCodec
 	appModule.RegisterCodec(codec.New())
 
 	appModule.RegisterInvariants(MockInvariantRegistry{})
-	rs := cliLcd.NewRestServer(types.ModuleCdc, nil)
-	appModule.RegisterRESTRoutes(rs.CliCtx, rs.Mux)
+	rs := api.New(cliCtx, nil)
+	appModule.RegisterRESTRoutes(rs.ClientCtx, rs.Router)
 	handler := appModule.NewHandler()
 	require.True(t, handler != nil)
 	querior := appModule.NewQuerierHandler()
 	require.True(t, querior != nil)
 
 	// Initialization for genesis
-	defaultGen := appModule.DefaultGenesis()
-	err := appModule.ValidateGenesis(defaultGen)
+	defaultGen := appModule.DefaultGenesis(cliCtx.Codec)
+	err := appModule.ValidateGenesis(cliCtx.Codec, defaultGen)
 	require.True(t, err == nil)
 
 	illegalData := []byte{}
-	err = appModule.ValidateGenesis(illegalData)
+	err = appModule.ValidateGenesis(cliCtx.Codec, illegalData)
 	require.Error(t, err)
 
-	validatorUpdates := appModule.InitGenesis(ctx, defaultGen)
+	validatorUpdates := appModule.InitGenesis(ctx, cliCtx.Codec, defaultGen)
 	require.True(t, len(validatorUpdates) == 0)
-	exportedGenesis := appModule.ExportGenesis(ctx)
+	exportedGenesis := appModule.ExportGenesis(ctx, cliCtx.Codec)
 	require.True(t, exportedGenesis != nil)
 
 	// Begin Block

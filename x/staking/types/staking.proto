@@ -1,0 +1,295 @@
+syntax = "proto3";
+package okchain.staking;
+
+import "gogoproto/gogo.proto";
+import "cosmos_proto/cosmos.proto";
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/duration.proto";
+import "cosmos/cosmos.proto";
+
+option go_package = "github.com/okex/okchain/x/staking/types";
+
+// Description defines a validator description.
+message Description {
+  option (gogoproto.equal) = true;
+//  option (gogoproto.goproto_stringer) = false;
+
+  string moniker = 1;
+  string identity = 2;
+  string website = 3;
+  string details = 4;
+}
+
+// MsgCreateValidator defines an SDK message for creating a new validator.
+message MsgCreateValidator {
+  option (gogoproto.equal) = true;
+
+  Description     description = 1 [(gogoproto.nullable) = false];
+  cosmos.DecCoin  min_self_delegation = 2 [
+    (gogoproto.moretags) = "yaml:\"min_self_delegation\"",
+    (gogoproto.nullable) = false
+  ];
+  bytes delegator_address = 3 [
+    (gogoproto.casttype) = "github.com/cosmos/cosmos-sdk/types.AccAddress",
+    (gogoproto.moretags) = "yaml:\"delegator_address\""
+  ];
+  bytes validator_address = 4 [
+    (gogoproto.casttype) = "github.com/cosmos/cosmos-sdk/types.ValAddress",
+    (gogoproto.moretags) = "yaml:\"validator_address\""
+  ];
+  string             pub_key = 5;
+}
+
+// MsgEditValidator defines an SDK message for editing an existing validator.
+message MsgEditValidator {
+  option (gogoproto.equal) = true;
+
+  Description description = 1 [(gogoproto.nullable) = false];
+  bytes       validator_address = 2 [
+    (gogoproto.casttype) = "github.com/cosmos/cosmos-sdk/types.ValAddress",
+    (gogoproto.moretags) = "yaml:\"validator_addresses\""
+  ];
+}
+
+message MsgDeposit {
+  option (gogoproto.equal) = true;
+  bytes delegator_address = 1 [
+    (gogoproto.casttype) = "github.com/cosmos/cosmos-sdk/types.AccAddress",
+    (gogoproto.moretags) = "yaml:\"delegator_address\""
+  ];
+  cosmos.DecCoin  amount = 2 [
+    (gogoproto.moretags) = "yaml:\"amount\"",
+    (gogoproto.nullable) = false
+  ];
+}
+
+message MsgWithdraw {
+  option (gogoproto.equal) = true;
+  bytes delegator_address = 1 [
+    (gogoproto.casttype) = "github.com/cosmos/cosmos-sdk/types.AccAddress",
+    (gogoproto.moretags) = "yaml:\"delegator_address\""
+  ];
+  cosmos.DecCoin  amount = 2 [
+    (gogoproto.moretags) = "yaml:\"amount\"",
+    (gogoproto.nullable) = false
+  ];
+}
+
+message MsgAddShares {
+  option (gogoproto.equal) = true;
+  bytes del_addr = 1 [
+    (gogoproto.casttype) = "github.com/cosmos/cosmos-sdk/types.AccAddress",
+    (gogoproto.moretags) = "yaml:\"delegator_address\""
+  ];
+  repeated bytes val_addrs = 2 [
+    (gogoproto.casttype) = "github.com/cosmos/cosmos-sdk/types.ValAddress",
+    (gogoproto.moretags) = "yaml:\"validator_addresses\""
+  ];
+}
+
+message MsgBindProxy {
+  option (gogoproto.equal) = true;
+  bytes del_addr = 1 [
+    (gogoproto.casttype) = "github.com/cosmos/cosmos-sdk/types.AccAddress",
+    (gogoproto.moretags) = "yaml:\"delegator_address\""
+  ];
+  bytes proxy_address = 2 [
+    (gogoproto.casttype) = "github.com/cosmos/cosmos-sdk/types.AccAddress",
+    (gogoproto.moretags) = "yaml:\"proxy_address\""
+  ];
+}
+
+message MsgUnbindProxy {
+  option (gogoproto.equal) = true;
+  bytes del_addr = 1 [
+    (gogoproto.casttype) = "github.com/cosmos/cosmos-sdk/types.AccAddress",
+    (gogoproto.moretags) = "yaml:\"delegator_address\""
+  ];
+}
+
+message MsgRegProxy {
+  option (gogoproto.equal) = true;
+  bytes proxy_address = 1 [
+    (gogoproto.casttype) = "github.com/cosmos/cosmos-sdk/types.AccAddress",
+    (gogoproto.moretags) = "yaml:\"proxy_address\""
+  ];
+  bool reg = 2 [(gogoproto.moretags) = "yaml:\"reg\""];
+}
+
+message MsgDestroyValidator {
+  option (gogoproto.equal) = true;
+  bytes del_addr = 1 [
+    (gogoproto.casttype) = "github.com/cosmos/cosmos-sdk/types.AccAddress",
+    (gogoproto.moretags) = "yaml:\"delegator_address\""
+  ];
+}
+
+// CommissionRates defines the initial commission rates to be used for creating
+// a validator.
+message CommissionRates {
+  option (gogoproto.equal) = true;
+//  option (gogoproto.goproto_stringer) = false;
+
+  string rate = 1 [
+    (gogoproto.customtype) = "github.com/cosmos/cosmos-sdk/types.Dec",
+    (gogoproto.nullable) = false
+  ];
+  string max_rate = 2 [
+    (gogoproto.moretags) = "yaml:\"max_rate\"",
+    (gogoproto.customtype) = "github.com/cosmos/cosmos-sdk/types.Dec",
+    (gogoproto.nullable) = false
+  ];
+  string max_change_rate = 3 [
+    (gogoproto.moretags) = "yaml:\"max_change_rate\"",
+    (gogoproto.customtype) = "github.com/cosmos/cosmos-sdk/types.Dec",
+    (gogoproto.nullable) = false
+  ];
+}
+
+// Commission defines a commission parameters for a given validator.
+message Commission {
+  option (gogoproto.equal) = true;
+  option (gogoproto.goproto_stringer) = false;
+
+  CommissionRates commission_rates = 1 [(gogoproto.embed) = true, (gogoproto.nullable) = false];
+  google.protobuf.Timestamp update_time = 2 [
+    (gogoproto.nullable) = false,
+    (gogoproto.stdtime) = true,
+    (gogoproto.moretags) = "yaml:\"update_time\""
+  ];
+}
+
+// Validator defines the total amount of bond shares and their exchange rate to
+// coins. Slashing results in a decrease in the exchange rate, allowing correct
+// calculation of future undelegations without iterating over delegators.
+// When coins are delegated to this validator, the validator is credited with a
+// delegation whose number of bond shares is based on the amount of coins
+// delegated divided by the current exchange rate. Voting power can be
+// calculated as total bonded shares multiplied by exchange rate.
+message Validator {
+  option (gogoproto.equal) = true;
+  option (gogoproto.goproto_stringer) = false;
+  option (gogoproto.goproto_getters) = false;
+
+  bytes operator_address = 1 [
+    (gogoproto.casttype) = "github.com/cosmos/cosmos-sdk/types.ValAddress",
+    (gogoproto.moretags) = "yaml:\"operator_address\""
+  ];
+  string cons_pubKey = 2 [(gogoproto.moretags) = "yaml:\"consensus_pubkey\""];
+  bool   jailed = 3;
+  int32  status = 4 [(gogoproto.casttype) = "github.com/cosmos/cosmos-sdk/types.BondStatus"];
+  string tokens = 5 [
+    (gogoproto.customtype) = "github.com/cosmos/cosmos-sdk/types.Int",
+    (gogoproto.nullable) = false
+  ];
+  string delegator_shares = 6 [
+    (gogoproto.moretags) = "yaml:\"delegator_shares\"",
+    (gogoproto.customtype) = "github.com/cosmos/cosmos-sdk/types.Dec",
+    (gogoproto.nullable) = false
+  ];
+  Description description = 7 [(gogoproto.nullable) = false];
+  int64       unbonding_height = 8 [(gogoproto.moretags) = "yaml:\"unbonding_height\""];
+  google.protobuf.Timestamp unbonding_completion_time = 9 [
+    (gogoproto.nullable) = false,
+    (gogoproto.stdtime) = true,
+    (gogoproto.moretags) = "yaml:\"unbonding_time\""
+  ];
+  Commission commission = 10 [(gogoproto.nullable) = false];
+  string     min_self_delegation = 11 [
+    (gogoproto.moretags) = "yaml:\"min_self_delegation\"",
+    (gogoproto.customtype) = "github.com/cosmos/cosmos-sdk/types.Dec",
+    (gogoproto.nullable) = false
+  ];
+}
+
+message Delegator {
+  option (gogoproto.equal) = true;
+//  option (gogoproto.goproto_stringer) = false;
+  option (gogoproto.goproto_getters) = false;
+
+  bytes delegator_address = 1 [
+    (gogoproto.casttype) = "github.com/cosmos/cosmos-sdk/types.AccAddress",
+    (gogoproto.moretags) = "yaml:\"delegator_address\""
+  ];
+  repeated bytes validator_addresses = 2 [
+    (gogoproto.casttype) = "github.com/cosmos/cosmos-sdk/types.ValAddress",
+    (gogoproto.moretags) = "yaml:\"validator_addresses\""
+  ];
+  string shares = 3 [
+    (gogoproto.moretags) = "yaml:\"shares\"",
+    (gogoproto.customtype) = "github.com/cosmos/cosmos-sdk/types.Dec",
+    (gogoproto.nullable) = false
+  ];
+  string tokens = 4 [
+    (gogoproto.moretags) = "yaml:\"tokens\"",
+    (gogoproto.customtype) = "github.com/cosmos/cosmos-sdk/types.Dec",
+    (gogoproto.nullable) = false
+  ];
+  bool IsProxy = 5;
+  string total_delegated_tokens = 6 [
+    (gogoproto.moretags) = "yaml:\"total_delegated_tokens\"",
+    (gogoproto.customtype) = "github.com/cosmos/cosmos-sdk/types.Dec",
+    (gogoproto.nullable) = false
+  ];
+  bytes proxy_address = 7 [
+    (gogoproto.casttype) = "github.com/cosmos/cosmos-sdk/types.AccAddress",
+    (gogoproto.moretags) = "yaml:\"proxy_address\""
+  ];
+}
+
+message UndelegationInfo {
+  option (gogoproto.equal) = true;
+  option (gogoproto.goproto_stringer) = false;
+  option (gogoproto.goproto_getters) = false;
+
+  bytes delegator_address = 1 [
+    (gogoproto.casttype) = "github.com/cosmos/cosmos-sdk/types.AccAddress",
+    (gogoproto.moretags) = "yaml:\"delegator_address\""
+  ];
+  string quantity = 2 [
+    (gogoproto.moretags) = "yaml:\"quantity\"",
+    (gogoproto.customtype) = "github.com/cosmos/cosmos-sdk/types.Dec",
+    (gogoproto.nullable) = false
+  ];
+  google.protobuf.Timestamp completion_time = 3 [
+    (gogoproto.nullable) = false,
+    (gogoproto.stdtime) = true,
+    (gogoproto.moretags) = "yaml:\"completion_time\""
+  ];
+}
+
+
+// Params defines the high level settings for staking
+message Params {
+  option (gogoproto.equal) = true;
+  option (gogoproto.goproto_stringer) = false;
+  option (gogoproto.goproto_getters) = false;
+
+  // time duration of unbonding
+  google.protobuf.Duration unbonding_time = 1 [
+    (gogoproto.nullable) = false,
+    (gogoproto.stdduration) = true,
+    (gogoproto.moretags) = "yaml:\"unbonding_time\""
+  ];
+
+  // note: we need to be a bit careful about potential overflow here, since this is user-determined
+  // maximum number of validators (max uint16 = 65535)
+  uint32 max_validators = 2 [(gogoproto.moretags) = "yaml:\"max_bonded_validators\""];
+  // epoch for validator update
+  uint32 epoch = 3 [(gogoproto.moretags) = "yaml:\"epoch\""];
+  uint32 max_vals_to_add_shares = 4 [(gogoproto.moretags) = "yaml:\"max_validators_to_add_shares\""];
+  // bondable coin denomination
+  string bond_denom = 5 [(gogoproto.moretags) = "yaml:\"bond_denom\""];
+  // limited amount of delegate
+  string min_delegation = 6 [
+    (gogoproto.moretags) = "yaml:\"min_delegation\"",
+    (gogoproto.customtype) = "github.com/cosmos/cosmos-sdk/types.Dec",
+    (gogoproto.nullable) = false
+  ];
+  // validator's self declared minimum self delegation
+  string min_self_delegation = 7[
+    (gogoproto.moretags) = "yaml:\"min_self_delegation\"",
+    (gogoproto.customtype) = "github.com/cosmos/cosmos-sdk/types.Dec",
+    (gogoproto.nullable) = false
+  ];
+}

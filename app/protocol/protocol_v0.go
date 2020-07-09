@@ -3,22 +3,37 @@ package protocol
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/cosmos/cosmos-sdk/x/auth/ante"
+	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
+	slashingtypes "github.com/cosmos/cosmos-sdk/x/slashing/types"
+	govtypes "github.com/okex/okchain/x/gov/types"
+	ordertypes "github.com/okex/okchain/x/order/types"
 	"os"
 
 	"github.com/cosmos/cosmos-sdk/baseapp"
+	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/codec"
+	"github.com/cosmos/cosmos-sdk/codec/types"
 	"github.com/cosmos/cosmos-sdk/server"
 	"github.com/cosmos/cosmos-sdk/server/config"
 	"github.com/cosmos/cosmos-sdk/simapp"
+	"github.com/cosmos/cosmos-sdk/std"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/module"
 	"github.com/cosmos/cosmos-sdk/x/auth"
+	authkeeper "github.com/cosmos/cosmos-sdk/x/auth/keeper"
+	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	"github.com/cosmos/cosmos-sdk/x/bank"
+	bankkeeper "github.com/cosmos/cosmos-sdk/x/bank/keeper"
 	"github.com/cosmos/cosmos-sdk/x/crisis"
-	"github.com/cosmos/cosmos-sdk/x/genaccounts"
+	crisiskeeper "github.com/cosmos/cosmos-sdk/x/crisis/keeper"
+	crisistypes "github.com/cosmos/cosmos-sdk/x/crisis/types"
+	ibckeeper "github.com/cosmos/cosmos-sdk/x/ibc/keeper"
 	"github.com/cosmos/cosmos-sdk/x/mint"
+	mintkeeper "github.com/cosmos/cosmos-sdk/x/mint/keeper"
+	minttypes "github.com/cosmos/cosmos-sdk/x/mint/types"
 	"github.com/cosmos/cosmos-sdk/x/slashing"
-	"github.com/cosmos/cosmos-sdk/x/supply"
+	slashingkeeper "github.com/cosmos/cosmos-sdk/x/slashing/keeper"
 	"github.com/okex/okchain/app/utils"
 	"github.com/okex/okchain/x/backend"
 	"github.com/okex/okchain/x/common/proto"
@@ -55,7 +70,6 @@ var (
 	// ModuleBasics is in charge of setting up basic, non-dependant module elements,
 	// such as codec registration and genesis verification
 	ModuleBasics = module.NewBasicManager(
-		genaccounts.AppModuleBasic{},
 		genutil.AppModuleBasic{},
 		auth.AppModuleBasic{},
 		bank.AppModuleBasic{},
@@ -69,7 +83,6 @@ var (
 		params.AppModuleBasic{},
 		crisis.AppModuleBasic{},
 		slashing.AppModuleBasic{},
-		supply.AppModuleBasic{},
 
 		// okchain extended
 		token.AppModuleBasic{},
@@ -84,17 +97,17 @@ var (
 
 	// module account permissions for bankKeeper and supplyKeeper
 	maccPerms = map[string][]string{
-		auth.FeeCollectorName:     nil,
-		distr.ModuleName:          nil,
-		mint.ModuleName:           {supply.Minter},
-		staking.BondedPoolName:    {supply.Burner, supply.Staking},
-		staking.NotBondedPoolName: {supply.Burner, supply.Staking},
-		gov.ModuleName:            nil,
-		token.ModuleName:          {supply.Minter, supply.Burner},
-		order.ModuleName:          nil,
-		backend.ModuleName:        nil,
-		dex.ModuleName:            nil,
-		poolswap.ModuleName:       {supply.Minter, supply.Burner},
+		authtypes.FeeCollectorName: nil,
+		distr.ModuleName:           nil,
+		minttypes.ModuleName:       {authtypes.Minter},
+		staking.BondedPoolName:     {authtypes.Burner, authtypes.Staking},
+		staking.NotBondedPoolName:  {authtypes.Burner, authtypes.Staking},
+		gov.ModuleName:             nil,
+		token.ModuleName:           {authtypes.Minter, authtypes.Burner},
+		order.ModuleName:           nil,
+		backend.ModuleName:         nil,
+		dex.ModuleName:             nil,
+		poolswap.ModuleName:        {authtypes.Minter, authtypes.Burner},
 	}
 )
 
@@ -103,6 +116,7 @@ type ProtocolV0 struct {
 	parent         Parent
 	version        uint64
 	cdc            *codec.Codec
+	appCodec       codec.Marshaler
 	logger         log.Logger
 	invCheckPeriod uint
 
@@ -111,15 +125,14 @@ type ProtocolV0 struct {
 	tkeys map[string]*sdk.TransientStoreKey
 
 	// keepers
-	accountKeeper  auth.AccountKeeper
-	bankKeeper     bank.Keeper
-	supplyKeeper   supply.Keeper
+	accountKeeper  authkeeper.AccountKeeper
+	bankKeeper     bankkeeper.BaseKeeper
 	stakingKeeper  staking.Keeper
-	slashingKeeper slashing.Keeper
-	mintKeeper     mint.Keeper
+	slashingKeeper slashingkeeper.Keeper
+	mintKeeper     mintkeeper.Keeper
 	distrKeeper    distr.Keeper
 	govKeeper      gov.Keeper
-	crisisKeeper   crisis.Keeper
+	crisisKeeper   crisiskeeper.Keeper
 	paramsKeeper   params.Keeper
 	tokenKeeper    token.Keeper
 	dexKeeper      dex.Keeper
@@ -138,6 +151,13 @@ type ProtocolV0 struct {
 
 	// the module manager
 	mm *module.Manager
+}
+
+type EncodingConfig struct {
+	InterfaceRegistry types.InterfaceRegistry
+	Marshaler         codec.Marshaler
+	TxGenerator       client.TxGenerator
+	Amino             *codec.Codec
 }
 
 // NewProtocolV0 creates a new instance of NewProtocolV0
@@ -205,7 +225,7 @@ func (p *ProtocolV0) GetStreamKeeper() stream.Keeper {
 }
 
 // GetCrisisKeeper gets crisis keeper
-func (p *ProtocolV0) GetCrisisKeeper() crisis.Keeper {
+func (p *ProtocolV0) GetCrisisKeeper() crisiskeeper.Keeper {
 	return p.crisisKeeper
 }
 
@@ -220,7 +240,7 @@ func (p *ProtocolV0) GetDistrKeeper() distr.Keeper {
 }
 
 // GetSlashingKeeper gets slashing keeper
-func (p *ProtocolV0) GetSlashingKeeper() slashing.Keeper {
+func (p *ProtocolV0) GetSlashingKeeper() slashingkeeper.Keeper {
 	return p.slashingKeeper
 }
 
@@ -243,7 +263,9 @@ func (p *ProtocolV0) GetTransientStoreKeysMap() map[string]*sdk.TransientStoreKe
 func (p *ProtocolV0) Init() {}
 
 func (p *ProtocolV0) setCodec() {
-	p.cdc = MakeCodec()
+	cfg := MakeEncodingConfig()
+	p.cdc = cfg.Amino
+	p.appCodec = cfg.Marshaler
 }
 
 // produceKeepers initializes all keepers declared in the ProtocolV0 struct
@@ -257,16 +279,16 @@ func (p *ProtocolV0) produceKeepers() {
 
 	// 1.init params keeper and subspaces
 	p.paramsKeeper = params.NewKeeper(
-		p.cdc, p.keys[params.StoreKey], p.tkeys[params.TStoreKey], params.DefaultCodespace,
+		p.appCodec, p.keys[params.StoreKey], p.tkeys[params.TStoreKey],
 	)
-	authSubspace := p.paramsKeeper.Subspace(auth.DefaultParamspace)
-	bankSubspace := p.paramsKeeper.Subspace(bank.DefaultParamspace)
+	authSubspace := p.paramsKeeper.Subspace(authtypes.ModuleName)
+	bankSubspace := p.paramsKeeper.Subspace(banktypes.ModuleName)
 	stakingSubspace := p.paramsKeeper.Subspace(staking.DefaultParamspace)
-	mintSubspace := p.paramsKeeper.Subspace(mint.DefaultParamspace)
+	mintSubspace := p.paramsKeeper.Subspace(minttypes.ModuleName)
 	distrSubspace := p.paramsKeeper.Subspace(distr.DefaultParamspace)
-	slashingSubspace := p.paramsKeeper.Subspace(slashing.DefaultParamspace)
+	slashingSubspace := p.paramsKeeper.Subspace(slashingtypes.DefaultParamspace)
 	govSubspace := p.paramsKeeper.Subspace(gov.DefaultParamspace)
-	crisisSubspace := p.paramsKeeper.Subspace(crisis.DefaultParamspace)
+	crisisSubspace := p.paramsKeeper.Subspace(crisistypes.ModuleName)
 	tokenSubspace := p.paramsKeeper.Subspace(token.DefaultParamspace)
 	orderSubspace := p.paramsKeeper.Subspace(order.DefaultParamspace)
 	upgradeSubspace := p.paramsKeeper.Subspace(upgrade.DefaultParamspace)
@@ -274,43 +296,46 @@ func (p *ProtocolV0) produceKeepers() {
 	swapSubSpace := p.paramsKeeper.Subspace(poolswap.DefaultParamspace)
 
 	// 2.add keepers
-	p.accountKeeper = auth.NewAccountKeeper(p.cdc, p.keys[auth.StoreKey], authSubspace, auth.ProtoBaseAccount)
-	p.bankKeeper = bank.NewBaseKeeper(p.accountKeeper, bankSubspace, bank.DefaultCodespace, p.moduleAccountAddrs())
+	p.accountKeeper = authkeeper.NewAccountKeeper(
+		p.appCodec, p.keys[authtypes.StoreKey], authSubspace, authtypes.ProtoBaseAccount, maccPerms)
+	p.bankKeeper = bankkeeper.NewBaseKeeper(
+		p.appCodec, p.keys[banktypes.StoreKey], p.accountKeeper, bankSubspace, p.moduleAccountAddrs())
 	p.paramsKeeper.SetBankKeeper(p.bankKeeper)
-	p.supplyKeeper = supply.NewKeeper(p.cdc, p.keys[supply.StoreKey], p.accountKeeper, p.bankKeeper, maccPerms)
-	stakingKeeper := staking.NewKeeper(p.cdc, p.keys[staking.StoreKey], p.tkeys[staking.TStoreKey],
-		p.supplyKeeper, stakingSubspace, staking.DefaultCodespace)
+	p.parent.SetParamStore(p.paramsKeeper.Subspace(baseapp.Paramspace).WithKeyTable(std.ConsensusParamsKeyTable()))
+	stakingKeeper := staking.NewKeeper(p.appCodec, p.keys[staking.StoreKey], p.tkeys[staking.TStoreKey],
+		p.accountKeeper, p.bankKeeper, stakingSubspace, staking.DefaultCodespace)
 
 	p.paramsKeeper.SetStakingKeeper(stakingKeeper)
-	p.mintKeeper = mint.NewKeeper(
-		p.cdc, p.keys[mint.StoreKey], mintSubspace, &stakingKeeper, p.supplyKeeper, auth.FeeCollectorName,
+	p.mintKeeper = mintkeeper.NewKeeper(
+		p.appCodec, p.keys[minttypes.StoreKey], mintSubspace, stakingKeeper, p.accountKeeper,
+		p.bankKeeper, authtypes.FeeCollectorName,
 	)
 
 	p.distrKeeper = distr.NewKeeper(p.cdc, p.keys[distr.StoreKey],
-		distrSubspace, &stakingKeeper, p.supplyKeeper,
-		distr.DefaultCodespace, auth.FeeCollectorName, p.moduleAccountAddrs(),
+		distrSubspace, &stakingKeeper, p.accountKeeper, p.bankKeeper,
+		distr.DefaultCodespace, authtypes.FeeCollectorName, p.moduleAccountAddrs(),
 	)
 
-	p.slashingKeeper = slashing.NewKeeper(
-		p.cdc, p.keys[slashing.StoreKey], &stakingKeeper, slashingSubspace, slashing.DefaultCodespace,
+	p.slashingKeeper = slashingkeeper.NewKeeper(
+		p.appCodec, p.keys[slashingtypes.StoreKey], stakingKeeper, slashingSubspace,
 	)
 
-	p.crisisKeeper = crisis.NewKeeper(crisisSubspace, p.invCheckPeriod, p.supplyKeeper, auth.FeeCollectorName)
+	p.crisisKeeper = crisiskeeper.NewKeeper(crisisSubspace, p.invCheckPeriod, p.bankKeeper, authtypes.FeeCollectorName)
 
 	p.tokenKeeper = token.NewKeeper(
-		p.bankKeeper, tokenSubspace, auth.FeeCollectorName, p.supplyKeeper,
+		p.bankKeeper, tokenSubspace, authtypes.FeeCollectorName, p.accountKeeper,
 		p.keys[token.StoreKey], p.keys[token.KeyLock],
 		p.cdc, appConfig.BackendConfig.EnableBackend)
 
-	p.dexKeeper = dex.NewKeeper(auth.FeeCollectorName, p.supplyKeeper, dexSubspace, p.tokenKeeper, &stakingKeeper,
+	p.dexKeeper = dex.NewKeeper(authtypes.FeeCollectorName, p.accountKeeper, dexSubspace, p.tokenKeeper, &stakingKeeper,
 		p.bankKeeper, p.keys[dex.StoreKey], p.keys[dex.TokenPairStoreKey], p.cdc)
 
 	p.orderKeeper = order.NewKeeper(
-		p.tokenKeeper, p.supplyKeeper, p.dexKeeper, orderSubspace, auth.FeeCollectorName,
+		p.tokenKeeper, p.accountKeeper, p.bankKeeper, p.dexKeeper, orderSubspace, authtypes.FeeCollectorName,
 		p.keys[order.OrderStoreKey], p.cdc, appConfig.BackendConfig.EnableBackend, orderMetrics,
 	)
 
-	p.swapKeeper = poolswap.NewKeeper(p.supplyKeeper, p.tokenKeeper, p.cdc, p.keys[poolswap.StoreKey], swapSubSpace)
+	p.swapKeeper = poolswap.NewKeeper(p.bankKeeper, p.tokenKeeper, p.cdc, p.keys[poolswap.StoreKey], swapSubSpace)
 
 	p.streamKeeper = stream.NewKeeper(p.orderKeeper, p.tokenKeeper, &p.dexKeeper, &p.accountKeeper,
 		p.cdc, p.logger, appConfig, streamMetrics)
@@ -330,9 +355,9 @@ func (p *ProtocolV0) produceKeepers() {
 		AddRoute(dex.RouterKey, &p.dexKeeper).
 		AddRoute(upgrade.RouterKey, &p.upgradeKeeper)
 	p.govKeeper = gov.NewKeeper(
-		p.cdc, p.keys[gov.StoreKey], p.paramsKeeper, govSubspace,
-		p.supplyKeeper, &stakingKeeper, gov.DefaultCodespace, govRouter,
-		p.bankKeeper, govProposalHandlerRouter, auth.FeeCollectorName,
+		p.appCodec, p.keys[gov.StoreKey], govSubspace.WithKeyTable(govtypes.ParamKeyTable()),
+		p.accountKeeper, p.bankKeeper, stakingKeeper, govRouter,
+		govProposalHandlerRouter, authtypes.FeeCollectorName,
 	)
 	p.paramsKeeper.SetGovKeeper(p.govKeeper)
 	p.dexKeeper.SetGovKeeper(p.govKeeper)
@@ -343,14 +368,14 @@ func (p *ProtocolV0) produceKeepers() {
 	p.upgradeKeeper = upgrade.NewKeeper(
 		p.cdc, p.keys[upgrade.StoreKey], p.protocolKeeper, p.stakingKeeper, p.bankKeeper, upgradeSubspace,
 	)
-	p.debugKeeper = debug.NewDebugKeeper(p.cdc, p.keys[debug.StoreKey], p.orderKeeper, p.stakingKeeper, auth.FeeCollectorName, p.Stop)
+	p.debugKeeper = debug.NewDebugKeeper(p.cdc, p.keys[debug.StoreKey], p.orderKeeper, p.stakingKeeper, authtypes.FeeCollectorName, p.Stop)
 }
 
 // moduleAccountAddrs returns all the module account addresses
 func (p *ProtocolV0) moduleAccountAddrs() map[string]bool {
 	modAccAddrs := make(map[string]bool)
 	for acc := range maccPerms {
-		modAccAddrs[p.supplyKeeper.GetModuleAddress(acc).String()] = true
+		modAccAddrs[p.accountKeeper.GetModuleAddress(acc).String()] = true
 	}
 
 	return modAccAddrs
@@ -360,24 +385,22 @@ func (p *ProtocolV0) moduleAccountAddrs() map[string]bool {
 func (p *ProtocolV0) setManager() {
 
 	p.mm = module.NewManager(
-		genaccounts.NewAppModule(p.accountKeeper),
 		genutil.NewAppModule(p.accountKeeper, p.stakingKeeper, p.parent.DeliverTx),
-		auth.NewAppModule(p.accountKeeper),
-		bank.NewAppModule(p.bankKeeper, p.accountKeeper),
+		auth.NewAppModule(p.appCodec, p.accountKeeper),
+		bank.NewAppModule(p.appCodec, p.bankKeeper, p.accountKeeper),
 		crisis.NewAppModule(&p.crisisKeeper),
-		supply.NewAppModule(p.supplyKeeper, p.accountKeeper),
 		params.NewAppModule(p.paramsKeeper),
-		mint.NewAppModule(p.mintKeeper),
-		slashing.NewAppModule(p.slashingKeeper, p.stakingKeeper),
-		staking.NewAppModule(p.stakingKeeper, p.accountKeeper, p.supplyKeeper),
-		distr.NewAppModule(p.distrKeeper, p.supplyKeeper),
-		gov.NewAppModule(version.ProtocolVersionV0, p.govKeeper, p.supplyKeeper),
-		order.NewAppModule(version.ProtocolVersionV0, p.orderKeeper, p.supplyKeeper),
-		token.NewAppModule(version.ProtocolVersionV0, p.tokenKeeper, p.supplyKeeper),
+		mint.NewAppModule(p.appCodec, p.mintKeeper, p.accountKeeper),
+		slashing.NewAppModule(p.appCodec, p.slashingKeeper, p.accountKeeper, p.bankKeeper, p.stakingKeeper),
+		staking.NewAppModule(p.stakingKeeper, p.accountKeeper, p.bankKeeper),
+		distr.NewAppModule(p.distrKeeper, p.bankKeeper),
+		gov.NewAppModule(version.ProtocolVersionV0, p.govKeeper, p.accountKeeper, p.bankKeeper),
+		order.NewAppModule(version.ProtocolVersionV0, p.orderKeeper),
+		token.NewAppModule(version.ProtocolVersionV0, p.tokenKeeper),
 		poolswap.NewAppModule(p.swapKeeper),
 
 		// TODO
-		dex.NewAppModule(version.ProtocolVersionV0, p.dexKeeper, p.supplyKeeper),
+		dex.NewAppModule(version.ProtocolVersionV0, p.dexKeeper, p.accountKeeper, p.bankKeeper),
 		backend.NewAppModule(p.backendKeeper),
 		stream.NewAppModule(p.streamKeeper),
 		upgrade.NewAppModule(p.upgradeKeeper),
@@ -391,14 +414,14 @@ func (p *ProtocolV0) setManager() {
 		order.ModuleName,
 		token.ModuleName,
 		dex.ModuleName,
-		mint.ModuleName,
+		minttypes.ModuleName,
 		distr.ModuleName,
-		slashing.ModuleName,
+		slashingtypes.ModuleName,
 		staking.ModuleName,
 	)
 
 	p.mm.SetOrderEndBlockers(
-		crisis.ModuleName,
+		crisistypes.ModuleName,
 		gov.ModuleName,
 		dex.ModuleName,
 		order.ModuleName,
@@ -409,21 +432,19 @@ func (p *ProtocolV0) setManager() {
 	)
 
 	p.mm.SetOrderInitGenesis(
-		genaccounts.ModuleName,
 		distr.ModuleName,
 		staking.ModuleName,
-		auth.ModuleName,
-		bank.ModuleName,
-		slashing.ModuleName,
+		authtypes.ModuleName,
+		banktypes.ModuleName,
+		slashingtypes.ModuleName,
 		gov.ModuleName,
-		mint.ModuleName,
-		supply.ModuleName,
+		minttypes.ModuleName,
 		token.ModuleName,
 		dex.ModuleName,
 		order.ModuleName,
 		poolswap.ModuleName,
 		upgrade.ModuleName,
-		crisis.ModuleName,
+		crisistypes.ModuleName,
 		genutil.ModuleName,
 		params.ModuleName,
 	)
@@ -438,13 +459,15 @@ func (p *ProtocolV0) registerRouters() {
 
 // setAnteHandler sets ante handler
 func (p *ProtocolV0) setAnteHandler() {
-	p.anteHandler = auth.NewAnteHandler(
+	p.anteHandler = ante.NewAnteHandler(
 		p.accountKeeper,
-		p.supplyKeeper,
-		auth.DefaultSigVerificationGasConsumer,
-		validateMsgHook(p.orderKeeper),
-		isSystemFreeHook,
+		p.bankKeeper,
+		ibckeeper.Keeper{},
+		ante.DefaultSigVerificationGasConsumer,
+		authtypes.LegacyAminoJSONHandler{},
 	)
+	ante.IsSysFreeHandler = isSystemFreeHook
+	ante.ValMsgHandler = validateMsgHook(p.orderKeeper)
 	p.parent.PushAnteHandler(p.anteHandler)
 }
 
@@ -453,18 +476,18 @@ func (p *ProtocolV0) InitChainer(ctx sdk.Context, req abci.RequestInitChain) abc
 	var genesisState simapp.GenesisState
 	p.cdc.MustUnmarshalJSON(req.AppStateBytes, &genesisState)
 
-	var accGenesisState genaccounts.GenesisState
-	p.cdc.MustUnmarshalJSON(genesisState[genaccounts.ModuleName], &accGenesisState)
-
-	var acc auth.Account
-	if len(accGenesisState) > 0 {
-		acc = accGenesisState[0].ToAccount()
-	}
-
-	if err := token.IssueOKT(ctx, p.tokenKeeper, genesisState[token.ModuleName], acc); err != nil {
-		panic(err)
-	}
-	return p.mm.InitGenesis(ctx, genesisState)
+	//var accGenesisState authtypes.GenesisState
+	//p.cdc.MustUnmarshalJSON(genesisState[authtypes.ModuleName], &accGenesisState)
+	//
+	//var acc authtypes.AccountI
+	//if len(accGenesisState.Accounts) > 0 {
+	//	acc = accGenesisState.Accounts[0]
+	//}
+	//
+	//if err := token.IssueOKT(ctx, p.tokenKeeper, genesisState[token.ModuleName], acc); err != nil {
+	//	panic(err)
+	//}
+	return p.mm.InitGenesis(ctx, p.appCodec, genesisState)
 
 }
 
@@ -484,27 +507,37 @@ func (p *ProtocolV0) Stop() {
 	p.stopped = true
 }
 
-// MakeCodec registers codec from all the modules
-func MakeCodec() *codec.Codec {
-	var cdc = codec.New()
-	ModuleBasics.RegisterCodec(cdc)
-	sdk.RegisterCodec(cdc)
-	codec.RegisterCrypto(cdc)
-	codec.RegisterEvidences(cdc)
-	return cdc
+func MakeEncodingConfig() EncodingConfig {
+	cdc := codec.New()
+	interfaceRegistry := types.NewInterfaceRegistry()
+	marshaler := codec.NewHybridCodec(cdc, interfaceRegistry)
+
+	encodingConfig := EncodingConfig{
+		InterfaceRegistry: interfaceRegistry,
+		Marshaler:         marshaler,
+		TxGenerator:       authtypes.StdTxGenerator{Cdc: cdc},
+		Amino:             cdc,
+	}
+	std.RegisterCodec(encodingConfig.Amino)
+	std.RegisterInterfaces(encodingConfig.InterfaceRegistry)
+	ModuleBasics.RegisterCodec(encodingConfig.Amino)
+	ModuleBasics.RegisterInterfaceModules(encodingConfig.InterfaceRegistry)
+	return encodingConfig
 }
 
-func validateMsgHook(orderKeeper order.Keeper) auth.ValidateMsgHandler {
-	return func(newCtx sdk.Context, msgs []sdk.Msg) sdk.Result {
+func validateMsgHook(orderKeeper order.Keeper) ante.ValidateMsgHandler {
+	return func(newCtx sdk.Context, msgs []sdk.Msg) error {
 		for _, msg := range msgs {
-			switch assertedMsg := msg.(type) {
-			case order.MsgNewOrders:
-				return order.ValidateMsgNewOrders(newCtx, orderKeeper, assertedMsg)
-			case order.MsgCancelOrders:
-				return order.ValidateMsgCancelOrders(newCtx, orderKeeper, assertedMsg)
+			if msg != nil {
+				switch assertedMsg := msg.(type) {
+				case *ordertypes.MsgNewOrders:
+					return order.ValidateMsgNewOrders(newCtx, orderKeeper, assertedMsg)
+				case *ordertypes.MsgCancelOrders:
+					return order.ValidateMsgCancelOrders(newCtx, orderKeeper, assertedMsg)
+				}
 			}
 		}
-		return sdk.Result{}
+		return nil
 	}
 }
 
@@ -518,7 +551,7 @@ func isSystemFreeHook(ctx sdk.Context, msgs []sdk.Msg) bool {
 
 // ExportGenesis exports the genesis state for whole protocol
 func (p *ProtocolV0) ExportGenesis(ctx sdk.Context) map[string]json.RawMessage {
-	return p.mm.ExportGenesis(ctx)
+	return p.mm.ExportGenesis(ctx, p.appCodec)
 }
 
 // SetLogger sets logger

@@ -30,7 +30,7 @@ func TestModuleAccountInvariant(t *testing.T) {
 
 	// module acount balance 100okt
 	// xxb_okt deposits 100 okt. withdraw info 0 okt
-	invariant := ModuleAccountInvariant(keeper, keeper.supplyKeeper)
+	invariant := ModuleAccountInvariant(keeper, keeper.accKeeper, keeper.bankKeeper)
 	_, broken := invariant(ctx)
 	require.False(t, broken)
 
@@ -43,7 +43,7 @@ func TestModuleAccountInvariant(t *testing.T) {
 
 	// module acount balance 100okt
 	// xxb_okt deposits 50 okt. withdraw info 50 okt
-	invariant = ModuleAccountInvariant(keeper, keeper.supplyKeeper)
+	invariant = ModuleAccountInvariant(keeper, keeper.accKeeper, keeper.bankKeeper)
 	_, broken = invariant(ctx)
 	require.False(t, broken)
 

@@ -2,11 +2,13 @@ package poolswap
 
 import (
 	"fmt"
+	sdkerror "github.com/cosmos/cosmos-sdk/types/errors"
+	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
+	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	"testing"
 	"time"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/cosmos/cosmos-sdk/x/supply"
 	"github.com/okex/okchain/x/poolswap/types"
 	token "github.com/okex/okchain/x/token/types"
 	"github.com/stretchr/testify/require"
@@ -20,18 +22,20 @@ func TestHandleMsgCreateExchange(t *testing.T) {
 	ctx := mapp.BaseApp.NewContext(false, abci.Header{}).WithBlockHeight(10)
 	testToken := initToken(types.TestBasePooledToken)
 
-	mapp.supplyKeeper.SetSupply(ctx, supply.NewSupply(mapp.TotalCoinsSupply))
+	mapp.BankKeeper.SetSupply(ctx, banktypes.NewSupply(mapp.TotalCoinsSupply))
 	handler := NewHandler(keeper)
 	msg := types.NewMsgCreateExchange(testToken.Symbol, addrKeysSlice[0].Address)
 
 	// test case1: token is not exist
-	result := handler(ctx, msg)
+	result, err := handler(ctx, &msg)
+	require.Nil(t, err)
 	require.NotNil(t, result.Log)
 
 	mapp.tokenKeeper.NewToken(ctx, testToken)
 
 	// test case2: success
-	result = handler(ctx, msg)
+	result, err = handler(ctx, &msg)
+	require.Nil(t, err)
 	require.Equal(t, "", result.Log)
 
 	// check account balance
@@ -42,7 +46,7 @@ func TestHandleMsgCreateExchange(t *testing.T) {
 		sdk.NewDecCoinFromDec(types.TestBasePooledToken2, sdk.MustNewDecFromStr("100")),
 		sdk.NewDecCoinFromDec(types.TestBasePooledToken3, sdk.MustNewDecFromStr("100")),
 	}
-	require.EqualValues(t, expectCoins.String(), acc.GetCoins().String())
+	require.EqualValues(t, expectCoins.String(), mapp.BankKeeper.GetAllBalances(ctx, acc.GetAddress()).String())
 
 	expectSwapTokenPair := types.GetTestSwapTokenPair()
 	swapTokenPair, err := keeper.GetSwapTokenPair(ctx, types.TestSwapTokenPairName)
@@ -50,7 +54,8 @@ func TestHandleMsgCreateExchange(t *testing.T) {
 	require.EqualValues(t, expectSwapTokenPair, swapTokenPair)
 
 	// test case3: swapTokenPair already exists
-	result = handler(ctx, msg)
+	result, err = handler(ctx, &msg)
+	require.Nil(t, err)
 	require.NotNil(t, result.Log)
 }
 
@@ -62,7 +67,7 @@ func initToken(name string) token.Token {
 		WholeName:           name,
 		OriginalTotalSupply: sdk.NewDec(0),
 		TotalSupply:         sdk.NewDec(0),
-		Owner:               supply.NewModuleAddress(ModuleName),
+		Owner:               authtypes.NewModuleAddress(ModuleName),
 		Type:                1,
 		Mintable:            true,
 	}
@@ -75,12 +80,13 @@ func TestHandleMsgAddLiquidity(t *testing.T) {
 	ctx := mapp.BaseApp.NewContext(false, abci.Header{}).WithBlockHeight(10).WithBlockTime(time.Now())
 	testToken := initToken(types.TestBasePooledToken)
 
-	mapp.supplyKeeper.SetSupply(ctx, supply.NewSupply(mapp.TotalCoinsSupply))
+	mapp.BankKeeper.SetSupply(ctx, banktypes.NewSupply(mapp.TotalCoinsSupply))
 	handler := NewHandler(keeper)
 	msg := types.NewMsgCreateExchange(testToken.Symbol, addrKeysSlice[0].Address)
 	mapp.tokenKeeper.NewToken(ctx, testToken)
 
-	result := handler(ctx, msg)
+	result, err := handler(ctx, &msg)
+	require.Nil(t, err)
 	require.Equal(t, "", result.Log)
 
 	minLiquidity := sdk.NewDec(1)
@@ -101,20 +107,22 @@ func TestHandleMsgAddLiquidity(t *testing.T) {
 		quoteAmount      sdk.DecCoin
 		deadLine         int64
 		addr             sdk.AccAddress
-		exceptResultCode sdk.CodeType
+		exceptResultCode string
 	}{
-		{"success", minLiquidity, maxBaseAmount, quoteAmount, deadLine, addr, 0},
-		{"blockTime exceeded deadline", minLiquidity, maxBaseAmount, quoteAmount, 0, addr, sdk.CodeInternal},
-		{"unknown swapTokenPair", minLiquidity, nonExistMaxBaseAmount, quoteAmount, deadLine, addr, sdk.CodeInternal},
-		{"The required baseTokens are greater than MaxBaseAmount", minLiquidity, invalidMaxBaseAmount, quoteAmount, deadLine, addr, sdk.CodeInternal},
-		{"The available liquidity is less than MinLiquidity", invalidMinLiquidity, maxBaseAmount, quoteAmount, deadLine, addr, sdk.CodeInternal},
-		{"insufficient Coins", minLiquidity, insufficientMaxBaseAmount, insufficientQuoteAmount, deadLine, addr, sdk.CodeInsufficientCoins},
+		{"success", minLiquidity, maxBaseAmount, quoteAmount, deadLine, addr, ""},
+		{"blockTime exceeded deadline", minLiquidity, maxBaseAmount, quoteAmount, 0, addr, sdkerror.ErrInternal.Error()},
+		{"unknown swapTokenPair", minLiquidity, nonExistMaxBaseAmount, quoteAmount, deadLine, addr, sdkerror.ErrInternal.Error()},
+		{"The required baseTokens are greater than MaxBaseAmount", minLiquidity, invalidMaxBaseAmount, quoteAmount, deadLine, addr, sdkerror.ErrInternal.Error()},
+		{"The available liquidity is less than MinLiquidity", invalidMinLiquidity, maxBaseAmount, quoteAmount, deadLine, addr, sdkerror.ErrInternal.Error()},
+		{"insufficient Coins", minLiquidity, insufficientMaxBaseAmount, insufficientQuoteAmount, deadLine, addr, sdkerror.ErrInsufficientFunds.Error()},
 	}
 
 	for _, testCase := range tests {
 		addLiquidityMsg := types.NewMsgAddLiquidity(testCase.minLiquidity, testCase.maxBaseAmount, testCase.quoteAmount, testCase.deadLine, testCase.addr)
-		result = handler(ctx, addLiquidityMsg)
-		require.Equal(t, testCase.exceptResultCode, result.Code)
+		result, err = handler(ctx, &addLiquidityMsg)
+		if err != nil {
+			require.Contains(t, err.Error(), testCase.exceptResultCode)
+		}
 	}
 }
 
@@ -125,12 +133,13 @@ func TestHandleMsgRemoveLiquidity(t *testing.T) {
 	ctx := mapp.BaseApp.NewContext(false, abci.Header{}).WithBlockHeight(10).WithBlockTime(time.Now())
 	testToken := initToken(types.TestBasePooledToken)
 
-	mapp.supplyKeeper.SetSupply(ctx, supply.NewSupply(mapp.TotalCoinsSupply))
+	mapp.BankKeeper.SetSupply(ctx, banktypes.NewSupply(mapp.TotalCoinsSupply))
 	handler := NewHandler(keeper)
 	msg := types.NewMsgCreateExchange(testToken.Symbol, addrKeysSlice[0].Address)
 	mapp.tokenKeeper.NewToken(ctx, testToken)
 
-	result := handler(ctx, msg)
+	result, err := handler(ctx, &msg)
+	require.Nil(t, err)
 	require.Equal(t, "", result.Log)
 
 	minLiquidity := sdk.NewDec(1)
@@ -140,7 +149,8 @@ func TestHandleMsgRemoveLiquidity(t *testing.T) {
 	addr := addrKeysSlice[0].Address
 
 	addLiquidityMsg := types.NewMsgAddLiquidity(minLiquidity, maxBaseAmount, quoteAmount, deadLine, addr)
-	result = handler(ctx, addLiquidityMsg)
+	result, err = handler(ctx, &addLiquidityMsg)
+	require.Nil(t, err)
 	require.Equal(t, "", result.Log)
 
 	liquidity, err := sdk.NewDecFromStr("0.01")
@@ -159,20 +169,22 @@ func TestHandleMsgRemoveLiquidity(t *testing.T) {
 		minQuoteAmount   sdk.DecCoin
 		deadLine         int64
 		addr             sdk.AccAddress
-		exceptResultCode sdk.CodeType
+		exceptResultCode string
 	}{
-		{"success", liquidity, minBaseAmount, minQuoteAmount, deadLine, addr, 0},
-		{"blockTime exceeded deadline", liquidity, minBaseAmount, minQuoteAmount, 0, addr, sdk.CodeInternal},
-		{"unknown swapTokenPair", liquidity, nonExistMinBaseAmount, minQuoteAmount, deadLine, addr, sdk.CodeInternal},
-		{"The available baseAmount are less than MinBaseAmount", liquidity, invalidMinBaseAmount, minQuoteAmount, deadLine, addr, sdk.CodeInternal},
-		{"The available quoteAmount are less than MinQuoteAmount", liquidity, minBaseAmount, invalidMinQuoteAmount, deadLine, addr, sdk.CodeInternal},
-		{"insufficient poolToken", invalidLiquidity, minBaseAmount, minQuoteAmount, deadLine, addr, sdk.CodeInsufficientCoins},
+		{"success", liquidity, minBaseAmount, minQuoteAmount, deadLine, addr, ""},
+		{"blockTime exceeded deadline", liquidity, minBaseAmount, minQuoteAmount, 0, addr, sdkerror.ErrInternal.Error()},
+		{"unknown swapTokenPair", liquidity, nonExistMinBaseAmount, minQuoteAmount, deadLine, addr, sdkerror.ErrInternal.Error()},
+		{"The available baseAmount are less than MinBaseAmount", liquidity, invalidMinBaseAmount, minQuoteAmount, deadLine, addr, sdkerror.ErrInternal.Error()},
+		{"The available quoteAmount are less than MinQuoteAmount", liquidity, minBaseAmount, invalidMinQuoteAmount, deadLine, addr, sdkerror.ErrInternal.Error()},
+		{"insufficient poolToken", invalidLiquidity, minBaseAmount, minQuoteAmount, deadLine, addr, sdkerror.ErrInsufficientFunds.Error()},
 	}
 
 	for _, testCase := range tests {
 		addLiquidityMsg := types.NewMsgRemoveLiquidity(testCase.liquidity, testCase.minBaseAmount, testCase.minQuoteAmount, testCase.deadLine, testCase.addr)
-		result = handler(ctx, addLiquidityMsg)
-		require.Equal(t, testCase.exceptResultCode, result.Code)
+		result, err = handler(ctx, &addLiquidityMsg)
+		if err != nil {
+			require.Contains(t, err.Error(), testCase.exceptResultCode)
+		}
 	}
 }
 
@@ -186,16 +198,18 @@ func TestHandleMsgTokenToTokenExchange(t *testing.T) {
 	secondTestToken := initToken(secondTestTokenName)
 	mapp.swapKeeper.SetParams(ctx, types.DefaultParams())
 
-	mapp.supplyKeeper.SetSupply(ctx, supply.NewSupply(mapp.TotalCoinsSupply))
+	mapp.BankKeeper.SetSupply(ctx, banktypes.NewSupply(mapp.TotalCoinsSupply))
 	handler := NewHandler(keeper)
 	msgCreateExchange := types.NewMsgCreateExchange(testToken.Symbol, addrKeysSlice[0].Address)
 	msgCreateExchange2 := types.NewMsgCreateExchange(secondTestToken.Symbol, addrKeysSlice[0].Address)
 	mapp.tokenKeeper.NewToken(ctx, testToken)
 	mapp.tokenKeeper.NewToken(ctx, secondTestToken)
 
-	result := handler(ctx, msgCreateExchange)
+	result, err := handler(ctx, &msgCreateExchange)
+	require.Nil(t, err)
 	require.Equal(t, "", result.Log)
-	result = handler(ctx, msgCreateExchange2)
+	result, err = handler(ctx, &msgCreateExchange2)
+	require.Nil(t, err)
 	require.Equal(t, "", result.Log)
 
 	minLiquidity := sdk.NewDec(1)
@@ -206,12 +220,15 @@ func TestHandleMsgTokenToTokenExchange(t *testing.T) {
 	addr := addrKeysSlice[0].Address
 
 	addLiquidityMsg := types.NewMsgAddLiquidity(minLiquidity, maxBaseAmount, quoteAmount, deadLine, addr)
-	result = handler(ctx, addLiquidityMsg)
+	result, err = handler(ctx, &addLiquidityMsg)
+	require.Nil(t, err)
 	require.Equal(t, "", result.Log)
 	addLiquidityMsg2 := types.NewMsgAddLiquidity(minLiquidity, maxBaseAmount2, quoteAmount, deadLine, addr)
-	result = handler(ctx, addLiquidityMsg)
+	result, err = handler(ctx, &addLiquidityMsg)
+	require.Nil(t, err)
 	require.Equal(t, "", result.Log)
-	result = handler(ctx, addLiquidityMsg2)
+	result, err = handler(ctx, &addLiquidityMsg2)
+	require.Nil(t, err)
 	require.Equal(t, "", result.Log)
 
 	minBoughtTokenAmount := sdk.NewDecCoinFromDec(types.TestBasePooledToken, sdk.NewDec(1))
@@ -235,27 +252,27 @@ func TestHandleMsgTokenToTokenExchange(t *testing.T) {
 		deadLine             int64
 		recipient            sdk.AccAddress
 		addr                 sdk.AccAddress
-		exceptResultCode     sdk.CodeType
+		exceptResultCode     string
 	}{
-		{"(tokenToNativeToken) success", minBoughtTokenAmount, soldTokenAmount, deadLine, addr, addr, 0},
-		{"(tokenToToken) success", minBoughtTokenAmount2, soldTokenAmount2, deadLine, addr, addr, 0},
-		{"(tokenToNativeToken) blockTime exceeded deadline", minBoughtTokenAmount, soldTokenAmount, 0, addr, addr, sdk.CodeInternal},
-		{"(tokenToToken) blockTime exceeded deadline", minBoughtTokenAmount2, soldTokenAmount2, 0, addr, addr, sdk.CodeInternal},
-		{"(tokenToNativeToken) insufficient SoldTokenAmount", minBoughtTokenAmount, insufficientSoldTokenAmount, deadLine, addr, addr, sdk.CodeInsufficientCoins},
-		{"(tokenToToken) insufficient SoldTokenAmount", minBoughtTokenAmount2, insufficientSoldTokenAmount2, deadLine, addr, addr, sdk.CodeInsufficientCoins},
-		{"(tokenToNativeToken) unknown swapTokenPair", unkownBoughtTokenAmount, soldTokenAmount, deadLine, addr, addr, sdk.CodeInternal},
-		{"(tokenToToken) unknown swapTokenPair", unkownBountTokenAmount2, soldTokenAmount2, deadLine, addr, addr, sdk.CodeInternal},
-		{"(tokenToToken) unknown swapTokenPair2", minBoughtTokenAmount2, unkownSoldTokenAmount2, deadLine, addr, addr, sdk.CodeInternal},
-		{"(tokenToNativeToken) The available BoughtTokenAmount are less than minBoughtTokenAmount", invalidMinBoughtTokenAmount, soldTokenAmount, deadLine, addr, addr, sdk.CodeInternal},
-		{"(tokenToToken) The available BoughtTokenAmount are less than minBoughtTokenAmount", invalidMinBoughtTokenAmount2, soldTokenAmount2, deadLine, addr, addr, sdk.CodeInternal},
+		{"(tokenToNativeToken) success", minBoughtTokenAmount, soldTokenAmount, deadLine, addr, addr, ""},
+		{"(tokenToToken) success", minBoughtTokenAmount2, soldTokenAmount2, deadLine, addr, addr, ""},
+		{"(tokenToNativeToken) blockTime exceeded deadline", minBoughtTokenAmount, soldTokenAmount, 0, addr, addr, sdkerror.ErrInternal.Error()},
+		{"(tokenToToken) blockTime exceeded deadline", minBoughtTokenAmount2, soldTokenAmount2, 0, addr, addr, sdkerror.ErrInternal.Error()},
+		{"(tokenToNativeToken) insufficient SoldTokenAmount", minBoughtTokenAmount, insufficientSoldTokenAmount, deadLine, addr, addr, sdkerror.ErrInsufficientFunds.Error()},
+		{"(tokenToToken) insufficient SoldTokenAmount", minBoughtTokenAmount2, insufficientSoldTokenAmount2, deadLine, addr, addr, sdkerror.ErrInsufficientFunds.Error()},
+		{"(tokenToNativeToken) unknown swapTokenPair", unkownBoughtTokenAmount, soldTokenAmount, deadLine, addr, addr, sdkerror.ErrInternal.Error()},
+		{"(tokenToToken) unknown swapTokenPair", unkownBountTokenAmount2, soldTokenAmount2, deadLine, addr, addr, sdkerror.ErrInternal.Error()},
+		{"(tokenToToken) unknown swapTokenPair2", minBoughtTokenAmount2, unkownSoldTokenAmount2, deadLine, addr, addr, sdkerror.ErrInternal.Error()},
+		{"(tokenToNativeToken) The available BoughtTokenAmount are less than minBoughtTokenAmount", invalidMinBoughtTokenAmount, soldTokenAmount, deadLine, addr, addr, sdkerror.ErrInternal.Error()},
+		{"(tokenToToken) The available BoughtTokenAmount are less than minBoughtTokenAmount", invalidMinBoughtTokenAmount2, soldTokenAmount2, deadLine, addr, addr, sdkerror.ErrInternal.Error()},
 	}
 
 	for _, testCase := range tests {
 		fmt.Println(testCase.testCase)
 		addLiquidityMsg := types.NewMsgTokenToNativeToken(testCase.soldTokenAmount, testCase.minBoughtTokenAmount, testCase.deadLine, testCase.recipient, testCase.addr)
-		result = handler(ctx, addLiquidityMsg)
-		fmt.Println(result.Log)
-		require.Equal(t, testCase.exceptResultCode, result.Code)
-
+		result, err = handler(ctx, &addLiquidityMsg)
+		if err != nil {
+			require.Contains(t, err.Error(), testCase.exceptResultCode)
+		}
 	}
 }

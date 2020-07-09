@@ -8,7 +8,7 @@ import (
 )
 
 func TestHooks(t *testing.T) {
-	ctx, ak, k, _, supplyKeeper := CreateTestInputDefault(t, false, 1000)
+	ctx, ak, k, _, bankKeeper := CreateTestInputDefault(t, false, 1000)
 	hook := k.Hooks()
 
 	// test AfterValidatorCreated
@@ -16,8 +16,8 @@ func TestHooks(t *testing.T) {
 	require.True(t, k.GetValidatorAccumulatedCommission(ctx, valOpAddr1).IsZero())
 
 	// test AfterValidatorRemoved
-	acc := ak.GetAccount(ctx, supplyKeeper.GetModuleAddress(types.ModuleName))
-	err := acc.SetCoins(NewTestDecCoins(123, 2))
+	acc := ak.GetAccount(ctx, ak.GetModuleAddress(types.ModuleName))
+	err := bankKeeper.SetBalances(ctx, acc.GetAddress(), NewTestDecCoins(123, 2))
 	require.NoError(t, err)
 	ak.SetAccount(ctx, acc)
 	k.SetValidatorAccumulatedCommission(ctx, valOpAddr1, NewTestDecCoins(123,2))

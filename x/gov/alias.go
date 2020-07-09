@@ -5,7 +5,8 @@
 package gov
 
 import (
-	sdkGov "github.com/cosmos/cosmos-sdk/x/gov"
+	sdkGovkeeper "github.com/cosmos/cosmos-sdk/x/gov/keeper"
+	sdkGovtypes "github.com/cosmos/cosmos-sdk/x/gov/types"
 
 	"github.com/okex/okchain/x/gov/keeper"
 	"github.com/okex/okchain/x/gov/types"
@@ -37,10 +38,8 @@ var (
 	RegisterProposalTypeCodec  = types.RegisterProposalTypeCodec
 	ErrInvalidProposer         = types.ErrInvalidProposer
 	ErrInvalidHeight           = types.ErrInvalidHeight
-	ErrAlreadyFinishedProposal = sdkGov.ErrAlreadyFinishedProposal
 	ErrInvalidProposalContent  = types.ErrInvalidProposalContent
 	ErrInvalidProposalType     = types.ErrInvalidProposalType
-	ErrInvalidVote             = sdkGov.ErrInvalidVote
 	ErrInvalidGenesis          = types.ErrInvalidGenesis
 	ErrNoProposalHandlerExists = types.ErrNoProposalHandlerExists
 	ProposalKey                = types.ProposalKey
@@ -48,9 +47,7 @@ var (
 	ActiveProposalQueueKey     = types.ActiveProposalQueueKey
 	InactiveProposalByTimeKey  = types.InactiveProposalByTimeKey
 	InactiveProposalQueueKey   = types.InactiveProposalQueueKey
-	DepositsKey                = sdkGov.DepositsKey
 	DepositKey                 = types.DepositKey
-	VotesKey                   = sdkGov.VotesKey
 	VoteKey                    = types.VoteKey
 	NewMsgSubmitProposal       = types.NewMsgSubmitProposal
 	NewMsgDeposit              = types.NewMsgDeposit
@@ -60,8 +57,6 @@ var (
 	NewTallyParams             = types.NewTallyParams
 	NewVotingParams            = types.NewVotingParams
 	NewParams                  = types.NewParams
-	ProposalStatusFromString   = sdkGov.ProposalStatusFromString
-	ValidProposalStatus        = sdkGov.ValidProposalStatus
 	NewTallyResultFromMap      = types.NewTallyResultFromMap
 	EmptyTallyResult           = types.EmptyTallyResult
 	NewTextProposal            = types.NewTextProposal
@@ -73,8 +68,6 @@ var (
 	NewQueryDepositParams      = types.NewQueryDepositParams
 	NewQueryVoteParams         = types.NewQueryVoteParams
 	NewQueryProposalsParams    = types.NewQueryProposalsParams
-	VoteOptionFromString       = sdkGov.VoteOptionFromString
-	ValidVoteOption            = sdkGov.ValidVoteOption
 
 	// variable aliases
 	ModuleCdc                   = types.ModuleCdc
@@ -88,9 +81,9 @@ var (
 	ParamStoreKeyVotingParams   = types.ParamStoreKeyVotingParams
 	ParamStoreKeyTallyParams    = types.ParamStoreKeyTallyParams
 
-	NewRouter  = sdkGov.NewRouter
+	NewRouter  = sdkGovtypes.NewRouter
 	NewKeeper  = keeper.NewKeeper
-	NewQuerier = keeper.NewQuerier
+	NewQuerier = sdkGovkeeper.NewQuerier
 )
 
 type (
@@ -111,8 +104,8 @@ type (
 	TallyResult       = types.TallyResult
 	Vote              = types.Vote
 	Votes             = types.Votes
-	VoteOption        = sdkGov.VoteOption
+	VoteOption        = sdkGovtypes.VoteOption
 	Keeper            = keeper.Keeper
 
-	Router = sdkGov.Router
+	Router = sdkGovtypes.Router
 )

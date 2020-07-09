@@ -5,7 +5,7 @@ import (
 
 	"github.com/okex/okchain/x/genutil/types"
 
-	"github.com/cosmos/cosmos-sdk/client/context"
+	"github.com/cosmos/cosmos-sdk/client"
 	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/types/module"
@@ -28,14 +28,14 @@ func (AppModuleBasic) Name() string {
 }
 
 // DefaultGenesis returns the default genesis state in json raw message
-func (AppModuleBasic) DefaultGenesis() json.RawMessage {
-	return ModuleCdc.MustMarshalJSON(GenesisState{})
+func (AppModuleBasic) DefaultGenesis(cdc codec.JSONMarshaler) json.RawMessage {
+	return cdc.MustMarshalJSON(GenesisState{})
 }
 
 // ValidateGenesis gives a quick validity check for module genesis
-func (AppModuleBasic) ValidateGenesis(bz json.RawMessage) error {
+func (AppModuleBasic) ValidateGenesis(cdc codec.JSONMarshaler, bz json.RawMessage) error {
 	var data GenesisState
-	err := ModuleCdc.UnmarshalJSON(bz, &data)
+	err := cdc.UnmarshalJSON(bz, &data)
 	if err != nil {
 		return err
 	}
@@ -44,9 +44,9 @@ func (AppModuleBasic) ValidateGenesis(bz json.RawMessage) error {
 
 // nolint
 func (AppModuleBasic) RegisterCodec(cdc *codec.Codec)                         {}
-func (AppModuleBasic) RegisterRESTRoutes(_ context.CLIContext, _ *mux.Router) {}
-func (AppModuleBasic) GetTxCmd(_ *codec.Codec) *cobra.Command                 { return nil }
-func (AppModuleBasic) GetQueryCmd(_ *codec.Codec) *cobra.Command              { return nil }
+func (AppModuleBasic) RegisterRESTRoutes(_ client.Context, _ *mux.Router) {}
+func (AppModuleBasic) GetTxCmd(_ client.Context) *cobra.Command                 { return nil }
+func (AppModuleBasic) GetQueryCmd(_ client.Context) *cobra.Command              { return nil }
 
 // AppModule is the struct of this app module
 type AppModule struct {
@@ -69,13 +69,13 @@ func NewAppModule(accountKeeper types.AccountKeeper,
 }
 
 // InitGenesis initializes the module genesis state
-func (am AppModule) InitGenesis(ctx sdk.Context, data json.RawMessage) []abci.ValidatorUpdate {
+func (am AppModule) InitGenesis(ctx sdk.Context, cdc codec.JSONMarshaler, data json.RawMessage) []abci.ValidatorUpdate {
 	var genesisState GenesisState
-	ModuleCdc.MustUnmarshalJSON(data, &genesisState)
+	cdc.MustUnmarshalJSON(data, &genesisState)
 	return InitGenesis(ctx, ModuleCdc, am.stakingKeeper, am.deliverTx, genesisState)
 }
 
 // ExportGenesis exports the module genesis state
-func (am AppModule) ExportGenesis(ctx sdk.Context) json.RawMessage {
+func (am AppModule) ExportGenesis(ctx sdk.Context, cdc codec.JSONMarshaler) json.RawMessage {
 	return nil
 }

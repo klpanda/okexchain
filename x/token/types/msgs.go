@@ -3,7 +3,8 @@ package types
 
 import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/cosmos/cosmos-sdk/x/auth"
+	sdkerror "github.com/cosmos/cosmos-sdk/types/errors"
+	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 )
 
 const (
@@ -14,16 +15,7 @@ const (
 	TotalSupplyUpperbound = int64(9 * 1e10)
 )
 
-//
-type MsgTokenIssue struct {
-	Description    string         `json:"description"`
-	Symbol         string         `json:"symbol"`
-	OriginalSymbol string         `json:"original_symbol"`
-	WholeName      string         `json:"whole_name"`
-	TotalSupply    string         `json:"total_supply"`
-	Owner          sdk.AccAddress `json:"owner"`
-	Mintable       bool           `json:"mintable"`
-}
+var _ sdk.Msg = &MsgTokenIssue{}
 
 func NewMsgTokenIssue(tokenDescription, symbol, originalSymbol, wholeName, totalSupply string, owner sdk.AccAddress, mintable bool) MsgTokenIssue {
 	return MsgTokenIssue{
@@ -41,28 +33,28 @@ func (msg MsgTokenIssue) Route() string { return RouterKey }
 
 func (msg MsgTokenIssue) Type() string { return "issue" }
 
-func (msg MsgTokenIssue) ValidateBasic() sdk.Error {
+func (msg MsgTokenIssue) ValidateBasic() error {
 	// check owner
 	if msg.Owner.Empty() {
-		return sdk.ErrInvalidAddress(msg.Owner.String())
+		return sdkerror.Wrapf(sdkerror.ErrInvalidAddress, msg.Owner.String())
 	}
 
 	// check original symbol
 	if len(msg.OriginalSymbol) == 0 {
-		return sdk.ErrUnknownRequest("failed to check issue msg because original symbol cannot be empty")
+		return sdkerror.Wrapf(sdkerror.ErrUnknownRequest, "failed to check issue msg because original symbol cannot be empty")
 	}
 	if !ValidOriginalSymbol(msg.OriginalSymbol) {
-		return sdk.ErrUnknownRequest("failed to check issue msg because invalid original symbol: " + msg.OriginalSymbol)
+		return sdkerror.Wrapf(sdkerror.ErrUnknownRequest, "failed to check issue msg because invalid original symbol: " + msg.OriginalSymbol)
 	}
 
 	// check wholeName
 	isValid := wholeNameValid(msg.WholeName)
 	if !isValid {
-		return sdk.ErrUnknownRequest("failed to check issue msg because invalid wholename")
+		return sdkerror.Wrapf(sdkerror.ErrUnknownRequest, "failed to check issue msg because invalid wholename")
 	}
 	// check desc
 	if len(msg.Description) > DescLenLimit {
-		return sdk.ErrUnknownRequest("failed to check issue msg because invalid desc")
+		return sdkerror.Wrapf(sdkerror.ErrUnknownRequest, "failed to check issue msg because invalid desc")
 	}
 	// check totalSupply
 	totalSupply, err := sdk.NewDecFromStr(msg.TotalSupply)
@@ -70,7 +62,7 @@ func (msg MsgTokenIssue) ValidateBasic() sdk.Error {
 		return err
 	}
 	if totalSupply.GT(sdk.NewDec(TotalSupplyUpperbound)) || totalSupply.LTE(sdk.ZeroDec()) {
-		return sdk.ErrUnknownRequest("failed to check issue msg because invalid total supply")
+		return sdkerror.Wrapf(sdkerror.ErrUnknownRequest, "failed to check issue msg because invalid total supply")
 	}
 	return nil
 }
@@ -84,10 +76,7 @@ func (msg MsgTokenIssue) GetSigners() []sdk.AccAddress {
 	return []sdk.AccAddress{msg.Owner}
 }
 
-type MsgTokenBurn struct {
-	Amount sdk.DecCoin    `json:"amount"`
-	Owner  sdk.AccAddress `json:"owner"`
-}
+var _ sdk.Msg = &MsgTokenBurn{}
 
 func NewMsgTokenBurn(amount sdk.DecCoin, owner sdk.AccAddress) MsgTokenBurn {
 	return MsgTokenBurn{
@@ -100,13 +89,13 @@ func (msg MsgTokenBurn) Route() string { return RouterKey }
 
 func (msg MsgTokenBurn) Type() string { return "burn" }
 
-func (msg MsgTokenBurn) ValidateBasic() sdk.Error {
+func (msg MsgTokenBurn) ValidateBasic() error {
 	// check owner
 	if msg.Owner.Empty() {
-		return sdk.ErrInvalidAddress(msg.Owner.String())
+		return sdkerror.Wrapf(sdkerror.ErrInvalidAddress, msg.Owner.String())
 	}
 	if !msg.Amount.IsValid() {
-		return sdk.ErrInsufficientCoins("failed to check burn msg because invalid Coins: " + msg.Amount.String())
+		return sdkerror.Wrapf(sdkerror.ErrInsufficientFunds, "failed to check burn msg because invalid Coins: " + msg.Amount.String())
 	}
 
 	return nil
@@ -121,10 +110,7 @@ func (msg MsgTokenBurn) GetSigners() []sdk.AccAddress {
 	return []sdk.AccAddress{msg.Owner}
 }
 
-type MsgTokenMint struct {
-	Amount sdk.DecCoin    `json:"amount"`
-	Owner  sdk.AccAddress `json:"owner"`
-}
+var _ sdk.Msg = &MsgTokenMint{}
 
 func NewMsgTokenMint(amount sdk.DecCoin, owner sdk.AccAddress) MsgTokenMint {
 	return MsgTokenMint{
@@ -137,17 +123,17 @@ func (msg MsgTokenMint) Route() string { return RouterKey }
 
 func (msg MsgTokenMint) Type() string { return "mint" }
 
-func (msg MsgTokenMint) ValidateBasic() sdk.Error {
+func (msg MsgTokenMint) ValidateBasic() error {
 	if msg.Owner.Empty() {
-		return sdk.ErrInvalidAddress(msg.Owner.String())
+		return sdkerror.Wrapf(sdkerror.ErrInvalidAddress, msg.Owner.String())
 	}
 
 	amount := msg.Amount.Amount
 	if amount.GT(sdk.NewDec(TotalSupplyUpperbound)) {
-		return sdk.ErrUnknownRequest("failed to check mint msg because invalid amount")
+		return sdkerror.Wrapf(sdkerror.ErrUnknownRequest, "failed to check mint msg because invalid amount")
 	}
 	if !msg.Amount.IsValid() {
-		return sdk.ErrInsufficientCoins("failed to check mint msg because invalid Coins: " + msg.Amount.String())
+		return sdkerror.Wrapf(sdkerror.ErrInsufficientFunds, "failed to check mint msg because invalid Coins: " + msg.Amount.String())
 	}
 	return nil
 }
@@ -162,10 +148,7 @@ func (msg MsgTokenMint) GetSigners() []sdk.AccAddress {
 	return []sdk.AccAddress{msg.Owner}
 }
 
-type MsgMultiSend struct {
-	From      sdk.AccAddress `json:"from"`
-	Transfers []TransferUnit `json:"transfers"`
-}
+var _ sdk.Msg = &MsgMultiSend{}
 
 func NewMsgMultiSend(from sdk.AccAddress, transfers []TransferUnit) MsgMultiSend {
 	return MsgMultiSend{
@@ -178,22 +161,22 @@ func (msg MsgMultiSend) Route() string { return RouterKey }
 
 func (msg MsgMultiSend) Type() string { return "multi-send" }
 
-func (msg MsgMultiSend) ValidateBasic() sdk.Error {
+func (msg MsgMultiSend) ValidateBasic() error {
 	if msg.From.Empty() {
-		return sdk.ErrInvalidAddress(msg.From.String())
+		return sdkerror.Wrapf(sdkerror.ErrInvalidAddress, msg.From.String())
 	}
 
 	// check transfers
 	if len(msg.Transfers) > MultiSendLimit {
-		return sdk.ErrUnknownRequest("failed to check multisend msg because restrictions on the number of transfers")
+		return sdkerror.Wrapf(sdkerror.ErrUnknownRequest, "failed to check multisend msg because restrictions on the number of transfers")
 	}
 	for _, transfer := range msg.Transfers {
 		if !transfer.Coins.IsAllPositive() || !transfer.Coins.IsValid() {
-			return sdk.ErrInvalidCoins("failed to check multisend msg because send amount must be positive")
+			return sdkerror.Wrapf(sdkerror.ErrInvalidCoins, "failed to check multisend msg because send amount must be positive")
 		}
 
 		if transfer.To.Empty() {
-			return sdk.ErrInvalidAddress("failed to check multisend msg because address is empty, not valid")
+			return sdkerror.Wrapf(sdkerror.ErrInvalidAddress, "failed to check multisend msg because address is empty, not valid")
 		}
 	}
 	return nil
@@ -208,12 +191,7 @@ func (msg MsgMultiSend) GetSigners() []sdk.AccAddress {
 	return []sdk.AccAddress{msg.From}
 }
 
-// MsgSend - high level transaction of the coin module
-type MsgSend struct {
-	FromAddress sdk.AccAddress `json:"from_address"`
-	ToAddress   sdk.AccAddress `json:"to_address"`
-	Amount      sdk.DecCoins   `json:"amount"`
-}
+var _ sdk.Msg = &MsgSend{}
 
 func NewMsgTokenSend(from, to sdk.AccAddress, coins sdk.DecCoins) MsgSend {
 	return MsgSend{
@@ -227,18 +205,18 @@ func (msg MsgSend) Route() string { return RouterKey }
 
 func (msg MsgSend) Type() string { return "send" }
 
-func (msg MsgSend) ValidateBasic() sdk.Error {
+func (msg MsgSend) ValidateBasic() error {
 	if msg.FromAddress.Empty() {
-		return sdk.ErrInvalidAddress("failed to check send msg because miss sender address")
+		return sdkerror.Wrapf(sdkerror.ErrInvalidAddress, "failed to check send msg because miss sender address")
 	}
 	if msg.ToAddress.Empty() {
-		return sdk.ErrInvalidAddress("failed to check send msg because miss recipient address")
+		return sdkerror.Wrapf(sdkerror.ErrInvalidAddress, "failed to check send msg because miss recipient address")
 	}
 	if !msg.Amount.IsValid() {
-		return sdk.ErrInvalidCoins("failed to check send msg because send amount is invalid: " + msg.Amount.String())
+		return sdkerror.Wrapf(sdkerror.ErrInvalidCoins, "failed to check send msg because send amount is invalid: " + msg.Amount.String())
 	}
 	if !msg.Amount.IsAllPositive() {
-		return sdk.ErrInsufficientCoins("failed to check send msg because send amount must be positive")
+		return sdkerror.Wrapf(sdkerror.ErrInsufficientFunds, "failed to check send msg because send amount must be positive")
 	}
 	return nil
 }
@@ -253,21 +231,13 @@ func (msg MsgSend) GetSigners() []sdk.AccAddress {
 }
 
 // MsgTransferOwnership - high level transaction of the coin module
-type MsgTransferOwnership struct {
-	FromAddress sdk.AccAddress `json:"from_address"`
-	ToAddress   sdk.AccAddress `json:"to_address"`
-	Symbol      string         `json:"symbol"`
-	//FromSignature auth.StdSignature `json:"from_signature"`
-	ToSignature auth.StdSignature `json:"to_signature"`
-}
+var _ sdk.Msg = &MsgTransferOwnership{}
 
 func NewMsgTransferOwnership(from, to sdk.AccAddress, symbol string) MsgTransferOwnership {
 	return MsgTransferOwnership{
 		FromAddress: from,
 		ToAddress:   to,
 		Symbol:      symbol,
-		//FromSignature: auth.StdSignature{},
-		ToSignature: auth.StdSignature{},
 	}
 }
 
@@ -275,23 +245,23 @@ func (msg MsgTransferOwnership) Route() string { return RouterKey }
 
 func (msg MsgTransferOwnership) Type() string { return "transfer" }
 
-func (msg MsgTransferOwnership) ValidateBasic() sdk.Error {
+func (msg MsgTransferOwnership) ValidateBasic() error {
 	if msg.FromAddress.Empty() {
-		return sdk.ErrInvalidAddress("failed to check transferownership msg because miss sender address")
+		return sdkerror.Wrapf(sdkerror.ErrInvalidAddress, "failed to check transferownership msg because miss sender address")
 	}
 	if msg.ToAddress.Empty() {
-		return sdk.ErrInvalidAddress("failed to check transferownership msg because miss recipient address")
+		return sdkerror.Wrapf(sdkerror.ErrInvalidAddress, "failed to check transferownership msg because miss recipient address")
 	}
 	if len(msg.Symbol) == 0 {
-		return sdk.ErrUnknownRequest("failed to check transferownership msg because symbol cannot be empty")
+		return sdkerror.Wrapf(sdkerror.ErrUnknownRequest, "failed to check transferownership msg because symbol cannot be empty")
 	}
 
 	if sdk.ValidateDenom(msg.Symbol) != nil {
-		return sdk.ErrUnknownRequest("failed to check transferownership msg because invalid token symbol: " + msg.Symbol)
+		return sdkerror.Wrapf(sdkerror.ErrUnknownRequest, "failed to check transferownership msg because invalid token symbol: " + msg.Symbol)
 	}
 
 	if !msg.checkMultiSign() {
-		return sdk.ErrUnauthorized("failed to check transferownership msg because invalid multi signature")
+		return sdkerror.Wrapf(sdkerror.ErrUnauthorized, "failed to check transferownership msg because invalid multi signature")
 	}
 	return nil
 }
@@ -307,29 +277,25 @@ func (msg MsgTransferOwnership) GetSigners() []sdk.AccAddress {
 
 func (msg MsgTransferOwnership) checkMultiSign() bool {
 	// check pubkey
-	if msg.ToSignature.PubKey == nil {
+	if msg.Pubkey == nil {
 		return false
 	}
 
-	if !sdk.AccAddress(msg.ToSignature.PubKey.Address()).Equals(msg.ToAddress) {
+	stdSign := authtypes.StdSignature {
+		msg.Pubkey,
+		msg.ToSignature,
+	}
+
+	if !sdk.AccAddress(stdSign.GetPubKey().Address()).Equals(msg.ToAddress) {
 		return false
 	}
 
 	// check multisign
-	toSignature := msg.ToSignature
-	msg.ToSignature = auth.StdSignature{}
-	toValid := toSignature.VerifyBytes(msg.GetSignBytes(), toSignature.Signature)
+	toValid := stdSign.GetPubKey().VerifyBytes(msg.GetSignBytes(), msg.ToSignature)
 	return toValid
 }
 
-type MsgTokenModify struct {
-	Owner                 sdk.AccAddress `json:"owner"`
-	Symbol                string         `json:"symbol"`
-	Description           string         `json:"description"`
-	WholeName             string         `json:"whole_name"`
-	IsDescriptionModified bool           `json:"description_modified"`
-	IsWholeNameModified   bool           `json:"whole_name_modified"`
-}
+var _ sdk.Msg = &MsgTokenModify{}
 
 func NewMsgTokenModify(symbol, desc, wholeName string, isDescEdit, isWholeNameEdit bool, owner sdk.AccAddress) MsgTokenModify {
 	return MsgTokenModify{
@@ -346,29 +312,29 @@ func (msg MsgTokenModify) Route() string { return RouterKey }
 
 func (msg MsgTokenModify) Type() string { return "edit" }
 
-func (msg MsgTokenModify) ValidateBasic() sdk.Error {
+func (msg MsgTokenModify) ValidateBasic() error {
 	// check owner
 	if msg.Owner.Empty() {
-		return sdk.ErrInvalidAddress(msg.Owner.String())
+		return sdkerror.Wrapf(sdkerror.ErrInvalidAddress, msg.Owner.String())
 	}
 	// check symbol
 	if len(msg.Symbol) == 0 {
-		return sdk.ErrUnknownRequest("failed to check modify msg because symbol cannot be empty")
+		return sdkerror.Wrapf(sdkerror.ErrUnknownRequest, "failed to check modify msg because symbol cannot be empty")
 	}
 	if sdk.ValidateDenom(msg.Symbol) != nil {
-		return sdk.ErrUnknownRequest("failed to check modify msg because invalid token symbol: " + msg.Symbol)
+		return sdkerror.Wrapf(sdkerror.ErrUnknownRequest, "failed to check modify msg because invalid token symbol: " + msg.Symbol)
 	}
 	// check wholeName
 	if msg.IsWholeNameModified {
 		isValid := wholeNameValid(msg.WholeName)
 		if !isValid {
-			return sdk.ErrUnknownRequest("failed to check modify msg because invalid wholename")
+			return sdkerror.Wrapf(sdkerror.ErrUnknownRequest, "failed to check modify msg because invalid wholename")
 		}
 	}
 	// check desc
 	if msg.IsDescriptionModified {
 		if len(msg.Description) > DescLenLimit {
-			return sdk.ErrUnknownRequest("failed to check modify msg because invalid desc")
+			return sdkerror.Wrapf(sdkerror.ErrUnknownRequest, "failed to check modify msg because invalid desc")
 		}
 	}
 	return nil

@@ -1,14 +1,15 @@
 package cli
 
 import (
+	"bufio"
 	"fmt"
+	"github.com/cosmos/cosmos-sdk/client/flags"
+	authclient "github.com/cosmos/cosmos-sdk/x/auth/client"
 	"strings"
 
 	"github.com/cosmos/cosmos-sdk/client"
-	"github.com/cosmos/cosmos-sdk/client/context"
 	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/cosmos/cosmos-sdk/x/auth/client/utils"
 	authtxb "github.com/cosmos/cosmos-sdk/x/auth/types"
 	"github.com/okex/okchain/x/order/types"
 	"github.com/pkg/errors"
@@ -22,7 +23,7 @@ func GetTxCmd(cdc *codec.Codec) *cobra.Command {
 		Short: "Order transactions subcommands",
 	}
 
-	txCmd.AddCommand(client.PostCommands(
+	txCmd.AddCommand(flags.PostCommands(
 		getCmdNewOrder(cdc),
 		getCmdCancelOrder(cdc),
 	)...)
@@ -52,7 +53,7 @@ func getCmdNewOrder(cdc *codec.Codec) *cobra.Command {
 				return errors.New("invalid param counts")
 			}
 
-			err := handleNewOrder(cdc, product, side, price, quantity)
+			err := handleNewOrder(cdc, cmd, product, side, price, quantity)
 			return err
 
 		},
@@ -65,7 +66,7 @@ func getCmdNewOrder(cdc *codec.Codec) *cobra.Command {
 	return cmd
 }
 
-func handleNewOrder(cdc *codec.Codec, product string, side string, price string, quantity string) error {
+func handleNewOrder(cdc *codec.Codec, cmd *cobra.Command, product string, side string, price string, quantity string) error {
 	var items []types.OrderItem
 	productArr := strings.Split(product, ",")
 	sideArr := strings.Split(side, ",")
@@ -102,11 +103,12 @@ func handleNewOrder(cdc *codec.Codec, product string, side string, price string,
 		})
 	}
 
-	txBldr := authtxb.NewTxBuilderFromCLI().WithTxEncoder(utils.GetTxEncoder(cdc))
-	cliCtx := context.NewCLIContext().WithCodec(cdc)
+	inBuf := bufio.NewReader(cmd.InOrStdin())
+	txBldr := authtxb.NewTxBuilderFromCLI(inBuf).WithTxEncoder(authclient.GetTxEncoder(cdc))
+	cliCtx := client.NewContext().WithCodec(cdc)
 
 	msg := types.NewMsgNewOrders(cliCtx.GetFromAddress(), items)
-	err := utils.GenerateOrBroadcastMsgs(cliCtx, txBldr, []sdk.Msg{msg})
+	err := authclient.GenerateOrBroadcastMsgs(cliCtx, txBldr, []sdk.Msg{&msg})
 	return err
 }
 
@@ -118,11 +120,12 @@ func getCmdCancelOrder(cdc *codec.Codec) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			orderIDs := strings.Split(args[0], ",")
 
-			txBldr := authtxb.NewTxBuilderFromCLI().WithTxEncoder(utils.GetTxEncoder(cdc))
-			cliCtx := context.NewCLIContext().WithCodec(cdc)
+			inBuf := bufio.NewReader(cmd.InOrStdin())
+			txBldr := authtxb.NewTxBuilderFromCLI(inBuf).WithTxEncoder(authclient.GetTxEncoder(cdc))
+			cliCtx := client.NewContext().WithCodec(cdc)
 
 			msg := types.NewMsgCancelOrders(cliCtx.GetFromAddress(), orderIDs)
-			err := utils.GenerateOrBroadcastMsgs(cliCtx, txBldr, []sdk.Msg{msg})
+			err := authclient.GenerateOrBroadcastMsgs(cliCtx, txBldr, []sdk.Msg{&msg})
 			if err != nil {
 				fmt.Println(err)
 			}

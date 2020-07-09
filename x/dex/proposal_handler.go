@@ -2,6 +2,7 @@ package dex
 
 import (
 	"fmt"
+	sdkerror "github.com/cosmos/cosmos-sdk/types/errors"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/okex/okchain/x/dex/types"
@@ -10,19 +11,19 @@ import (
 
 // NewProposalHandler handles "gov" type message in "dex"
 func NewProposalHandler(k *Keeper) govTypes.Handler {
-	return func(ctx sdk.Context, proposal *govTypes.Proposal) (err sdk.Error) {
-		switch c := proposal.Content.(type) {
+	return func(ctx sdk.Context, proposal *govTypes.Proposal) (err error) {
+		switch c := proposal.GetContent().(type) {
 		case types.DelistProposal:
 			return handleDelistProposal(ctx, k, proposal)
 		default:
 			errMsg := fmt.Sprintf("unrecognized param proposal content type: %s", c)
-			return sdk.ErrUnknownRequest(errMsg)
+			return sdkerror.Wrap(sdkerror.ErrUnknownRequest, errMsg)
 		}
 	}
 }
 
-func handleDelistProposal(ctx sdk.Context, keeper *Keeper, proposal *govTypes.Proposal) (err sdk.Error) {
-	p := proposal.Content.(types.DelistProposal)
+func handleDelistProposal(ctx sdk.Context, keeper *Keeper, proposal *govTypes.Proposal) (err error) {
+	p := proposal.GetContent().(types.DelistProposal)
 	logger := ctx.Logger().With("module", types.ModuleName)
 	logger.Debug("execute DelistProposal begin")
 
@@ -33,12 +34,12 @@ func handleDelistProposal(ctx sdk.Context, keeper *Keeper, proposal *govTypes.Pr
 	}
 	if keeper.IsTokenPairLocked(ctx, tokenPairName) {
 		errContent := fmt.Sprintf("unexpected state, the trading pair (%s) is locked", tokenPairName)
-		return sdk.ErrInternal(errContent)
+		return sdkerror.Wrapf(sdkerror.ErrInternal, errContent)
 	}
 	// withdraw
 	if tokenPair.Deposits.IsPositive() {
 		if err := keeper.Withdraw(ctx, tokenPair.Name(), tokenPair.Owner, tokenPair.Deposits); err != nil {
-			return sdk.ErrInternal(fmt.Sprintf("failed to withdraw deposits:%s error:%s",
+			return sdkerror.Wrapf(sdkerror.ErrInternal, fmt.Sprintf("failed to withdraw deposits:%s error:%s",
 				tokenPair.Deposits.String(), err.Error()))
 		}
 	}

@@ -2,10 +2,10 @@ package cli
 
 import (
 	"fmt"
+	"github.com/cosmos/cosmos-sdk/client/flags"
 	"strings"
 
 	"github.com/cosmos/cosmos-sdk/client"
-	"github.com/cosmos/cosmos-sdk/client/context"
 	"github.com/cosmos/cosmos-sdk/codec"
 	"github.com/okex/okchain/x/common/proto"
 	"github.com/okex/okchain/x/upgrade/keeper"
@@ -20,7 +20,7 @@ func GetQueryCmd(queryRoute string, cdc *codec.Codec) *cobra.Command {
 		Short: "Querying commands for the upgrade module",
 	}
 
-	upgradeQueryCmd.AddCommand(client.GetCommands(
+	upgradeQueryCmd.AddCommand(flags.GetCommands(
 		GetCmdQueryUpgradeConfig(queryRoute, cdc),
 		GetCmdQueryUpgradeVersion(queryRoute, cdc),
 		GetCmdQueryUpgradeFailedVersion(queryRoute, cdc))...)
@@ -39,7 +39,7 @@ $ okchaincli query upgrade config
 `),
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cliCtx := context.NewCLIContext().WithCodec(cdc)
+			cliCtx := client.NewContext().WithCodec(cdc)
 
 			route := fmt.Sprintf("custom/%s/%s", storeName, keeper.QueryUpgradeConfig)
 			bz, _, err := cliCtx.QueryWithData(route, nil)
@@ -65,7 +65,7 @@ $ okchaincli query upgrade version
 `),
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cliCtx := context.NewCLIContext().WithCodec(cdc)
+			cliCtx := client.NewContext().WithCodec(cdc)
 
 			route := fmt.Sprintf("custom/%s/%s", storeName, keeper.QueryUpgradeVersion)
 			bz, _, err := cliCtx.QueryWithData(route, nil)
@@ -91,7 +91,7 @@ $ okchaincli query upgrade failed-version
 `),
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cliCtx := context.NewCLIContext().WithCodec(cdc)
+			cliCtx := client.NewContext().WithCodec(cdc)
 
 			route := fmt.Sprintf("custom/%s/%s", storeName, keeper.QueryUpgradeFailedVersion)
 			bz, _, err := cliCtx.QueryWithData(route, nil)

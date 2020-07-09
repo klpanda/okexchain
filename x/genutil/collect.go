@@ -16,7 +16,7 @@ import (
 
 	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	authexported "github.com/cosmos/cosmos-sdk/x/auth/exported"
+	bankexported "github.com/cosmos/cosmos-sdk/x/bank/exported"
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
 	"github.com/cosmos/cosmos-sdk/x/genutil/types"
 	cfg "github.com/tendermint/tendermint/config"
@@ -24,14 +24,14 @@ import (
 )
 
 // GenAppStateFromConfig gets the genesis app state from the config
-func GenAppStateFromConfig(cdc *codec.Codec, config *cfg.Config,
+func GenAppStateFromConfig(cdc codec.JSONMarshaler, config *cfg.Config,
 	initCfg InitConfig, genDoc tmtypes.GenesisDoc,
-	genAccIterator types.GenesisAccountsIterator,
+	genbankIterator types.GenesisBalancesIterator,
 ) (appState json.RawMessage, err error) {
 
 	// process genesis transactions, else create default genesis.json
 	appGenTxs, persistentPeers, err := CollectStdTxs(
-		cdc, config.Moniker, initCfg.GenTxsDir, genDoc, genAccIterator)
+		cdc, config.Moniker, initCfg.GenTxsDir, genDoc, genbankIterator)
 	if err != nil {
 		return appState, err
 	}
@@ -66,8 +66,8 @@ func GenAppStateFromConfig(cdc *codec.Codec, config *cfg.Config,
 
 // CollectStdTxs processes and validates application's genesis StdTxs and returns
 // the list of appGenTxs, and persistent peers required to generate genesis.json.
-func CollectStdTxs(cdc *codec.Codec, moniker, genTxsDir string,
-	genDoc tmtypes.GenesisDoc, genAccIterator types.GenesisAccountsIterator,
+func CollectStdTxs(cdc codec.JSONMarshaler, moniker, genTxsDir string,
+	genDoc tmtypes.GenesisDoc, genBankIterator types.GenesisBalancesIterator,
 ) (appGenTxs []authtypes.StdTx, persistentPeers string, err error) {
 
 	var fos []os.FileInfo
@@ -83,10 +83,11 @@ func CollectStdTxs(cdc *codec.Codec, moniker, genTxsDir string,
 		return appGenTxs, persistentPeers, err
 	}
 
-	addrMap := make(map[string]authexported.Account)
-	genAccIterator.IterateGenesisAccounts(cdc, appState,
-		func(acc authexported.Account) (stop bool) {
-			addrMap[acc.GetAddress().String()] = acc
+	balancesMap := make(map[string]bankexported.GenesisBalance)
+	genBankIterator.IterateGenesisBalances(
+		cdc, appState,
+		func(balance bankexported.GenesisBalance) (stop bool) {
+			balancesMap[balance.GetAddress().String()] = balance
 			return false
 		},
 	)
@@ -131,27 +132,27 @@ func CollectStdTxs(cdc *codec.Codec, moniker, genTxsDir string,
 		}
 
 		// TODO abstract out staking message validation back to staking
-		msg := msgs[0].(stakingtypes.MsgCreateValidator)
+		msg := msgs[0].(*stakingtypes.MsgCreateValidator)
 		// validate delegator and validator addresses and funds against the accounts in the state
 		delAddr := msg.DelegatorAddress.String()
 		valAddr := sdk.AccAddress(msg.ValidatorAddress).String()
 
-		delAcc, delOk := addrMap[delAddr]
+		delBal, delOk := balancesMap[delAddr]
 		if !delOk {
 			return appGenTxs, persistentPeers, fmt.Errorf(
-				"account %v not in genesis.json: %+v", delAddr, addrMap)
+				"account %v not in genesis.json: %+v", delAddr, balancesMap)
 		}
 
-		_, valOk := addrMap[valAddr]
+		_, valOk := balancesMap[valAddr]
 		if !valOk {
 			return appGenTxs, persistentPeers, fmt.Errorf(
-				"account %v not in genesis.json: %+v", valAddr, addrMap)
+				"account %v not in genesis.json: %+v", valAddr, balancesMap)
 		}
 
-		if delAcc.GetCoins().AmountOf(msg.MinSelfDelegation.Denom).LT(msg.MinSelfDelegation.Amount) {
+		if delBal.GetCoins().AmountOf(msg.MinSelfDelegation.Denom).LT(msg.MinSelfDelegation.Amount) {
 			return appGenTxs, persistentPeers, fmt.Errorf(
 				"insufficient fund for delegation %v: %v < %v",
-				delAcc.GetAddress(), delAcc.GetCoins().AmountOf(msg.MinSelfDelegation.Denom), msg.MinSelfDelegation.Amount,
+				delBal.GetAddress(), delBal.GetCoins().AmountOf(msg.MinSelfDelegation.Denom), msg.MinSelfDelegation.Amount,
 			)
 		}
 

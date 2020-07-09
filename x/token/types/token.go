@@ -61,11 +61,6 @@ type Transfer struct {
 	Amount string `json:"amount"`
 }
 
-type TransferUnit struct {
-	To    sdk.AccAddress `json:"to"`
-	Coins sdk.DecCoins   `json:"coins"`
-}
-
 type CoinsInfo []CoinInfo
 
 func (d CoinsInfo) Len() int           { return len(d) }

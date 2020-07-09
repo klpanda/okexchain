@@ -3,6 +3,7 @@ package keeper
 import (
 	"bytes"
 	"fmt"
+	gogotypes "github.com/gogo/protobuf/types"
 	"time"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -95,7 +96,7 @@ func (k Keeper) SetValidator(ctx sdk.Context, validator types.Validator) {
 // SetValidatorByConsAddr sets the operator address with the key of validator consensus pubkey
 func (k Keeper) SetValidatorByConsAddr(ctx sdk.Context, validator types.Validator) {
 	store := ctx.KVStore(k.storeKey)
-	consAddr := sdk.ConsAddress(validator.ConsPubKey.Address())
+	consAddr := sdk.ConsAddress(sdk.MustGetPubKeyFromBech32(sdk.Bech32PubKeyTypeConsPub, validator.ConsPubKey).Address())
 	store.Set(types.GetValidatorByConsAddrKey(consAddr), validator.OperatorAddress)
 }
 
@@ -145,7 +146,7 @@ func (k Keeper) RemoveValidator(ctx sdk.Context, address sdk.ValAddress) {
 	// delete the old validator record
 	store := ctx.KVStore(k.storeKey)
 	store.Delete(types.GetValidatorKey(address))
-	store.Delete(types.GetValidatorByConsAddrKey(sdk.ConsAddress(validator.ConsPubKey.Address())))
+	store.Delete(types.GetValidatorByConsAddrKey(sdk.ConsAddress(sdk.MustGetPubKeyFromBech32(sdk.Bech32PubKeyTypeConsPub, validator.ConsPubKey).Address())))
 	store.Delete(types.GetValidatorsByPowerIndexKey(validator))
 
 	// call hooks
@@ -184,14 +185,15 @@ func (k Keeper) GetLastValidatorPower(ctx sdk.Context, operator sdk.ValAddress) 
 	if bz == nil {
 		return 0
 	}
-	k.cdc.MustUnmarshalBinaryLengthPrefixed(bz, &power)
-	return
+	var p gogotypes.Int64Value
+	k.cdc.MustUnmarshalBinaryBare(bz, &p)
+	return p.Value
 }
 
 // SetLastValidatorPower sets the last validator power
 func (k Keeper) SetLastValidatorPower(ctx sdk.Context, operator sdk.ValAddress, power int64) {
 	store := ctx.KVStore(k.storeKey)
-	bz := k.cdc.MustMarshalBinaryLengthPrefixed(power)
+	bz := k.cdc.MustMarshalBinaryBare(&gogotypes.Int64Value{Value: power})
 	store.Set(types.GetLastValidatorPowerKey(operator), bz)
 }
 
@@ -216,9 +218,9 @@ func (k Keeper) IterateLastValidatorPowers(ctx sdk.Context,
 	defer iter.Close()
 	for ; iter.Valid(); iter.Next() {
 		addr := sdk.ValAddress(iter.Key()[len(types.LastValidatorPowerKey):])
-		var power int64
+		var power gogotypes.Int64Value
 		k.cdc.MustUnmarshalBinaryLengthPrefixed(iter.Value(), &power)
-		if handler(addr, power) {
+		if handler(addr, power.Value) {
 			break
 		}
 	}
@@ -235,14 +237,15 @@ func (k Keeper) GetValidatorQueueTimeSlice(ctx sdk.Context, timestamp time.Time)
 	if bz == nil {
 		return []sdk.ValAddress{}
 	}
-	k.cdc.MustUnmarshalBinaryLengthPrefixed(bz, &valAddrs)
-	return valAddrs
+	var vals sdk.ValAddresses
+	k.cdc.MustUnmarshalBinaryBare(bz, &vals)
+	return vals.Addresses
 }
 
 // SetValidatorQueueTimeSlice sets a specific validator queue timeslice
 func (k Keeper) SetValidatorQueueTimeSlice(ctx sdk.Context, timestamp time.Time, keys []sdk.ValAddress) {
 	store := ctx.KVStore(k.storeKey)
-	bz := k.cdc.MustMarshalBinaryLengthPrefixed(keys)
+	bz := k.cdc.MustMarshalBinaryBare(&sdk.ValAddresses{Addresses: keys})
 	store.Set(types.GetValidatorQueueTimeKey(timestamp), bz)
 }
 
@@ -293,10 +296,10 @@ func (k Keeper) UnbondAllMatureValidatorQueue(ctx sdk.Context) {
 	defer validatorTimesliceIterator.Close()
 
 	for ; validatorTimesliceIterator.Valid(); validatorTimesliceIterator.Next() {
-		timeslice := []sdk.ValAddress{}
-		k.cdc.MustUnmarshalBinaryLengthPrefixed(validatorTimesliceIterator.Value(), &timeslice)
+		var vals sdk.ValAddresses
+		k.cdc.MustUnmarshalBinaryBare(validatorTimesliceIterator.Value(), &vals)
 
-		for _, valAddr := range timeslice {
+		for _, valAddr := range vals.Addresses {
 			val, found := k.GetValidator(ctx, valAddr)
 			if !found {
 				panic("validator in the unbonding queue was not found")

@@ -1,38 +1,39 @@
 package params
 
 import (
-	sdkparams "github.com/cosmos/cosmos-sdk/x/params"
+	sdkparamstypes "github.com/cosmos/cosmos-sdk/x/params/types"
+	sdkparamsproposal "github.com/cosmos/cosmos-sdk/x/params/types/proposal"
 	"github.com/okex/okchain/x/params/types"
 )
 
 // const
 const (
-	ModuleName        = sdkparams.ModuleName
-	DefaultCodespace  = sdkparams.DefaultCodespace
-	DefaultParamspace = sdkparams.ModuleName
-	StoreKey          = sdkparams.StoreKey
-	TStoreKey         = sdkparams.TStoreKey
-	RouterKey         = sdkparams.RouterKey
+	ModuleName        = sdkparamstypes.ModuleName
+	DefaultParamspace = sdkparamstypes.ModuleName
+	StoreKey          = sdkparamstypes.StoreKey
+	TStoreKey         = sdkparamstypes.TStoreKey
+	RouterKey         = sdkparamsproposal.RouterKey
 )
 
 type (
 	// KeyTable is the type alias of the one in cmsdk
-	KeyTable = sdkparams.KeyTable
+	KeyTable = sdkparamstypes.KeyTable
 	// ParamSetPairs is the type alias of the one in cmsdk
-	ParamSetPairs = sdkparams.ParamSetPairs
+	ParamSetPairs = sdkparamstypes.ParamSetPairs
 	// Subspace is the type alias of the one in cmsdk
-	Subspace = sdkparams.Subspace
+	Subspace = sdkparamstypes.Subspace
 	// ParamSet is the type alias of the one in cmsdk
-	ParamSet = sdkparams.ParamSet
+	ParamSet = sdkparamstypes.ParamSet
 	// ParamChange is the type alias of the one in cmsdk
-	ParamChange = sdkparams.ParamChange
+	ParamChange = sdkparamsproposal.ParamChange
 	// ParameterChangeProposal is alias of ParameterChangeProposal in types
 	ParameterChangeProposal = types.ParameterChangeProposal
+	ParamSetPair           = sdkparamstypes.ParamSetPair
 )
 
 var (
 	// nolint
-	NewKeyTable    = sdkparams.NewKeyTable
-	NewParamChange = sdkparams.NewParamChange
+	NewKeyTable    = sdkparamstypes.NewKeyTable
+	NewParamChange = sdkparamsproposal.NewParamChange
 	DefaultParams  = types.DefaultParams
 )

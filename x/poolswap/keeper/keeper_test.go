@@ -1,10 +1,10 @@
 package keeper
 
 import (
+	banktypes "github.com/cosmos/cosmos-sdk/x/bank/types"
 	"testing"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	"github.com/cosmos/cosmos-sdk/x/supply"
 	"github.com/okex/okchain/x/common"
 	"github.com/okex/okchain/x/poolswap/types"
 	"github.com/stretchr/testify/require"
@@ -17,7 +17,7 @@ func TestKeeper_GetPoolTokenInfo(t *testing.T) {
 	keeper := mapp.swapKeeper
 	mapp.BeginBlock(abci.RequestBeginBlock{Header: abci.Header{Height: 2}})
 	ctx := mapp.BaseApp.NewContext(false, abci.Header{}).WithBlockHeight(10)
-	mapp.supplyKeeper.SetSupply(ctx, supply.NewSupply(mapp.TotalCoinsSupply))
+	mapp.BankKeeper.SetSupply(ctx, banktypes.NewSupply(mapp.TotalCoinsSupply))
 
 	// init a pool token
 	symbol := types.PoolTokenPrefix + common.TestToken
@@ -38,6 +38,6 @@ func TestKeeper_GetPoolTokenInfo(t *testing.T) {
 	err = keeper.MintPoolCoinsToUser(ctx, sdk.DecCoins{mintToken}, sdk.AccAddress(addrTest))
 	require.Nil(t, err)
 
-	balance := mapp.bankKeeper.GetCoins(ctx, sdk.AccAddress(addrTest))
+	balance := mapp.BankKeeper.GetAllBalances(ctx, sdk.AccAddress(addrTest))
 	require.NotNil(t, balance)
 }

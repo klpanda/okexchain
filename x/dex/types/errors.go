@@ -2,22 +2,21 @@ package types
 
 import (
 	"fmt"
-
-	sdk "github.com/cosmos/cosmos-sdk/types"
+	sdkerror "github.com/cosmos/cosmos-sdk/types/errors"
 )
 
 // const CodeType
 const (
-	codeInvalidProduct      sdk.CodeType = 1
-	codeTokenPairNotFound   sdk.CodeType = 2
-	codeDelistOwnerNotMatch sdk.CodeType = 3
+	codeInvalidProduct      uint32 = 1
+	codeTokenPairNotFound   uint32 = 2
+	codeDelistOwnerNotMatch uint32 = 3
 
-	codeInvalidBalanceNotEnough sdk.CodeType = 4
-	codeInvalidAsset            sdk.CodeType = 5
+	codeInvalidBalanceNotEnough uint32 = 4
+	codeInvalidAsset            uint32 = 5
 )
 
 // CodeType to Message
-func codeToDefaultMsg(code sdk.CodeType) string {
+func codeToDefaultMsg(code uint32) string {
 	switch code {
 	case codeInvalidProduct:
 		return "invalid product"
@@ -31,32 +30,32 @@ func codeToDefaultMsg(code sdk.CodeType) string {
 }
 
 // ErrInvalidProduct returns invalid product error
-func ErrInvalidProduct(msg string) sdk.Error {
-	return sdk.NewError(DefaultCodespace, codeInvalidProduct, codeToDefaultMsg(codeInvalidProduct)+": %s", msg)
+func ErrInvalidProduct(msg string) *sdkerror.Error {
+	return sdkerror.New(DefaultCodespace, codeInvalidProduct, codeToDefaultMsg(codeInvalidProduct)+": %s" + msg)
 }
 
 // ErrTokenPairNotFound returns token pair not found error
-func ErrTokenPairNotFound(msg string) sdk.Error {
-	return sdk.NewError(DefaultCodespace, codeTokenPairNotFound, codeToDefaultMsg(codeTokenPairNotFound)+": %s", msg)
+func ErrTokenPairNotFound(msg string) *sdkerror.Error {
+	return sdkerror.New(DefaultCodespace, codeTokenPairNotFound, codeToDefaultMsg(codeTokenPairNotFound)+": %s" + msg)
 }
 
 // ErrDelistOwnerNotMatch returns delist owner not match error
-func ErrDelistOwnerNotMatch(msg string) sdk.Error {
-	return sdk.NewError(DefaultCodespace, codeDelistOwnerNotMatch, codeToDefaultMsg(codeDelistOwnerNotMatch)+": %s", msg)
+func ErrDelistOwnerNotMatch(msg string) *sdkerror.Error {
+	return sdkerror.New(DefaultCodespace, codeDelistOwnerNotMatch, codeToDefaultMsg(codeDelistOwnerNotMatch)+": %s" + msg)
 }
 
 // ErrInvalidBalanceNotEnough returns invalid balance not enough error
-func ErrInvalidBalanceNotEnough(message string) sdk.Error {
-	return sdk.NewError(DefaultCodespace, codeInvalidBalanceNotEnough, message)
+func ErrInvalidBalanceNotEnough(message string) *sdkerror.Error {
+	return sdkerror.New(DefaultCodespace, codeInvalidBalanceNotEnough, message)
 }
 
 // ErrInvalidAsset returns invalid asset error
-func ErrInvalidAsset(message string) sdk.Error {
-	return sdk.NewError(DefaultCodespace, codeInvalidAsset, message)
+func ErrInvalidAsset(message string) *sdkerror.Error {
+	return sdkerror.New(DefaultCodespace, codeInvalidAsset, message)
 }
 
 // ErrTokenPairExisted returns an error when the token pair is existing during the process of listing
-func ErrTokenPairExisted(baseAsset, quoteAsset string) sdk.Error {
-	return sdk.NewError(DefaultCodespace, codeInvalidAsset,
+func ErrTokenPairExisted(baseAsset, quoteAsset string) *sdkerror.Error {
+	return sdkerror.New(DefaultCodespace, codeInvalidAsset,
 		fmt.Sprintf("failed. the token pair exists with %s and %s", baseAsset, quoteAsset))
 }

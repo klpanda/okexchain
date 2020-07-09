@@ -2,12 +2,10 @@ package types
 
 import (
 	"fmt"
+	sdkparamstypes "github.com/cosmos/cosmos-sdk/x/params/types"
 	"time"
 
-	"github.com/cosmos/cosmos-sdk/x/params/subspace"
-
 	sdk "github.com/cosmos/cosmos-sdk/types"
-	sdkparams "github.com/cosmos/cosmos-sdk/x/params"
 )
 
 const (
@@ -15,8 +13,8 @@ const (
 )
 
 // ParamKeyTable returns the key declaration for parameters
-func ParamKeyTable() sdkparams.KeyTable {
-	return sdkparams.NewKeyTable().RegisterParamSet(&Params{})
+func ParamKeyTable() sdkparamstypes.KeyTable {
+	return sdkparamstypes.NewKeyTable().RegisterParamSet(&Params{})
 }
 
 // Params is the struct of the parameters in this module
@@ -52,14 +50,18 @@ MaxBlockHeight:   %d,
 `, p.MaxDepositPeriod, p.MinDeposit, p.VotingPeriod, p.MaxBlockHeight)
 }
 
+func tmpValidate(value interface{}) error {
+	return nil
+}
+
 // ParamSetPairs implements the ParamSet interface and returns all the key/value pairs
 // pairs of auth module's parameters.
 // nolint
-func (p *Params) ParamSetPairs() subspace.ParamSetPairs {
-	return subspace.ParamSetPairs{
-		{KeyMaxDepositPeriod, &p.MaxDepositPeriod},
-		{KeyMinDeposit, &p.MinDeposit},
-		{KeyVotingPeriod, &p.VotingPeriod},
-		{KeyMaxBlockHeight, &p.MaxBlockHeight},
+func (p *Params) ParamSetPairs() sdkparamstypes.ParamSetPairs {
+	return sdkparamstypes.ParamSetPairs{
+		{KeyMaxDepositPeriod, &p.MaxDepositPeriod, tmpValidate},
+		{KeyMinDeposit, &p.MinDeposit, tmpValidate},
+		{KeyVotingPeriod, &p.VotingPeriod, tmpValidate},
+		{KeyMaxBlockHeight, &p.MaxBlockHeight, tmpValidate},
 	}
 }

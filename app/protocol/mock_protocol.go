@@ -7,8 +7,8 @@ import (
 
 	"github.com/tendermint/tendermint/libs/log"
 
-	"github.com/cosmos/cosmos-sdk/x/crisis"
-	"github.com/cosmos/cosmos-sdk/x/slashing"
+	crisiskeeper "github.com/cosmos/cosmos-sdk/x/crisis/keeper"
+	slashingkeeper "github.com/cosmos/cosmos-sdk/x/slashing/keeper"
 
 	"github.com/cosmos/cosmos-sdk/codec"
 	sdk "github.com/cosmos/cosmos-sdk/types"
@@ -71,8 +71,8 @@ func (*MockProtocol) GetKVStoreKeysMap() map[string]*sdk.KVStoreKey             
 func (*MockProtocol) GetTransientStoreKeysMap() map[string]*sdk.TransientStoreKey { return nil }
 func (*MockProtocol) GetBackendKeeper() backend.Keeper                            { return backend.Keeper{} }
 func (*MockProtocol) GetStreamKeeper() stream.Keeper                              { return stream.Keeper{} }
-func (*MockProtocol) GetCrisisKeeper() crisis.Keeper                              { return crisis.Keeper{} }
+func (*MockProtocol) GetCrisisKeeper() crisiskeeper.Keeper                        { return crisiskeeper.Keeper{} }
 func (*MockProtocol) GetStakingKeeper() staking.Keeper                            { return staking.Keeper{} }
 func (*MockProtocol) GetDistrKeeper() distr.Keeper                                { return distr.Keeper{} }
-func (*MockProtocol) GetSlashingKeeper() slashing.Keeper                          { return slashing.Keeper{} }
+func (*MockProtocol) GetSlashingKeeper() slashingkeeper.Keeper                    { return slashingkeeper.Keeper{} }
 func (*MockProtocol) GetTokenKeeper() token.Keeper                                { return token.Keeper{} }

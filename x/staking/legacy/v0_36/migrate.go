@@ -25,7 +25,7 @@ func migrateValidators(oldValidators v034staking.Validators) Validators {
 	validators := make(Validators, len(oldValidators))
 
 	for i, val := range oldValidators {
-		bechConsPubKey, err := sdk.Bech32ifyConsPub(val.ConsPubKey)
+		bechConsPubKey, err := sdk.Bech32ifyPubKey(sdk.Bech32PubKeyTypeConsPub, val.ConsPubKey)
 		if err != nil {
 			panic(err)
 		}

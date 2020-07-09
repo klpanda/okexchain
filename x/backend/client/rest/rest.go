@@ -2,10 +2,10 @@ package rest
 
 import (
 	"fmt"
+	"github.com/cosmos/cosmos-sdk/client"
 	"net/http"
 	"strconv"
 
-	"github.com/cosmos/cosmos-sdk/client/context"
 	"github.com/cosmos/cosmos-sdk/types/rest"
 	"github.com/gorilla/mux"
 	"github.com/okex/okchain/x/backend/client/cli"
@@ -14,7 +14,7 @@ import (
 )
 
 // RegisterRoutes - Central function to define routes that get registered by the main application
-func RegisterRoutes(cliCtx context.CLIContext, r *mux.Router) {
+func RegisterRoutes(cliCtx client.Context, r *mux.Router) {
 	r.HandleFunc("/candles/{product}", candleHandler(cliCtx)).Methods("GET")
 	r.HandleFunc("/tickers", tickerHandler(cliCtx)).Methods("GET")
 	r.HandleFunc("/tickers/{product}", tickerHandler(cliCtx)).Methods("GET")
@@ -26,7 +26,7 @@ func RegisterRoutes(cliCtx context.CLIContext, r *mux.Router) {
 	r.HandleFunc("/transactions", txListHandler(cliCtx)).Methods("GET")
 }
 
-func candleHandler(cliCtx context.CLIContext) http.HandlerFunc {
+func candleHandler(cliCtx client.Context) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		vars := mux.Vars(r)
 		product := vars["product"]
@@ -70,7 +70,7 @@ func candleHandler(cliCtx context.CLIContext) http.HandlerFunc {
 	}
 }
 
-func tickerHandler(cliCtx context.CLIContext) http.HandlerFunc {
+func tickerHandler(cliCtx client.Context) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		vars := mux.Vars(r)
 		product := vars["product"]
@@ -117,7 +117,7 @@ func tickerHandler(cliCtx context.CLIContext) http.HandlerFunc {
 	}
 }
 
-func matchHandler(cliCtx context.CLIContext) http.HandlerFunc {
+func matchHandler(cliCtx client.Context) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		product := r.URL.Query().Get("product")
 		startStr := r.URL.Query().Get("start")
@@ -177,7 +177,7 @@ func matchHandler(cliCtx context.CLIContext) http.HandlerFunc {
 	}
 }
 
-func dealHandler(cliCtx context.CLIContext) http.HandlerFunc {
+func dealHandler(cliCtx client.Context) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		addr := r.URL.Query().Get("address")
 		product := r.URL.Query().Get("product")
@@ -239,7 +239,7 @@ func dealHandler(cliCtx context.CLIContext) http.HandlerFunc {
 	}
 }
 
-func feeDetailListHandler(cliCtx context.CLIContext) http.HandlerFunc {
+func feeDetailListHandler(cliCtx client.Context) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		addr := r.URL.Query().Get("address")
 		pageStr := r.URL.Query().Get("page")
@@ -283,7 +283,7 @@ func feeDetailListHandler(cliCtx context.CLIContext) http.HandlerFunc {
 	}
 }
 
-func orderListHandler(cliCtx context.CLIContext) http.HandlerFunc {
+func orderListHandler(cliCtx client.Context) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		vars := mux.Vars(r)
 		openOrClosed := vars["openOrClosed"]
@@ -358,7 +358,7 @@ func orderListHandler(cliCtx context.CLIContext) http.HandlerFunc {
 	}
 }
 
-func txListHandler(cliCtx context.CLIContext) http.HandlerFunc {
+func txListHandler(cliCtx client.Context) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		addr := r.URL.Query().Get("address")
 		txTypeStr := r.URL.Query().Get("type")
@@ -424,7 +424,7 @@ func txListHandler(cliCtx context.CLIContext) http.HandlerFunc {
 	}
 }
 
-func blockTxHashesHandler(cliCtx context.CLIContext) http.HandlerFunc {
+func blockTxHashesHandler(cliCtx client.Context) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		vars := mux.Vars(r)
 		blockHeightStr := vars["blockHeight"]

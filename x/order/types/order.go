@@ -178,7 +178,7 @@ func (order *Order) RecordOrderDealFee(fee sdk.DecCoins) {
 		log.Println(err)
 		return
 	}
-	newFee := oldFee.Add(fee)
+	newFee := oldFee.Add(fee...)
 	order.setExtraInfoWithKeyValue(OrderExtraInfoKeyDealFee, newFee.String())
 }
 
